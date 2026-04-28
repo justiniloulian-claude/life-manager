@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=8">
+  <link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
 
@@ -40,6 +40,7 @@
       <span class="dash-divider"></span>
       <button class="dash-pill" id="pillFuture">Future</button>
       <button class="dash-pill" id="pillCheshbon">Cheshbon</button>
+      <button class="dash-pill" id="pillHealth">Physical Health</button>
       <button class="dash-pill" id="pillReminders">Reminders</button>
     </div>
     <div class="dash-subnav-right">
@@ -155,6 +156,15 @@
         <button id="addCheshbonItemBtn" class="add-task-row">+ Add Item</button>
       </div>
 
+    </div>
+  </div>
+
+  <!-- Physical Health View -->
+  <div id="healthView" class="view">
+    <div class="placeholder-page">
+      <div style="font-size:52px;margin-bottom:16px">💪</div>
+      <h2>Physical Health</h2>
+      <p>Your physical health tracker is coming soon.<br>We'll build this section out together.</p>
     </div>
   </div>
 
@@ -436,8 +446,8 @@
           </div>
         </div>
         <div style="flex:1;min-width:140px">
-          <label class="field-label">Folder <span class="optional">optional</span></label>
-          <select id="noteFolderSelect" class="field" style="margin-top:4px"></select>
+          <label class="field-label">Folders <span class="optional">optional</span></label>
+          <div id="noteFolderPicker" class="folder-picker" style="margin-top:6px"></div>
         </div>
       </div>
       <label class="field-label" style="margin-top:14px">Color</label>
@@ -468,6 +478,8 @@
       <select id="folderParent" class="field">
         <option value="">None (top-level)</option>
       </select>
+      <label class="field-label">Label color <span class="optional">optional</span></label>
+      <div class="color-picker" id="folderColorPicker"></div>
     </div>
     <div class="modal-footer">
       <button id="cancelFolder" class="btn-cancel">Cancel</button>
@@ -709,6 +721,6 @@
   </div>
 </div>
 
-<script src="app.js?v=8"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>

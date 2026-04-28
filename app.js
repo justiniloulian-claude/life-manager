@@ -52,6 +52,8 @@ const state = {
   activeFolderId: 'all',
   editNoteId: null,
   selectedNoteColor: '',
+  selectedNoteFolderIds: [],
+  selectedFolderColor: '',
   noteType: 'text',
   noteCheckItems: [],
   notesSearchQuery: '',
@@ -300,14 +302,22 @@ function deleteCalEvent(id){ var data=getData(); saveCE(data.calEvents.filter(fu
 // ============================================================
 // NOTES & FOLDERS
 // ============================================================
-function addFolder(name,parentId){ var data=getData(); data.folders.push({id:uid(),name:name,parentId:parentId||null}); saveF(data.folders); }
+function addFolder(name,parentId,color){ var data=getData(); data.folders.push({id:uid(),name:name,parentId:parentId||null,color:color||''}); saveF(data.folders); }
 function deleteFolder(id){
   var data=getData();
-  data.notes.forEach(function(n){if(n.folderId===id)n.folderId=null;}); saveN(data.notes);
+  data.notes.forEach(function(n){
+    if(n.folderId===id) n.folderId=null;
+    if(n.folderIds) n.folderIds=n.folderIds.filter(function(fid){return fid!==id;});
+  }); saveN(data.notes);
   data.folders=data.folders.filter(function(f){return f.id!==id&&f.parentId!==id;}); saveF(data.folders);
 }
-function addNote(d){ var data=getData(); data.notes.push({id:uid(),type:d.type,title:d.title,content:d.content||'',items:d.items||[],folderId:d.folderId||null,color:d.color||'',pinned:d.pinned||false,archived:false,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()}); saveN(data.notes); }
-function updateNote(id,d){ var data=getData(); var n=data.notes.find(function(n){return n.id===id;}); if(n){n.type=d.type;n.title=d.title;n.content=d.content||'';n.items=d.items||[];n.folderId=d.folderId||null;n.color=d.color||'';n.pinned=d.pinned||false;n.updatedAt=new Date().toISOString();} saveN(data.notes); }
+// Helper: get folderIds array for a note (handles legacy single folderId)
+function getNoteFolderIds(note) {
+  if (note.folderIds) return note.folderIds;
+  return note.folderId ? [note.folderId] : [];
+}
+function addNote(d){ var data=getData(); data.notes.push({id:uid(),type:d.type,title:d.title,content:d.content||'',items:d.items||[],folderId:(d.folderIds||[])[0]||null,folderIds:d.folderIds||[],color:d.color||'',pinned:d.pinned||false,archived:false,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()}); saveN(data.notes); }
+function updateNote(id,d){ var data=getData(); var n=data.notes.find(function(n){return n.id===id;}); if(n){n.type=d.type;n.title=d.title;n.content=d.content||'';n.items=d.items||[];n.folderIds=d.folderIds||[];n.folderId=(d.folderIds||[])[0]||null;n.color=d.color||'';n.pinned=d.pinned||false;n.updatedAt=new Date().toISOString();} saveN(data.notes); }
 function deleteNote(id){ var data=getData(); saveN(data.notes.filter(function(n){return n.id!==id;})); }
 function toggleNotePin(id){ var data=getData(); var n=data.notes.find(function(n){return n.id===id;}); if(n)n.pinned=!n.pinned; saveN(data.notes); }
 
@@ -840,10 +850,12 @@ function renderNotesSidebar() {
   html+='<div class="sidebar-item'+(active==='pinned'?' active':'')+'" onclick="setNoteFolder(\'pinned\')">📌 Pinned</div>';
   html+='<hr class="sidebar-divider">';
   data.folders.filter(function(f){return !f.parentId;}).forEach(function(f){
-    html+='<div class="sidebar-item folder-item'+(active===f.id?' active':'')+'" onclick="setNoteFolder(\''+f.id+'\')">📁 '+escHtml(f.name)+
+    var dot = f.color ? '<span class="folder-color-dot" style="background:'+f.color+'"></span>' : '📁 ';
+    html+='<div class="sidebar-item folder-item'+(active===f.id?' active':'')+'" onclick="setNoteFolder(\''+f.id+'\')">'+ dot+escHtml(f.name)+
       '<button class="btn-icon" style="margin-left:auto;font-size:12px;opacity:0.5" onclick="event.stopPropagation();removeFolder(\''+f.id+'\')">✕</button></div>';
     data.folders.filter(function(sf){return sf.parentId===f.id;}).forEach(function(sf){
-      html+='<div class="sidebar-item subfolder-item'+(active===sf.id?' active':'')+'" onclick="setNoteFolder(\''+sf.id+'\')">↳ '+escHtml(sf.name)+
+      var sdot = sf.color ? '<span class="folder-color-dot" style="background:'+sf.color+'"></span>' : '';
+      html+='<div class="sidebar-item subfolder-item'+(active===sf.id?' active':'')+'" onclick="setNoteFolder(\''+sf.id+'\')">'+'↳ '+sdot+escHtml(sf.name)+
         '<button class="btn-icon" style="margin-left:auto;font-size:12px;opacity:0.5" onclick="event.stopPropagation();removeFolder(\''+sf.id+'\')">✕</button></div>';
     });
   });
@@ -858,7 +870,7 @@ function renderNotesMain() {
     if (query) return (n.title+' '+n.content+' '+n.items.map(function(i){return i.text;}).join(' ')).toLowerCase().includes(query);
     if (state.activeFolderId==='pinned') return n.pinned;
     if (state.activeFolderId==='all') return true;
-    return n.folderId===state.activeFolderId;
+    return getNoteFolderIds(n).indexOf(state.activeFolderId) !== -1;
   });
   var pinned=notes.filter(function(n){return n.pinned;}), regular=notes.filter(function(n){return !n.pinned;});
   if (!notes.length){ main.innerHTML='<div class="notes-empty"><div class="notes-empty-icon">📝</div><p>No notes here yet.<br>Click "+ New Note" to add one.</p></div>'; return; }
@@ -876,8 +888,16 @@ function noteCardHTML(note) {
       (note.items.length>5?'<div style="font-size:12px;color:#aaa;margin-top:4px">+'+(note.items.length-5)+' more</div>':'')+
       '</div>';
   } else { contentHTML='<div class="note-card-content">'+escHtml(note.content||'')+'</div>'; }
+  // Folder badges
+  var data=getData(); var folderIds=getNoteFolderIds(note);
+  var badges=folderIds.map(function(fid){
+    var f=data.folders.find(function(f){return f.id===fid;}); if(!f)return '';
+    var bg=f.color?'background:'+f.color+';':'';
+    return '<span class="note-folder-badge" style="'+bg+'">'+escHtml(f.name)+'</span>';
+  }).filter(Boolean).join('');
+  var badgesHTML=badges?'<div class="note-folder-badges">'+badges+'</div>':'';
   return '<div class="note-card'+colorClass+(note.pinned?' is-pinned':'')+'">'+(note.pinned?'<span class="note-pin-flag">📌</span>':'')+
-    (note.title?'<div class="note-card-title">'+escHtml(note.title)+'</div>':'')+contentHTML+
+    (note.title?'<div class="note-card-title">'+escHtml(note.title)+'</div>':'')+contentHTML+badgesHTML+
     '<div class="note-card-actions"><button class="btn-icon" onclick="openEditNote(\''+note.id+'\')" title="Edit">✏️</button>'+
     '<button class="btn-icon" onclick="pinNote(\''+note.id+'\')" title="Pin">'+(note.pinned?'📌':'📍')+'</button>'+
     '<button class="btn-icon" onclick="removeNote(\''+note.id+'\')" title="Delete">🗑</button></div></div>';
@@ -913,8 +933,8 @@ function renderDashDayModalBody(ds) {
 // DASHBOARD VIEW SWITCHING
 // ============================================================
 function setDashView(viewName) {
-  var viewMap = {single:'singleDayView',seven:'sevenDayView',future:'futureView',cheshbon:'cheshbonView',reminders:'remindersView'};
-  var pillMap = {single:'pillDay',seven:'pillSeven',future:'pillFuture',cheshbon:'pillCheshbon',reminders:'pillReminders'};
+  var viewMap = {single:'singleDayView',seven:'sevenDayView',future:'futureView',cheshbon:'cheshbonView',health:'healthView',reminders:'remindersView'};
+  var pillMap = {single:'pillDay',seven:'pillSeven',future:'pillFuture',cheshbon:'pillCheshbon',health:'pillHealth',reminders:'pillReminders'};
   Object.values(viewMap).forEach(function(v){ var el=document.getElementById(v); if(el)el.classList.remove('active'); });
   Object.values(pillMap).forEach(function(p){ var el=document.getElementById(p); if(el)el.classList.remove('active'); });
   state.dashView=viewName;
@@ -1073,6 +1093,7 @@ window.setNoteFolder    = function(id){ state.activeFolderId=id; renderNotes(); 
 window.openEditNote = function(id) {
   var data=getData(); var n=data.notes.find(function(n){return n.id===id;}); if(!n)return;
   state.editNoteId=id; state.selectedNoteColor=n.color||''; state.noteType=n.type;
+  state.selectedNoteFolderIds = getNoteFolderIds(n).slice();
   document.getElementById('noteModalTitle').textContent='Edit Note';
   document.getElementById('noteTitle').value=n.title||'';
   document.getElementById('notePinned').checked=n.pinned||false;
@@ -1081,7 +1102,7 @@ window.openEditNote = function(id) {
   state.noteCheckItems=(n.items||[]).map(function(i){return {id:uid(),text:i.text,done:i.done};});
   renderCheckItems();
   buildColorPicker('noteColorPicker',n.color||'',function(v){state.selectedNoteColor=v;});
-  populateFolderSelect(n.folderId);
+  renderFolderPicker(state.selectedNoteFolderIds);
   openModal('noteModal');
 };
 window.pinNote       = function(id){ toggleNotePin(id); renderNotes(); };
@@ -1225,18 +1246,36 @@ window.toggleCheckItem = function(i){ state.noteCheckItems[i].done=!state.noteCh
 window.updateCheckItem = function(i,v){ state.noteCheckItems[i].text=v; };
 window.removeCheckItem = function(i){ state.noteCheckItems.splice(i,1); renderCheckItems(); };
 
-function populateFolderSelect(selectedId) {
-  var data=getData(); var sel=document.getElementById('noteFolderSelect');
-  sel.innerHTML='<option value="">No folder</option>';
-  data.folders.forEach(function(f){ var opt=document.createElement('option'); opt.value=f.id; opt.textContent=f.name; if(f.id===selectedId)opt.selected=true; sel.appendChild(opt); });
+function renderFolderPicker(selectedIds) {
+  var data=getData(); var el=document.getElementById('noteFolderPicker'); if(!el)return;
+  if(!data.folders.length){el.innerHTML='<span class="folder-picker-empty">No folders yet</span>';return;}
+  el.innerHTML=data.folders.map(function(f){
+    var sel=(selectedIds||[]).indexOf(f.id)!==-1;
+    var bg=f.color&&sel?'background:'+f.color+';border-color:'+f.color+';color:#fff;':'';
+    return '<button type="button" class="folder-chip'+(sel?' active':'')+'" data-id="'+f.id+'" style="'+bg+'" onclick="toggleFolderChip(this,\''+f.id+'\')">'+escHtml(f.name)+'</button>';
+  }).join('');
 }
+window.toggleFolderChip = function(btn,folderId){
+  var idx=state.selectedNoteFolderIds.indexOf(folderId);
+  if(idx===-1) state.selectedNoteFolderIds.push(folderId);
+  else state.selectedNoteFolderIds.splice(idx,1);
+  btn.classList.toggle('active',idx===-1);
+  // Apply folder color when selected
+  var data=getData(); var f=data.folders.find(function(f){return f.id===folderId;});
+  if(f&&f.color){
+    btn.style.background  = idx===-1 ? f.color : '';
+    btn.style.borderColor = idx===-1 ? f.color : '';
+    btn.style.color       = idx===-1 ? '#fff'  : '';
+  }
+};
 function openNoteModal() {
   state.editNoteId=null; state.selectedNoteColor=''; state.noteType='text'; state.noteCheckItems=[];
+  state.selectedNoteFolderIds = (state.activeFolderId!=='all'&&state.activeFolderId!=='pinned') ? [state.activeFolderId] : [];
   document.getElementById('noteModalTitle').textContent='New Note';
   document.getElementById('noteTitle').value=''; document.getElementById('noteContent').value=''; document.getElementById('notePinned').checked=false;
   setNoteType('text'); renderCheckItems();
   buildColorPicker('noteColorPicker','',function(v){state.selectedNoteColor=v;});
-  populateFolderSelect(state.activeFolderId!=='all'&&state.activeFolderId!=='pinned'?state.activeFolderId:null);
+  renderFolderPicker(state.selectedNoteFolderIds);
   openModal('noteModal'); setTimeout(function(){document.getElementById('noteTitle').focus();},80);
 }
 function saveNoteModal() {
@@ -1244,21 +1283,22 @@ function saveNoteModal() {
   var title=document.getElementById('noteTitle').value.trim();
   if (!title&&!content&&!state.noteCheckItems.length){ document.getElementById('noteTitle').classList.add('error'); return; }
   document.getElementById('noteTitle').classList.remove('error');
-  var d={type:state.noteType,title:title,content:content,items:state.noteType==='checklist'?state.noteCheckItems.filter(function(i){return i.text.trim();}):[], folderId:document.getElementById('noteFolderSelect').value||null,color:state.selectedNoteColor,pinned:document.getElementById('notePinned').checked};
+  var d={type:state.noteType,title:title,content:content,items:state.noteType==='checklist'?state.noteCheckItems.filter(function(i){return i.text.trim();}):[], folderIds:state.selectedNoteFolderIds.slice(),color:state.selectedNoteColor,pinned:document.getElementById('notePinned').checked};
   state.editNoteId?updateNote(state.editNoteId,d):addNote(d);
   state.editNoteId=null; closeModal('noteModal'); renderNotes();
 }
 function openFolderModal() {
-  var data=getData(); document.getElementById('folderName').value='';
+  var data=getData(); document.getElementById('folderName').value=''; state.selectedFolderColor='';
   var sel=document.getElementById('folderParent'); sel.innerHTML='<option value="">None (top-level)</option>';
   data.folders.filter(function(f){return !f.parentId;}).forEach(function(f){ var opt=document.createElement('option'); opt.value=f.id; opt.textContent=f.name; sel.appendChild(opt); });
+  buildColorPicker('folderColorPicker','',function(v){state.selectedFolderColor=v;});
   openModal('folderModal'); setTimeout(function(){document.getElementById('folderName').focus();},80);
 }
 function saveFolderModal() {
   var name=document.getElementById('folderName').value.trim();
   if (!name){ document.getElementById('folderName').classList.add('error'); return; }
   document.getElementById('folderName').classList.remove('error');
-  addFolder(name,document.getElementById('folderParent').value||null); closeModal('folderModal'); renderNotes();
+  addFolder(name,document.getElementById('folderParent').value||null,state.selectedFolderColor); closeModal('folderModal'); renderNotes();
 }
 
 // ============================================================
@@ -1283,6 +1323,7 @@ function initListeners() {
   document.getElementById('pillRoutine').addEventListener('click',   function(){ renderRoutineList(); openModal('routineModal'); });
   document.getElementById('pillFuture').addEventListener('click',   function(){ setDashView('future'); });
   document.getElementById('pillCheshbon').addEventListener('click', function(){ setDashView('cheshbon'); });
+  document.getElementById('pillHealth').addEventListener('click',   function(){ setDashView('health'); });
   document.getElementById('pillReminders').addEventListener('click', function(){ setDashView('reminders'); });
 
   // Date jump
