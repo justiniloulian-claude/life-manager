@@ -608,10 +608,15 @@ function renderNotes() {
 // ============================================================
 function showPage(pageId) {
   document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
-  document.querySelectorAll('.nav-tab').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelectorAll('.page-tab').forEach(function(t) { t.classList.remove('active'); });
   document.getElementById('page-' + pageId).classList.add('active');
-  document.querySelector('[data-page="' + pageId + '"]').classList.add('active');
-  document.getElementById('dashActions').style.display = pageId === 'dashboard' ? 'flex' : 'none';
+  var activeTab = document.querySelector('.page-tab[data-page="' + pageId + '"]');
+  if (activeTab) activeTab.classList.add('active');
+  // Show/hide dashboard-only header buttons
+  var toggleBtn  = document.getElementById('toggleViewBtn');
+  var routineBtn = document.getElementById('routineBtn');
+  if (toggleBtn)  toggleBtn.style.display  = pageId === 'dashboard' ? '' : 'none';
+  if (routineBtn) routineBtn.style.display = pageId === 'dashboard' ? '' : 'none';
   state.currentPage = pageId;
   if (pageId === 'calendar') renderCalendar();
   if (pageId === 'notes')    renderNotes();
@@ -934,7 +939,7 @@ function initSwipe() {
 // ============================================================
 function initListeners() {
   // Page navigation
-  document.querySelectorAll('.nav-tab').forEach(function(tab) {
+  document.querySelectorAll('.page-tab').forEach(function(tab) {
     tab.addEventListener('click', function() { showPage(tab.dataset.page); });
   });
 
@@ -1034,8 +1039,15 @@ function initListeners() {
 // ============================================================
 // INIT
 // ============================================================
+function updateHeaderDate() {
+  var el = document.getElementById('headerDate');
+  if (el) el.textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
+
 function init() {
   seedRoutineIfEmpty();
+  updateHeaderDate();
+  setInterval(updateHeaderDate, 60000);
   initListeners();
   initSwipe();
   renderSingle();
