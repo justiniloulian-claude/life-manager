@@ -22,18 +22,32 @@
       <button class="header-nav-tab active" data-page="dashboard">Dashboard</button>
       <button class="header-nav-tab" data-page="calendar">Calendar</button>
       <button class="header-nav-tab" data-page="notes">Notes</button>
-      <button class="header-nav-tab header-nav-dim" data-page="financial">Financial</button>
+      <button class="header-nav-tab" data-page="learning">Learning</button>
+      <button class="header-nav-tab" data-page="financial">Financial</button>
     </nav>
-    <div class="header-divider"></div>
-    <div id="dashButtons" style="display:flex;gap:8px">
-      <button id="toggleViewBtn" class="btn-secondary">7-Day View</button>
-      <button id="routineBtn" class="btn-secondary">My Routine</button>
-    </div>
   </div>
 </header>
 
 <!-- ===== DASHBOARD PAGE ===== -->
 <div id="page-dashboard" class="page active">
+
+  <!-- Dashboard Sub-Nav -->
+  <div class="dash-subnav">
+    <div class="dash-subnav-pills">
+      <button class="dash-pill active" id="pillDay">Today View</button>
+      <button class="dash-pill" id="pillSeven">7-Day</button>
+      <button class="dash-pill" id="pillRoutine">My Routine</button>
+      <span class="dash-divider"></span>
+      <button class="dash-pill" id="pillShortTerm">Short Term</button>
+      <button class="dash-pill" id="pillLongTerm">Long Term</button>
+      <button class="dash-pill" id="pillCheshbon">Cheshbon</button>
+      <button class="dash-pill" id="pillReminders">Reminders</button>
+    </div>
+    <div class="dash-subnav-right">
+      <label class="date-jump-label">Jump to:</label>
+      <input type="date" id="dateJumpInput" class="date-jump-input" title="Jump to any date">
+    </div>
+  </div>
 
   <!-- Single Day View -->
   <div id="singleDayView" class="view active">
@@ -55,6 +69,51 @@
       <button id="nextWeekBtn" class="btn-nav">Next Week &#8594;</button>
     </div>
     <div id="sevenDayGrid" class="seven-day-grid"></div>
+  </div>
+
+  <!-- Short Term View -->
+  <div id="shortTermView" class="view">
+    <div class="list-page-header">
+      <div>
+        <h2 class="list-page-title">Short Term</h2>
+        <p class="list-page-subtitle">Tasks and goals for the near future</p>
+      </div>
+      <button id="addShortTermBtn" class="btn-primary">+ Add Task</button>
+    </div>
+    <div id="shortTermList" class="simple-task-list"></div>
+  </div>
+
+  <!-- Long Term View -->
+  <div id="longTermView" class="view">
+    <div class="list-page-header">
+      <div>
+        <h2 class="list-page-title">Long Term</h2>
+        <p class="list-page-subtitle">Big goals and future plans</p>
+      </div>
+      <button id="addLongTermBtn" class="btn-primary">+ Add Goal</button>
+    </div>
+    <div id="longTermList" class="simple-task-list"></div>
+  </div>
+
+  <!-- Cheshbon View -->
+  <div id="cheshbonView" class="view">
+    <div class="placeholder-page">
+      <div style="font-size:52px;margin-bottom:16px">📊</div>
+      <h2>Daily Cheshbon</h2>
+      <p>Your daily accountability &amp; reflection section is coming soon.<br>You'll track, reflect, and grow here.</p>
+    </div>
+  </div>
+
+  <!-- Reminders View -->
+  <div id="remindersView" class="view">
+    <div class="list-page-header">
+      <div>
+        <h2 class="list-page-title">Reminders</h2>
+        <p class="list-page-subtitle">Life principles &amp; behavioral reminders</p>
+      </div>
+      <button id="addReminderBtn" class="btn-primary">+ Add Reminder</button>
+    </div>
+    <div id="remindersList" class="reminders-list"></div>
   </div>
 
 </div>
@@ -92,12 +151,60 @@
   </div>
 </div>
 
+<!-- ===== LEARNING SEDER PAGE ===== -->
+<div id="page-learning" class="page">
+  <div class="learning-header">
+    <div>
+      <h2 class="learning-title">Learning Seder</h2>
+      <p class="learning-subtitle">Your weekly learning schedule — Mon through Sun</p>
+    </div>
+  </div>
+  <div class="learning-grid" id="learningGrid"></div>
+</div>
+
 <!-- ===== FINANCIAL PAGE ===== -->
 <div id="page-financial" class="page">
-  <div class="placeholder-page">
-    <div style="font-size:52px;margin-bottom:16px">💰</div>
-    <h2>Financial Dashboard</h2>
-    <p>Coming soon — your personal financial control center.<br>Track income, expenses, credit cards, and future goals.</p>
+  <div class="fin-tabs">
+    <button class="fin-tab active" data-tab="finances">Finances</button>
+    <button class="fin-tab" data-tab="moneymaking">Money Making</button>
+  </div>
+
+  <!-- Finances Panel -->
+  <div id="fin-finances" class="fin-panel active">
+    <div class="fin-sections">
+      <div class="fin-section">
+        <div class="fin-section-header">
+          <h3>Income</h3>
+          <button id="addIncomeBtn" class="btn-primary" style="font-size:13px;padding:7px 14px">+ Add</button>
+        </div>
+        <div id="incomeList" class="fin-table-wrap"></div>
+      </div>
+      <div class="fin-section">
+        <div class="fin-section-header">
+          <h3>Expenses</h3>
+          <button id="addExpenseBtn" class="btn-primary" style="font-size:13px;padding:7px 14px">+ Add</button>
+        </div>
+        <div id="expenseList" class="fin-table-wrap"></div>
+      </div>
+      <div class="fin-section fin-section-full">
+        <div class="fin-section-header">
+          <h3>Shopping List</h3>
+          <button id="addShoppingBtn" class="btn-primary" style="font-size:13px;padding:7px 14px">+ Add Item</button>
+        </div>
+        <div id="shoppingList" class="fin-shopping-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Money Making Panel -->
+  <div id="fin-moneymaking" class="fin-panel">
+    <div class="fin-section">
+      <div class="fin-section-header">
+        <h3>Ideas &amp; Projects</h3>
+        <button id="addMoneyIdeaBtn" class="btn-primary" style="font-size:13px;padding:7px 14px">+ Add Idea</button>
+      </div>
+      <div id="moneyMakingList" class="fin-table-wrap"></div>
+    </div>
   </div>
 </div>
 
@@ -220,6 +327,10 @@
       <input type="time" id="calEventTime" class="field">
       <label class="field-label">Color <span class="optional">optional</span></label>
       <div class="color-picker" id="calEventColorPicker"></div>
+      <div class="field-check-row">
+        <input type="checkbox" id="calEventAddToDashboard">
+        <label for="calEventAddToDashboard">Also add to Dashboard as a task</label>
+      </div>
     </div>
     <div class="modal-footer">
       <button id="cancelCalEvent" class="btn-cancel">Cancel</button>
@@ -303,6 +414,157 @@
     <div class="modal-footer">
       <button id="cancelFolder" class="btn-cancel">Cancel</button>
       <button id="saveFolder"   class="btn-primary">Create Folder</button>
+    </div>
+  </div>
+</div>
+
+<!-- Simple Item Modal (Short Term / Long Term) -->
+<div id="simpleItemModal" class="modal">
+  <div class="modal-box" style="max-width:380px">
+    <div class="modal-header">
+      <h2 id="simpleItemModalTitle">Add Item</h2>
+      <button class="modal-close" id="closeSimpleItemModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label" id="simpleItemLabel">Task</label>
+      <input type="text" id="simpleItemText" class="field" placeholder="What is it?">
+    </div>
+    <div class="modal-footer">
+      <button id="cancelSimpleItem" class="btn-cancel">Cancel</button>
+      <button id="saveSimpleItem" class="btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Move to Day Modal -->
+<div id="moveToDayModal" class="modal">
+  <div class="modal-box" style="max-width:340px">
+    <div class="modal-header">
+      <h2>Move to Day</h2>
+      <button class="modal-close" id="closeMoveToDayModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-note">Pick a date and this task will be added to that day's dashboard.</p>
+      <label class="field-label">Select date</label>
+      <input type="date" id="moveToDayDate" class="field">
+    </div>
+    <div class="modal-footer">
+      <button id="cancelMoveToDay" class="btn-cancel">Cancel</button>
+      <button id="confirmMoveToDay" class="btn-primary">Move to Day</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reminder Modal -->
+<div id="reminderModal" class="modal">
+  <div class="modal-box" style="max-width:400px">
+    <div class="modal-header">
+      <h2 id="reminderModalTitle">Add Reminder</h2>
+      <button class="modal-close" id="closeReminderModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Reminder text</label>
+      <textarea id="reminderText" class="field" rows="3" placeholder="e.g. Call Mom once a week. Don't skip davening."></textarea>
+      <label class="field-label">Category <span class="optional">optional</span></label>
+      <input type="text" id="reminderCategory" class="field" placeholder="e.g. Health, Relationships, Spiritual">
+    </div>
+    <div class="modal-footer">
+      <button id="cancelReminder" class="btn-cancel">Cancel</button>
+      <button id="saveReminder" class="btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Learning Item Modal -->
+<div id="learningItemModal" class="modal">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-header">
+      <h2 id="learningItemModalTitle">Add Learning</h2>
+      <button class="modal-close" id="closeLearningItemModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Subject</label>
+      <input type="text" id="learningSubject" class="field" placeholder="e.g. Gemara, Halacha, Chumash">
+      <label class="field-label">Source <span class="optional">optional</span></label>
+      <input type="text" id="learningSource" class="field" placeholder="e.g. Bava Metzia 12a, Shulchan Aruch OC 1">
+      <label class="field-label">Notes <span class="optional">optional</span></label>
+      <textarea id="learningNotes" class="field" rows="2" placeholder="Any extra details..."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button id="cancelLearningItem" class="btn-cancel">Cancel</button>
+      <button id="saveLearningItem" class="btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Financial Entry Modal (Income / Expense) -->
+<div id="finEntryModal" class="modal">
+  <div class="modal-box" style="max-width:400px">
+    <div class="modal-header">
+      <h2 id="finEntryModalTitle">Add Income</h2>
+      <button class="modal-close" id="closeFinEntryModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Description</label>
+      <input type="text" id="finEntryName" class="field" placeholder="e.g. Freelance Project, Rent">
+      <label class="field-label">Amount ($)</label>
+      <input type="number" id="finEntryAmount" class="field" placeholder="0.00" step="0.01" min="0">
+      <label class="field-label">Date</label>
+      <input type="date" id="finEntryDate" class="field">
+      <label class="field-label">Category <span class="optional">optional</span></label>
+      <input type="text" id="finEntryCategory" class="field" placeholder="e.g. Housing, Food, Education">
+    </div>
+    <div class="modal-footer">
+      <button id="cancelFinEntry" class="btn-cancel">Cancel</button>
+      <button id="saveFinEntry" class="btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Shopping Item Modal -->
+<div id="shoppingModal" class="modal">
+  <div class="modal-box" style="max-width:360px">
+    <div class="modal-header">
+      <h2>Add Shopping Item</h2>
+      <button class="modal-close" id="closeShoppingModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Item name</label>
+      <input type="text" id="shoppingItemName" class="field" placeholder="e.g. Milk, Laptop charger">
+      <label class="field-label">Quantity <span class="optional">optional</span></label>
+      <input type="number" id="shoppingItemQty" class="field" placeholder="1" min="1" value="1">
+    </div>
+    <div class="modal-footer">
+      <button id="cancelShopping" class="btn-cancel">Cancel</button>
+      <button id="saveShopping" class="btn-primary">Add Item</button>
+    </div>
+  </div>
+</div>
+
+<!-- Money Making Idea Modal -->
+<div id="moneyIdeaModal" class="modal">
+  <div class="modal-box" style="max-width:440px">
+    <div class="modal-header">
+      <h2 id="moneyIdeaModalTitle">Add Idea</h2>
+      <button class="modal-close" id="closeMoneyIdeaModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Idea / Project Name</label>
+      <input type="text" id="moneyIdeaName" class="field" placeholder="e.g. Case Brief Templates">
+      <label class="field-label">Status</label>
+      <select id="moneyIdeaStatus" class="field">
+        <option value="idea">💡 Idea</option>
+        <option value="exploring">🔍 Exploring</option>
+        <option value="inprogress">⚡ In Progress</option>
+        <option value="earning">💰 Earning</option>
+        <option value="paused">⏸ Paused</option>
+      </select>
+      <label class="field-label">Notes <span class="optional">optional</span></label>
+      <textarea id="moneyIdeaNotes" class="field" rows="3" placeholder="Details, next steps, potential..."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button id="cancelMoneyIdea" class="btn-cancel">Cancel</button>
+      <button id="saveMoneyIdea" class="btn-primary">Save</button>
     </div>
   </div>
 </div>

@@ -23,13 +23,29 @@ function colorByValue(val) {
 // ============================================================
 const state = {
   // Dashboard
-  view: 'single',
+  dashView: 'single',       // 'single' | 'seven' | 'shortterm' | 'longterm' | 'cheshbon' | 'reminders'
   dayOffset: 0,
   weekStart: 0,
   editTaskId: null,
   editTaskDate: null,
   editRoutineId: null,
   selectedTaskColor: '',
+  // Short/Long Term
+  simpleItemContext: null,  // 'shortterm' | 'longterm'
+  editSimpleItemId: null,
+  movingItemId: null,
+  movingItemList: null,     // 'shortterm' | 'longterm'
+  // Reminders
+  editReminderId: null,
+  // Learning Seder
+  learningDay: null,        // 'mon'|'tue'|'wed'|'thu'|'fri'|'sat'|'sun'
+  editLearningItemId: null,
+  // Financial
+  activeFinTab: 'finances',
+  finEntryType: null,       // 'income' | 'expense'
+  editFinEntryId: null,
+  editShoppingId: null,
+  editMoneyIdeaId: null,
   // Calendar
   calYear: new Date().getFullYear(),
   calMonth: new Date().getMonth(),
@@ -57,19 +73,35 @@ const state = {
 // ============================================================
 function getData() {
   return {
-    tasks:    JSON.parse(localStorage.getItem('dm_tasks')    || '{}'),
-    routine:  JSON.parse(localStorage.getItem('dm_routine')  || '[]'),
-    calEvents:JSON.parse(localStorage.getItem('dm_calEvents')|| '[]'),
-    notes:    JSON.parse(localStorage.getItem('dm_notes')    || '[]'),
-    folders:  JSON.parse(localStorage.getItem('dm_folders')  || '[]'),
+    tasks:       JSON.parse(localStorage.getItem('dm_tasks')       || '{}'),
+    routine:     JSON.parse(localStorage.getItem('dm_routine')     || '[]'),
+    calEvents:   JSON.parse(localStorage.getItem('dm_calEvents')   || '[]'),
+    notes:       JSON.parse(localStorage.getItem('dm_notes')       || '[]'),
+    folders:     JSON.parse(localStorage.getItem('dm_folders')     || '[]'),
+    shortterm:   JSON.parse(localStorage.getItem('dm_shortterm')   || '[]'),
+    longterm:    JSON.parse(localStorage.getItem('dm_longterm')    || '[]'),
+    reminders:   JSON.parse(localStorage.getItem('dm_reminders')   || '[]'),
+    learning:    JSON.parse(localStorage.getItem('dm_learning')    || '{}'),
+    income:      JSON.parse(localStorage.getItem('dm_income')      || '[]'),
+    expenses:    JSON.parse(localStorage.getItem('dm_expenses')    || '[]'),
+    shopping:    JSON.parse(localStorage.getItem('dm_shopping')    || '[]'),
+    moneymaking: JSON.parse(localStorage.getItem('dm_moneymaking') || '[]'),
   };
 }
-function saveT(v)  { localStorage.setItem('dm_tasks',     JSON.stringify(v)); }
-function saveR(v)  { localStorage.setItem('dm_routine',   JSON.stringify(v)); }
-function saveCE(v) { localStorage.setItem('dm_calEvents', JSON.stringify(v)); }
-function saveN(v)  { localStorage.setItem('dm_notes',     JSON.stringify(v)); }
-function saveF(v)  { localStorage.setItem('dm_folders',   JSON.stringify(v)); }
-function uid()     { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function saveT(v)   { localStorage.setItem('dm_tasks',       JSON.stringify(v)); }
+function saveR(v)   { localStorage.setItem('dm_routine',     JSON.stringify(v)); }
+function saveCE(v)  { localStorage.setItem('dm_calEvents',   JSON.stringify(v)); }
+function saveN(v)   { localStorage.setItem('dm_notes',       JSON.stringify(v)); }
+function saveF(v)   { localStorage.setItem('dm_folders',     JSON.stringify(v)); }
+function saveST(v)  { localStorage.setItem('dm_shortterm',   JSON.stringify(v)); }
+function saveLT(v)  { localStorage.setItem('dm_longterm',    JSON.stringify(v)); }
+function saveRem(v) { localStorage.setItem('dm_reminders',   JSON.stringify(v)); }
+function saveLrn(v) { localStorage.setItem('dm_learning',    JSON.stringify(v)); }
+function saveInc(v) { localStorage.setItem('dm_income',      JSON.stringify(v)); }
+function saveExp(v) { localStorage.setItem('dm_expenses',    JSON.stringify(v)); }
+function saveSho(v) { localStorage.setItem('dm_shopping',    JSON.stringify(v)); }
+function saveMM(v)  { localStorage.setItem('dm_moneymaking', JSON.stringify(v)); }
+function uid()      { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 
 // ============================================================
 // DATE HELPERS
@@ -100,6 +132,11 @@ function fmtISO(iso) {
   var d = new Date(iso);
   var h = d.getHours(), m = d.getMinutes();
   return (h % 12 || 12) + ':' + String(m).padStart(2, '0') + ' ' + (h >= 12 ? 'PM' : 'AM');
+}
+function fmtDateDisplay(ds) {
+  if (!ds) return '';
+  var d = fromDateStr(ds);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 function dayName(d)       { return d.toLocaleDateString('en-US', { weekday: 'long' }); }
 function shortDay(d)      { return d.toLocaleDateString('en-US', { weekday: 'short' }); }
@@ -188,7 +225,6 @@ async function loadCalHdate(ds) {
   var hdate = await fetchHebrewDate(ds);
   var el = document.getElementById('chd-' + ds);
   if (el && hdate) {
-    // Show just day number + abbreviated month from Hebrew date
     var hdParts = hdate.split(' ');
     el.textContent = hdParts[0] + ' ' + (hdParts[1] || '');
   }
@@ -282,7 +318,6 @@ function addFolder(name, parentId) {
 }
 function deleteFolder(id) {
   var data = getData();
-  // Move notes in this folder to root
   data.notes.forEach(function(n) { if (n.folderId === id) n.folderId = null; });
   saveN(data.notes);
   data.folders = data.folders.filter(function(f) { return f.id !== id && f.parentId !== id; });
@@ -308,6 +343,183 @@ function toggleNotePin(id) {
   var n = data.notes.find(function(n) { return n.id === id; });
   if (n) n.pinned = !n.pinned;
   saveN(data.notes);
+}
+
+// ============================================================
+// SHORT TERM / LONG TERM
+// ============================================================
+function addSimpleItem(list, text) {
+  var data = getData();
+  var arr = data[list];
+  arr.push({ id: uid(), title: text, done: false, doneAt: null, createdAt: new Date().toISOString() });
+  list === 'shortterm' ? saveST(arr) : saveLT(arr);
+}
+function toggleSimpleItem(list, id) {
+  var data = getData();
+  var item = data[list].find(function(i) { return i.id === id; });
+  if (item) { item.done = !item.done; item.doneAt = item.done ? new Date().toISOString() : null; }
+  list === 'shortterm' ? saveST(data[list]) : saveLT(data[list]);
+}
+function deleteSimpleItem(list, id) {
+  var data = getData();
+  var arr = data[list].filter(function(i) { return i.id !== id; });
+  list === 'shortterm' ? saveST(arr) : saveLT(arr);
+}
+function moveItemToDay(list, id, ds) {
+  var data = getData();
+  var item = data[list].find(function(i) { return i.id === id; });
+  if (!item) return;
+  addTask(ds, { title: item.title });
+  deleteSimpleItem(list, id);
+}
+
+// ============================================================
+// REMINDERS
+// ============================================================
+function addReminder(text, category) {
+  var data = getData();
+  data.reminders.push({ id: uid(), text: text, category: category || '', createdAt: new Date().toISOString() });
+  saveRem(data.reminders);
+}
+function updateReminder(id, text, category) {
+  var data = getData();
+  var r = data.reminders.find(function(r) { return r.id === id; });
+  if (r) { r.text = text; r.category = category || ''; }
+  saveRem(data.reminders);
+}
+function deleteReminder(id) {
+  var data = getData();
+  saveRem(data.reminders.filter(function(r) { return r.id !== id; }));
+}
+
+// ============================================================
+// LEARNING SEDER
+// ============================================================
+var LEARNING_DAYS = ['mon','tue','wed','thu','fri','sat','sun'];
+var LEARNING_DAY_LABELS = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday', fri:'Friday', sat:'Saturday', sun:'Sunday' };
+
+function addLearningItem(day, d) {
+  var data = getData();
+  if (!data.learning[day]) data.learning[day] = [];
+  data.learning[day].push({ id: uid(), subject: d.subject, source: d.source || '', notes: d.notes || '' });
+  saveLrn(data.learning);
+}
+function updateLearningItem(day, id, d) {
+  var data = getData();
+  if (!data.learning[day]) return;
+  var item = data.learning[day].find(function(i) { return i.id === id; });
+  if (item) { item.subject = d.subject; item.source = d.source || ''; item.notes = d.notes || ''; }
+  saveLrn(data.learning);
+}
+function deleteLearningItem(day, id) {
+  var data = getData();
+  if (!data.learning[day]) return;
+  data.learning[day] = data.learning[day].filter(function(i) { return i.id !== id; });
+  saveLrn(data.learning);
+}
+
+// ============================================================
+// FINANCIAL DATA
+// ============================================================
+function addIncome(d) {
+  var data = getData();
+  data.income.push({ id: uid(), name: d.name, amount: +d.amount, date: d.date, category: d.category || '' });
+  saveInc(data.income);
+}
+function deleteIncome(id) {
+  var data = getData();
+  saveInc(data.income.filter(function(i) { return i.id !== id; }));
+}
+function addExpense(d) {
+  var data = getData();
+  data.expenses.push({ id: uid(), name: d.name, amount: +d.amount, date: d.date, category: d.category || '' });
+  saveExp(data.expenses);
+}
+function deleteExpense(id) {
+  var data = getData();
+  saveExp(data.expenses.filter(function(e) { return e.id !== id; }));
+}
+function addShoppingItem(name, qty) {
+  var data = getData();
+  data.shopping.push({ id: uid(), name: name, qty: +qty || 1, done: false });
+  saveSho(data.shopping);
+}
+function toggleShoppingItem(id) {
+  var data = getData();
+  var item = data.shopping.find(function(i) { return i.id === id; });
+  if (item) item.done = !item.done;
+  saveSho(data.shopping);
+}
+function deleteShoppingItem(id) {
+  var data = getData();
+  saveSho(data.shopping.filter(function(i) { return i.id !== id; }));
+}
+function addMoneyIdea(d) {
+  var data = getData();
+  data.moneymaking.push({ id: uid(), idea: d.idea, status: d.status || 'idea', notes: d.notes || '', createdAt: new Date().toISOString() });
+  saveMM(data.moneymaking);
+}
+function updateMoneyIdea(id, d) {
+  var data = getData();
+  var item = data.moneymaking.find(function(i) { return i.id === id; });
+  if (item) { item.idea = d.idea; item.status = d.status || 'idea'; item.notes = d.notes || ''; }
+  saveMM(data.moneymaking);
+}
+function deleteMoneyIdea(id) {
+  var data = getData();
+  saveMM(data.moneymaking.filter(function(i) { return i.id !== id; }));
+}
+
+// ============================================================
+// SEED DATA
+// ============================================================
+function seedRoutineIfEmpty() {
+  var data = getData();
+  if (data.routine.length > 0) return;
+  var all = [0, 1, 2, 3, 4, 5, 6];
+  [{ title: 'Shacharit', time: '07:00' }, { title: 'Mincha', time: '13:30' }, { title: 'Maariv', time: '21:30' }].forEach(function(s) {
+    data.routine.push({ id: uid(), title: s.title, time: s.time, location: '', days: all });
+  });
+  saveR(data.routine);
+}
+function seedFinancialIfEmpty() {
+  var data = getData();
+  if (!data.income.length) {
+    [
+      { name: 'Law School Scholarship', amount: 45000, date: '2026-01-15', category: 'Education' },
+      { name: 'Part-time Work',         amount: 2800,  date: '2026-03-01', category: 'Employment' },
+      { name: 'Freelance Project',      amount: 1500,  date: '2026-02-20', category: 'Freelance'  },
+    ].forEach(function(d) { data.income.push({ id: uid(), name: d.name, amount: d.amount, date: d.date, category: d.category }); });
+    saveInc(data.income);
+  }
+  if (!data.expenses.length) {
+    [
+      { name: 'Rent',              amount: 1800, date: '2026-04-01', category: 'Housing'   },
+      { name: 'Groceries',         amount: 280,  date: '2026-04-15', category: 'Food'      },
+      { name: 'Phone Bill',        amount: 85,   date: '2026-04-10', category: 'Utilities' },
+      { name: 'Books & Supplies',  amount: 320,  date: '2026-03-28', category: 'Education' },
+      { name: 'Dining Out',        amount: 145,  date: '2026-04-20', category: 'Food'      },
+    ].forEach(function(d) { data.expenses.push({ id: uid(), name: d.name, amount: d.amount, date: d.date, category: d.category }); });
+    saveExp(data.expenses);
+  }
+  if (!data.shopping.length) {
+    [
+      { name: 'Printer Paper',     qty: 2, done: false },
+      { name: 'Laptop Charger',    qty: 1, done: true  },
+      { name: 'Highlighters',      qty: 3, done: false },
+      { name: 'Case Briefs Book',  qty: 1, done: false },
+    ].forEach(function(d) { data.shopping.push({ id: uid(), name: d.name, qty: d.qty, done: d.done }); });
+    saveSho(data.shopping);
+  }
+  if (!data.moneymaking.length) {
+    [
+      { idea: 'Legal Research Service',  status: 'exploring',  notes: 'Help law firms with targeted research' },
+      { idea: 'Case Brief Templates',    status: 'inprogress', notes: 'Sell templates to 1L students' },
+      { idea: 'LSAT Tutoring',           status: 'idea',       notes: 'Tutor undergrads for LSAT prep' },
+      { idea: 'Real Estate Research',    status: 'idea',       notes: 'Research REITs for passive income' },
+    ].forEach(function(d) { data.moneymaking.push({ id: uid(), idea: d.idea, status: d.status, notes: d.notes, createdAt: new Date().toISOString() }); });
+    saveMM(data.moneymaking);
+  }
 }
 
 // ============================================================
@@ -339,8 +551,8 @@ function taskHTML(task, ds) {
   var isR = task.type === 'routine';
   var colorObj = colorByValue(task.color || '');
   var colorClass = isR ? 'is-routine' : (colorObj.taskCls || '');
-  var tb = task.time     ? '<span class="badge badge-time">' + fmt12(task.time)      + '</span>' : '';
-  var lb = task.location ? '<span class="badge badge-loc">'  + escHtml(task.location)+ '</span>' : '';
+  var tb = task.time     ? '<span class="badge badge-time">' + fmt12(task.time)       + '</span>' : '';
+  var lb = task.location ? '<span class="badge badge-loc">'  + escHtml(task.location) + '</span>' : '';
   var eb = !isR ? '<button class="btn-icon" onclick="openEditTask(\'' + ds + '\',\'' + task.id + '\')">✏️</button>' : '';
   var db = !isR ? '<button class="btn-icon" onclick="removeTask(\'' + ds + '\',\'' + task.id + '\')">🗑</button>' : '';
   return '<div class="task-item ' + colorClass + (task.done ? ' is-done' : '') + '" id="ti-' + task.id + '">' +
@@ -403,23 +615,175 @@ function renderSeven() {
   });
   document.getElementById('prevWeekBtn').style.display = s <= 0 ? 'none' : '';
 }
-function refresh() { state.view === 'single' ? renderSingle() : renderSeven(); }
+function refresh() {
+  if (state.dashView === 'single')    renderSingle();
+  else if (state.dashView === 'seven') renderSeven();
+}
 
-function toggleView() {
-  if (state.view === 'single') {
-    state.view = 'seven'; state.weekStart = 0;
-    document.getElementById('singleDayView').classList.remove('active');
-    document.getElementById('sevenDayView').classList.add('active');
-    document.getElementById('toggleViewBtn').textContent = 'Today View';
-    document.getElementById('toggleViewBtn').classList.add('active');
-    renderSeven();
-  } else {
-    state.view = 'single';
-    document.getElementById('sevenDayView').classList.remove('active');
-    document.getElementById('singleDayView').classList.add('active');
-    document.getElementById('toggleViewBtn').textContent = '7-Day View';
-    document.getElementById('toggleViewBtn').classList.remove('active');
-    renderSingle();
+// ============================================================
+// RENDER — SHORT TERM / LONG TERM
+// ============================================================
+function renderSimpleList(list, containerId) {
+  var data = getData();
+  var items = data[list];
+  var el = document.getElementById(containerId);
+  if (!el) return;
+  if (!items.length) {
+    el.innerHTML = '<div class="stl-empty">Nothing here yet. Add one above.</div>';
+    return;
+  }
+  var inc = items.filter(function(i) { return !i.done; });
+  var don = items.filter(function(i) { return i.done; });
+  var sorted = inc.concat(don);
+  el.innerHTML = sorted.map(function(item) {
+    return '<div class="stl-item' + (item.done ? ' is-done' : '') + '">' +
+      '<input type="checkbox" class="task-check"' + (item.done ? ' checked' : '') +
+        ' onchange="toggleSTItem(\'' + list + '\',\'' + item.id + '\')">' +
+      '<span class="stl-item-title">' + escHtml(item.title) + '</span>' +
+      '<div class="stl-actions">' +
+        (!item.done ? '<button class="btn-move" onclick="openMoveToDay(\'' + list + '\',\'' + item.id + '\')">📅 Move to Day</button>' : '') +
+        '<button class="btn-icon" onclick="deleteSTItem(\'' + list + '\',\'' + item.id + '\')">🗑</button>' +
+      '</div></div>';
+  }).join('');
+}
+function renderShortTerm() { renderSimpleList('shortterm', 'shortTermList'); }
+function renderLongTerm()  { renderSimpleList('longterm',  'longTermList');  }
+
+// ============================================================
+// RENDER — REMINDERS
+// ============================================================
+function renderReminders() {
+  var data = getData();
+  var el   = document.getElementById('remindersList');
+  if (!el) return;
+  if (!data.reminders.length) {
+    el.innerHTML = '<div class="stl-empty">No reminders yet. Add life principles and behavioral reminders here.</div>';
+    return;
+  }
+  el.innerHTML = data.reminders.map(function(r) {
+    return '<div class="reminder-item">' +
+      '<div class="reminder-item-body">' +
+        '<div class="reminder-item-text">' + escHtml(r.text) + '</div>' +
+        (r.category ? '<div class="reminder-item-category">' + escHtml(r.category) + '</div>' : '') +
+      '</div>' +
+      '<div class="reminder-actions">' +
+        '<button class="btn-icon" onclick="openEditReminder(\'' + r.id + '\')">✏️</button>' +
+        '<button class="btn-icon" onclick="deleteRem(\'' + r.id + '\')">🗑</button>' +
+      '</div></div>';
+  }).join('');
+}
+
+// ============================================================
+// RENDER — LEARNING SEDER
+// ============================================================
+function renderLearning() {
+  var data = getData();
+  var grid = document.getElementById('learningGrid');
+  if (!grid) return;
+  grid.innerHTML = LEARNING_DAYS.map(function(day) {
+    var items = data.learning[day] || [];
+    var itemsHTML = items.map(function(item) {
+      return '<div class="learning-item">' +
+        '<div class="learning-item-body">' +
+          '<div class="learning-item-subject">' + escHtml(item.subject) + '</div>' +
+          (item.source ? '<div class="learning-item-source">' + escHtml(item.source) + '</div>' : '') +
+          (item.notes  ? '<div class="learning-item-notes">'  + escHtml(item.notes)  + '</div>' : '') +
+        '</div>' +
+        '<div class="learning-item-actions">' +
+          '<button class="btn-icon" onclick="openEditLearningItem(\'' + day + '\',\'' + item.id + '\')">✏️</button>' +
+          '<button class="btn-icon" onclick="deleteLrn(\'' + day + '\',\'' + item.id + '\')">🗑</button>' +
+        '</div></div>';
+    }).join('');
+    return '<div class="learning-day-col">' +
+      '<div class="learning-day-header">' + LEARNING_DAY_LABELS[day] + '</div>' +
+      '<div class="learning-day-body">' + (itemsHTML || '<div style="padding:12px 14px;font-size:13px;color:#ccc">Empty</div>') + '</div>' +
+      '<button class="learning-add-row" onclick="openAddLearningItem(\'' + day + '\')">+ Add</button>' +
+      '</div>';
+  }).join('');
+}
+
+// ============================================================
+// RENDER — FINANCIAL
+// ============================================================
+function renderFinancial() {
+  var data = getData();
+
+  // Income
+  var incEl = document.getElementById('incomeList');
+  if (incEl) {
+    if (!data.income.length) {
+      incEl.innerHTML = '<div class="fin-empty">No income entries yet.</div>';
+    } else {
+      var incTotal = data.income.reduce(function(s,i){ return s + i.amount; }, 0);
+      incEl.innerHTML = data.income.map(function(item) {
+        return '<div class="fin-row">' +
+          '<div class="fin-row-main"><div class="fin-row-name">' + escHtml(item.name) + '</div>' +
+          '<div class="fin-row-meta">' + fmtDateDisplay(item.date) + (item.category ? ' · ' + escHtml(item.category) : '') + '</div></div>' +
+          '<div class="fin-row-right"><span class="fin-row-amount income">+$' + item.amount.toLocaleString() + '</span>' +
+          '<button class="btn-icon" onclick="delInc(\'' + item.id + '\')">🗑</button></div></div>';
+      }).join('') +
+      '<div class="fin-row" style="background:#f9fef9"><div class="fin-row-main"><strong>Total</strong></div>' +
+      '<div class="fin-row-right"><span class="fin-row-amount income" style="font-size:16px">$' + incTotal.toLocaleString() + '</span></div></div>';
+    }
+  }
+
+  // Expenses
+  var expEl = document.getElementById('expenseList');
+  if (expEl) {
+    if (!data.expenses.length) {
+      expEl.innerHTML = '<div class="fin-empty">No expense entries yet.</div>';
+    } else {
+      var expTotal = data.expenses.reduce(function(s,i){ return s + i.amount; }, 0);
+      expEl.innerHTML = data.expenses.map(function(item) {
+        return '<div class="fin-row">' +
+          '<div class="fin-row-main"><div class="fin-row-name">' + escHtml(item.name) + '</div>' +
+          '<div class="fin-row-meta">' + fmtDateDisplay(item.date) + (item.category ? ' · ' + escHtml(item.category) : '') + '</div></div>' +
+          '<div class="fin-row-right"><span class="fin-row-amount expense">-$' + item.amount.toLocaleString() + '</span>' +
+          '<button class="btn-icon" onclick="delExp(\'' + item.id + '\')">🗑</button></div></div>';
+      }).join('') +
+      '<div class="fin-row" style="background:#fff5f5"><div class="fin-row-main"><strong>Total</strong></div>' +
+      '<div class="fin-row-right"><span class="fin-row-amount expense" style="font-size:16px">$' + expTotal.toLocaleString() + '</span></div></div>';
+    }
+  }
+
+  // Shopping
+  var shoEl = document.getElementById('shoppingList');
+  if (shoEl) {
+    if (!data.shopping.length) {
+      shoEl.innerHTML = '<div class="fin-empty">Your shopping list is empty.</div>';
+    } else {
+      shoEl.innerHTML = data.shopping.map(function(item) {
+        return '<div class="shopping-item' + (item.done ? ' is-done' : '') + '">' +
+          '<input type="checkbox" class="task-check"' + (item.done ? ' checked' : '') +
+            ' onchange="toggleShop(\'' + item.id + '\')">' +
+          '<span class="shopping-name">' + escHtml(item.name) + '</span>' +
+          '<span class="shopping-qty">×' + item.qty + '</span>' +
+          '<button class="btn-icon" onclick="delShop(\'' + item.id + '\')">🗑</button>' +
+          '</div>';
+      }).join('');
+    }
+  }
+
+  // Money Making
+  var mmEl = document.getElementById('moneyMakingList');
+  if (mmEl) {
+    var statusLabel = { idea:'💡 Idea', exploring:'🔍 Exploring', inprogress:'⚡ In Progress', earning:'💰 Earning', paused:'⏸ Paused' };
+    if (!data.moneymaking.length) {
+      mmEl.innerHTML = '<div class="fin-empty">No ideas yet. Add your first money-making idea.</div>';
+    } else {
+      mmEl.innerHTML = data.moneymaking.map(function(item) {
+        return '<div class="mm-row">' +
+          '<div class="mm-row-body">' +
+            '<div class="mm-idea">' + escHtml(item.idea) + '</div>' +
+            (item.notes ? '<div class="mm-notes">' + escHtml(item.notes) + '</div>' : '') +
+          '</div>' +
+          '<span class="mm-status ' + item.status + '">' + (statusLabel[item.status] || item.status) + '</span>' +
+          '<div class="mm-row-actions">' +
+            '<button class="btn-icon" onclick="openEditMoneyIdea(\'' + item.id + '\')">✏️</button>' +
+            '<button class="btn-icon" onclick="delMM(\'' + item.id + '\')">🗑</button>' +
+          '</div></div>';
+      }).join('');
+    }
   }
 }
 
@@ -434,7 +798,7 @@ function renderCalendar() {
   document.getElementById('calMonthLabel').textContent =
     new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-  var firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+  var firstDay = new Date(year, month, 1).getDay();
   var daysInMonth = new Date(year, month + 1, 0).getDate();
   var daysInPrevMonth = new Date(year, month, 0).getDate();
 
@@ -466,14 +830,11 @@ function renderCalendar() {
     if (cellDate.toDateString() === now.toDateString()) cell.classList.add('is-today');
 
     var ds = toDateStr(cellDate);
-
-    // Day number
     var numEl = document.createElement('div');
     numEl.className = 'cal-cell-top';
     numEl.innerHTML = '<div class="cal-day-num">' + dayNum + '</div><div class="cal-hdate" id="chd-' + ds + '"></div>';
     cell.appendChild(numEl);
 
-    // Events
     var events = getEventsForDate(ds);
     if (events.length) {
       var evDiv = document.createElement('div');
@@ -497,7 +858,6 @@ function renderCalendar() {
     if (!otherMonth) hdatesToLoad.push(ds);
   }
 
-  // Load Hebrew dates asynchronously
   hdatesToLoad.forEach(function(ds) { loadCalHdate(ds); });
 }
 
@@ -510,11 +870,10 @@ function renderNotesSidebar() {
   var active  = state.activeFolderId;
 
   var html = '';
-  html += '<div class="sidebar-item' + (active === 'all' ? ' active' : '') + '" onclick="setNoteFolder(\'all\')">📝 All Notes</div>';
+  html += '<div class="sidebar-item' + (active === 'all'    ? ' active' : '') + '" onclick="setNoteFolder(\'all\')">📝 All Notes</div>';
   html += '<div class="sidebar-item' + (active === 'pinned' ? ' active' : '') + '" onclick="setNoteFolder(\'pinned\')">📌 Pinned</div>';
   html += '<hr class="sidebar-divider">';
 
-  // Build folder tree
   var topFolders = data.folders.filter(function(f) { return !f.parentId; });
   topFolders.forEach(function(f) {
     html += '<div class="sidebar-item folder-item' + (active === f.id ? ' active' : '') + '" onclick="setNoteFolder(\'' + f.id + '\')">' +
@@ -532,7 +891,6 @@ function renderNotesSidebar() {
 
   html += '<hr class="sidebar-divider">';
   html += '<div class="sidebar-add-folder" onclick="openFolderModal()">+ New Folder</div>';
-
   sidebar.innerHTML = html;
 }
 
@@ -568,7 +926,6 @@ function renderNotesMain() {
     if (pinned.length) html += '<div class="notes-section-label" style="margin-top:8px">Other notes</div>';
     html += '<div class="notes-grid">' + regular.map(noteCardHTML).join('') + '</div>';
   }
-
   main.innerHTML = html;
 }
 
@@ -604,6 +961,39 @@ function renderNotes() {
 }
 
 // ============================================================
+// DASHBOARD VIEW SWITCHING
+// ============================================================
+function setDashView(viewName) {
+  var views = ['singleDayView','sevenDayView','shortTermView','longTermView','cheshbonView','remindersView'];
+  var pillMap = { single:'pillDay', seven:'pillSeven', shortterm:'pillShortTerm', longterm:'pillLongTerm', cheshbon:'pillCheshbon', reminders:'pillReminders' };
+  views.forEach(function(v) {
+    var el = document.getElementById(v);
+    if (el) el.classList.remove('active');
+  });
+  Object.values(pillMap).forEach(function(pid) {
+    var el = document.getElementById(pid);
+    if (el) el.classList.remove('active');
+  });
+
+  state.dashView = viewName;
+  var viewId = { single:'singleDayView', seven:'sevenDayView', shortterm:'shortTermView', longterm:'longTermView', cheshbon:'cheshbonView', reminders:'remindersView' }[viewName];
+  if (viewId) {
+    var el = document.getElementById(viewId);
+    if (el) el.classList.add('active');
+  }
+  if (pillMap[viewName]) {
+    var pillEl = document.getElementById(pillMap[viewName]);
+    if (pillEl) pillEl.classList.add('active');
+  }
+
+  if (viewName === 'single')    renderSingle();
+  if (viewName === 'seven')     renderSeven();
+  if (viewName === 'shortterm') renderShortTerm();
+  if (viewName === 'longterm')  renderLongTerm();
+  if (viewName === 'reminders') renderReminders();
+}
+
+// ============================================================
 // PAGE NAVIGATION
 // ============================================================
 function showPage(pageId) {
@@ -612,14 +1002,11 @@ function showPage(pageId) {
   document.getElementById('page-' + pageId).classList.add('active');
   var activeTab = document.querySelector('.header-nav-tab[data-page="' + pageId + '"]');
   if (activeTab) activeTab.classList.add('active');
-  // Show/hide dashboard-only buttons (7-Day View, My Routine)
-  var dashBtns = document.getElementById('dashButtons');
-  if (dashBtns) dashBtns.style.display = pageId === 'dashboard' ? 'flex' : 'none';
-  var divider = document.querySelector('.header-divider');
-  if (divider) divider.style.display = pageId === 'dashboard' ? '' : 'none';
   state.currentPage = pageId;
-  if (pageId === 'calendar') renderCalendar();
-  if (pageId === 'notes')    renderNotes();
+  if (pageId === 'calendar')  renderCalendar();
+  if (pageId === 'notes')     renderNotes();
+  if (pageId === 'learning')  renderLearning();
+  if (pageId === 'financial') renderFinancial();
 }
 
 // ============================================================
@@ -714,7 +1101,6 @@ window.openDayDetail = function(ds) {
     body.innerHTML = '<p style="color:#aaa;font-size:14px;padding:8px 0">No events on this day.</p>';
   } else {
     body.innerHTML = events.map(function(ev) {
-      var c = colorByValue(ev.color);
       return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f2f2f2">' +
         '<div><strong style="font-size:14px">' + escHtml(ev.title) + '</strong>' +
         (ev.time ? '<div style="font-size:12px;color:#888;margin-top:2px">' + fmt12(ev.time) + '</div>' : '') +
@@ -738,6 +1124,77 @@ window.removeCalEvent = function(id) {
   }
 };
 
+// Short/Long Term global callbacks
+window.toggleSTItem = function(list, id) { toggleSimpleItem(list, id); list === 'shortterm' ? renderShortTerm() : renderLongTerm(); };
+window.deleteSTItem = function(list, id) {
+  if (confirm('Delete this item?')) { deleteSimpleItem(list, id); list === 'shortterm' ? renderShortTerm() : renderLongTerm(); }
+};
+window.openMoveToDay = function(list, id) {
+  state.movingItemId   = id;
+  state.movingItemList = list;
+  document.getElementById('moveToDayDate').value = toDateStr(new Date());
+  openModal('moveToDayModal');
+};
+
+// Reminders global callbacks
+window.openEditReminder = function(id) {
+  var data = getData();
+  var r = data.reminders.find(function(r) { return r.id === id; });
+  if (!r) return;
+  state.editReminderId = id;
+  document.getElementById('reminderModalTitle').textContent = 'Edit Reminder';
+  document.getElementById('reminderText').value     = r.text;
+  document.getElementById('reminderCategory').value = r.category || '';
+  openModal('reminderModal');
+};
+window.deleteRem = function(id) {
+  if (confirm('Delete this reminder?')) { deleteReminder(id); renderReminders(); }
+};
+
+// Learning global callbacks
+window.openAddLearningItem = function(day) {
+  state.learningDay = day; state.editLearningItemId = null;
+  document.getElementById('learningItemModalTitle').textContent = 'Add to ' + LEARNING_DAY_LABELS[day];
+  document.getElementById('learningSubject').value = '';
+  document.getElementById('learningSource').value  = '';
+  document.getElementById('learningNotes').value   = '';
+  openModal('learningItemModal');
+  setTimeout(function() { document.getElementById('learningSubject').focus(); }, 80);
+};
+window.openEditLearningItem = function(day, id) {
+  var data = getData();
+  var items = data.learning[day] || [];
+  var item = items.find(function(i) { return i.id === id; });
+  if (!item) return;
+  state.learningDay = day; state.editLearningItemId = id;
+  document.getElementById('learningItemModalTitle').textContent = 'Edit ' + LEARNING_DAY_LABELS[day];
+  document.getElementById('learningSubject').value = item.subject;
+  document.getElementById('learningSource').value  = item.source || '';
+  document.getElementById('learningNotes').value   = item.notes  || '';
+  openModal('learningItemModal');
+};
+window.deleteLrn = function(day, id) {
+  if (confirm('Remove this entry?')) { deleteLearningItem(day, id); renderLearning(); }
+};
+
+// Financial global callbacks
+window.delInc  = function(id) { if (confirm('Delete income entry?')) { deleteIncome(id);      renderFinancial(); } };
+window.delExp  = function(id) { if (confirm('Delete expense entry?')) { deleteExpense(id);     renderFinancial(); } };
+window.delShop = function(id) { if (confirm('Remove this item?')) { deleteShoppingItem(id); renderFinancial(); } };
+window.toggleShop = function(id) { toggleShoppingItem(id); renderFinancial(); };
+window.delMM   = function(id) { if (confirm('Delete this idea?')) { deleteMoneyIdea(id);    renderFinancial(); } };
+window.openEditMoneyIdea = function(id) {
+  var data = getData();
+  var item = data.moneymaking.find(function(i) { return i.id === id; });
+  if (!item) return;
+  state.editMoneyIdeaId = id;
+  document.getElementById('moneyIdeaModalTitle').textContent = 'Edit Idea';
+  document.getElementById('moneyIdeaName').value   = item.idea;
+  document.getElementById('moneyIdeaStatus').value = item.status;
+  document.getElementById('moneyIdeaNotes').value  = item.notes || '';
+  openModal('moneyIdeaModal');
+};
+
 // ============================================================
 // MODALS
 // ============================================================
@@ -759,9 +1216,7 @@ function saveTaskModal() {
   var addToCal = document.getElementById('taskAddToCalendar').checked;
   if (state.editTaskId) { updateTask(state.editTaskDate, state.editTaskId, d); }
   else { addTask(state.editTaskDate, d); }
-  if (addToCal) {
-    addCalEvent({ title: d.title, date: state.editTaskDate, time: d.time, color: d.color });
-  }
+  if (addToCal) { addCalEvent({ title: d.title, date: state.editTaskDate, time: d.time, color: d.color }); }
   closeModal('taskModal');
   refresh();
 }
@@ -800,6 +1255,7 @@ function openAddCalEvent(ds) {
   document.getElementById('calEventTitle').value = '';
   document.getElementById('calEventDate').value  = ds || toDateStr(new Date());
   document.getElementById('calEventTime').value  = '';
+  document.getElementById('calEventAddToDashboard').checked = false;
   buildColorPicker('calEventColorPicker', '', function(v) { state.selectedCalEventColor = v; });
   openModal('calEventModal');
   setTimeout(function() { document.getElementById('calEventTitle').focus(); }, 80);
@@ -810,6 +1266,10 @@ function saveCalEventModal() {
   document.getElementById('calEventTitle').classList.remove('error');
   var d = { title: title, date: document.getElementById('calEventDate').value, time: document.getElementById('calEventTime').value, color: state.selectedCalEventColor };
   state.editCalEventId ? updateCalEvent(state.editCalEventId, d) : addCalEvent(d);
+  // Also add to dashboard as task
+  if (document.getElementById('calEventAddToDashboard').checked && d.date) {
+    addTask(d.date, { title: d.title, time: d.time, color: d.color });
+  }
   closeModal('calEventModal');
   renderCalendar();
 }
@@ -909,19 +1369,6 @@ function saveFolderModal() {
 }
 
 // ============================================================
-// SEED ROUTINE
-// ============================================================
-function seedRoutineIfEmpty() {
-  var data = getData();
-  if (data.routine.length > 0) return;
-  var all = [0, 1, 2, 3, 4, 5, 6];
-  [{ title: 'Shacharit', time: '07:00' }, { title: 'Mincha', time: '13:30' }, { title: 'Maariv', time: '21:30' }].forEach(function(s) {
-    data.routine.push({ id: uid(), title: s.title, time: s.time, location: '', days: all });
-  });
-  saveR(data.routine);
-}
-
-// ============================================================
 // SWIPE (iPhone)
 // ============================================================
 function initSwipe() {
@@ -943,9 +1390,204 @@ function initListeners() {
     tab.addEventListener('click', function() { showPage(tab.dataset.page); });
   });
 
-  // Dashboard controls
-  document.getElementById('toggleViewBtn').addEventListener('click', toggleView);
-  document.getElementById('routineBtn').addEventListener('click', function() { renderRoutineList(); openModal('routineModal'); });
+  // Dashboard sub-nav pills
+  document.getElementById('pillDay').addEventListener('click',       function() { setDashView('single'); });
+  document.getElementById('pillSeven').addEventListener('click',     function() { setDashView('seven'); });
+  document.getElementById('pillRoutine').addEventListener('click',   function() { renderRoutineList(); openModal('routineModal'); });
+  document.getElementById('pillShortTerm').addEventListener('click', function() { setDashView('shortterm'); });
+  document.getElementById('pillLongTerm').addEventListener('click',  function() { setDashView('longterm'); });
+  document.getElementById('pillCheshbon').addEventListener('click',  function() { setDashView('cheshbon'); });
+  document.getElementById('pillReminders').addEventListener('click', function() { setDashView('reminders'); });
+
+  // Date jump
+  document.getElementById('dateJumpInput').addEventListener('change', function(e) {
+    var val = e.target.value;
+    if (!val) return;
+    var today = new Date(); today.setHours(0,0,0,0);
+    var target = fromDateStr(val); target.setHours(0,0,0,0);
+    var diff = Math.round((target - today) / (1000 * 60 * 60 * 24));
+    state.dayOffset = diff;
+    setDashView('single');
+  });
+
+  // Short term add
+  document.getElementById('addShortTermBtn').addEventListener('click', function() {
+    state.simpleItemContext = 'shortterm'; state.editSimpleItemId = null;
+    document.getElementById('simpleItemModalTitle').textContent = 'Add Short Term Task';
+    document.getElementById('simpleItemLabel').textContent = 'Task';
+    document.getElementById('simpleItemText').value = '';
+    openModal('simpleItemModal');
+    setTimeout(function() { document.getElementById('simpleItemText').focus(); }, 80);
+  });
+  // Long term add
+  document.getElementById('addLongTermBtn').addEventListener('click', function() {
+    state.simpleItemContext = 'longterm'; state.editSimpleItemId = null;
+    document.getElementById('simpleItemModalTitle').textContent = 'Add Long Term Goal';
+    document.getElementById('simpleItemLabel').textContent = 'Goal';
+    document.getElementById('simpleItemText').value = '';
+    openModal('simpleItemModal');
+    setTimeout(function() { document.getElementById('simpleItemText').focus(); }, 80);
+  });
+  // Simple item modal
+  document.getElementById('closeSimpleItemModal').addEventListener('click', function() { closeModal('simpleItemModal'); });
+  document.getElementById('cancelSimpleItem').addEventListener('click',     function() { closeModal('simpleItemModal'); });
+  document.getElementById('saveSimpleItem').addEventListener('click', function() {
+    var text = document.getElementById('simpleItemText').value.trim();
+    if (!text) { document.getElementById('simpleItemText').classList.add('error'); return; }
+    document.getElementById('simpleItemText').classList.remove('error');
+    addSimpleItem(state.simpleItemContext, text);
+    closeModal('simpleItemModal');
+    state.simpleItemContext === 'shortterm' ? renderShortTerm() : renderLongTerm();
+  });
+  document.getElementById('simpleItemText').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') document.getElementById('saveSimpleItem').click();
+  });
+
+  // Move to Day modal
+  document.getElementById('closeMoveToDayModal').addEventListener('click', function() { closeModal('moveToDayModal'); });
+  document.getElementById('cancelMoveToDay').addEventListener('click',     function() { closeModal('moveToDayModal'); });
+  document.getElementById('confirmMoveToDay').addEventListener('click', function() {
+    var ds = document.getElementById('moveToDayDate').value;
+    if (!ds || !state.movingItemId) { closeModal('moveToDayModal'); return; }
+    moveItemToDay(state.movingItemList, state.movingItemId, ds);
+    closeModal('moveToDayModal');
+    state.movingItemList === 'shortterm' ? renderShortTerm() : renderLongTerm();
+    // If currently on single day view at that date, refresh
+    if (state.dashView === 'single' && toDateStr(dateFromOffset(state.dayOffset)) === ds) renderSingle();
+  });
+
+  // Reminders
+  document.getElementById('addReminderBtn').addEventListener('click', function() {
+    state.editReminderId = null;
+    document.getElementById('reminderModalTitle').textContent = 'Add Reminder';
+    document.getElementById('reminderText').value     = '';
+    document.getElementById('reminderCategory').value = '';
+    openModal('reminderModal');
+    setTimeout(function() { document.getElementById('reminderText').focus(); }, 80);
+  });
+  document.getElementById('closeReminderModal').addEventListener('click', function() { closeModal('reminderModal'); });
+  document.getElementById('cancelReminder').addEventListener('click',     function() { closeModal('reminderModal'); });
+  document.getElementById('saveReminder').addEventListener('click', function() {
+    var text = document.getElementById('reminderText').value.trim();
+    if (!text) { document.getElementById('reminderText').classList.add('error'); return; }
+    document.getElementById('reminderText').classList.remove('error');
+    var cat = document.getElementById('reminderCategory').value.trim();
+    state.editReminderId ? updateReminder(state.editReminderId, text, cat) : addReminder(text, cat);
+    state.editReminderId = null;
+    closeModal('reminderModal');
+    renderReminders();
+  });
+
+  // Learning Seder
+  document.getElementById('closeLearningItemModal').addEventListener('click', function() { closeModal('learningItemModal'); });
+  document.getElementById('cancelLearningItem').addEventListener('click',     function() { closeModal('learningItemModal'); });
+  document.getElementById('saveLearningItem').addEventListener('click', function() {
+    var subject = document.getElementById('learningSubject').value.trim();
+    if (!subject) { document.getElementById('learningSubject').classList.add('error'); return; }
+    document.getElementById('learningSubject').classList.remove('error');
+    var d = { subject: subject, source: document.getElementById('learningSource').value.trim(), notes: document.getElementById('learningNotes').value.trim() };
+    state.editLearningItemId ? updateLearningItem(state.learningDay, state.editLearningItemId, d) : addLearningItem(state.learningDay, d);
+    state.editLearningItemId = null;
+    closeModal('learningItemModal');
+    renderLearning();
+  });
+
+  // Financial tabs
+  document.querySelectorAll('.fin-tab').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      document.querySelectorAll('.fin-tab').forEach(function(t) { t.classList.remove('active'); });
+      document.querySelectorAll('.fin-panel').forEach(function(p) { p.classList.remove('active'); });
+      tab.classList.add('active');
+      var panel = document.getElementById('fin-' + tab.dataset.tab);
+      if (panel) panel.classList.add('active');
+      state.activeFinTab = tab.dataset.tab;
+    });
+  });
+
+  // Income
+  document.getElementById('addIncomeBtn').addEventListener('click', function() {
+    state.finEntryType = 'income'; state.editFinEntryId = null;
+    document.getElementById('finEntryModalTitle').textContent = 'Add Income';
+    document.getElementById('finEntryName').value     = '';
+    document.getElementById('finEntryAmount').value   = '';
+    document.getElementById('finEntryDate').value     = toDateStr(new Date());
+    document.getElementById('finEntryCategory').value = '';
+    openModal('finEntryModal');
+    setTimeout(function() { document.getElementById('finEntryName').focus(); }, 80);
+  });
+  // Expense
+  document.getElementById('addExpenseBtn').addEventListener('click', function() {
+    state.finEntryType = 'expense'; state.editFinEntryId = null;
+    document.getElementById('finEntryModalTitle').textContent = 'Add Expense';
+    document.getElementById('finEntryName').value     = '';
+    document.getElementById('finEntryAmount').value   = '';
+    document.getElementById('finEntryDate').value     = toDateStr(new Date());
+    document.getElementById('finEntryCategory').value = '';
+    openModal('finEntryModal');
+    setTimeout(function() { document.getElementById('finEntryName').focus(); }, 80);
+  });
+  // Finance entry modal
+  document.getElementById('closeFinEntryModal').addEventListener('click', function() { closeModal('finEntryModal'); });
+  document.getElementById('cancelFinEntry').addEventListener('click',     function() { closeModal('finEntryModal'); });
+  document.getElementById('saveFinEntry').addEventListener('click', function() {
+    var name = document.getElementById('finEntryName').value.trim();
+    var amt  = document.getElementById('finEntryAmount').value;
+    if (!name || !amt) {
+      if (!name) document.getElementById('finEntryName').classList.add('error');
+      if (!amt)  document.getElementById('finEntryAmount').classList.add('error');
+      return;
+    }
+    document.getElementById('finEntryName').classList.remove('error');
+    document.getElementById('finEntryAmount').classList.remove('error');
+    var d = { name: name, amount: amt, date: document.getElementById('finEntryDate').value, category: document.getElementById('finEntryCategory').value.trim() };
+    state.finEntryType === 'income' ? addIncome(d) : addExpense(d);
+    closeModal('finEntryModal');
+    renderFinancial();
+  });
+
+  // Shopping
+  document.getElementById('addShoppingBtn').addEventListener('click', function() {
+    document.getElementById('shoppingItemName').value = '';
+    document.getElementById('shoppingItemQty').value  = '1';
+    openModal('shoppingModal');
+    setTimeout(function() { document.getElementById('shoppingItemName').focus(); }, 80);
+  });
+  document.getElementById('closeShoppingModal').addEventListener('click', function() { closeModal('shoppingModal'); });
+  document.getElementById('cancelShopping').addEventListener('click',     function() { closeModal('shoppingModal'); });
+  document.getElementById('saveShopping').addEventListener('click', function() {
+    var name = document.getElementById('shoppingItemName').value.trim();
+    if (!name) { document.getElementById('shoppingItemName').classList.add('error'); return; }
+    document.getElementById('shoppingItemName').classList.remove('error');
+    addShoppingItem(name, document.getElementById('shoppingItemQty').value || 1);
+    closeModal('shoppingModal');
+    renderFinancial();
+  });
+  document.getElementById('shoppingItemName').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') document.getElementById('saveShopping').click();
+  });
+
+  // Money Making
+  document.getElementById('addMoneyIdeaBtn').addEventListener('click', function() {
+    state.editMoneyIdeaId = null;
+    document.getElementById('moneyIdeaModalTitle').textContent = 'Add Idea';
+    document.getElementById('moneyIdeaName').value   = '';
+    document.getElementById('moneyIdeaStatus').value = 'idea';
+    document.getElementById('moneyIdeaNotes').value  = '';
+    openModal('moneyIdeaModal');
+    setTimeout(function() { document.getElementById('moneyIdeaName').focus(); }, 80);
+  });
+  document.getElementById('closeMoneyIdeaModal').addEventListener('click', function() { closeModal('moneyIdeaModal'); });
+  document.getElementById('cancelMoneyIdea').addEventListener('click',     function() { closeModal('moneyIdeaModal'); });
+  document.getElementById('saveMoneyIdea').addEventListener('click', function() {
+    var idea = document.getElementById('moneyIdeaName').value.trim();
+    if (!idea) { document.getElementById('moneyIdeaName').classList.add('error'); return; }
+    document.getElementById('moneyIdeaName').classList.remove('error');
+    var d = { idea: idea, status: document.getElementById('moneyIdeaStatus').value, notes: document.getElementById('moneyIdeaNotes').value.trim() };
+    state.editMoneyIdeaId ? updateMoneyIdea(state.editMoneyIdeaId, d) : addMoneyIdea(d);
+    state.editMoneyIdeaId = null;
+    closeModal('moneyIdeaModal');
+    renderFinancial();
+  });
 
   // Single day nav
   document.getElementById('prevDayBtn').addEventListener('click', function() { state.dayOffset--; renderSingle(); });
@@ -953,11 +1595,11 @@ function initListeners() {
   document.getElementById('backToTodayBtn').addEventListener('click', function() { state.dayOffset = 0; renderSingle(); });
 
   // 7-day nav
-  document.getElementById('prevWeekBtn').addEventListener('click', function() { state.weekStart = Math.max(0, state.weekStart - 7); renderSeven(); });
-  document.getElementById('prevDayBtn7').addEventListener('click', function() { state.weekStart = Math.max(0, state.weekStart - 1); renderSeven(); });
+  document.getElementById('prevWeekBtn').addEventListener('click',        function() { state.weekStart = Math.max(0, state.weekStart - 7); renderSeven(); });
+  document.getElementById('prevDayBtn7').addEventListener('click',        function() { state.weekStart = Math.max(0, state.weekStart - 1); renderSeven(); });
   document.getElementById('backToTodayWeekBtn').addEventListener('click', function() { state.weekStart = 0; renderSeven(); });
-  document.getElementById('nextDayBtn7').addEventListener('click', function() { state.weekStart++; renderSeven(); });
-  document.getElementById('nextWeekBtn').addEventListener('click', function() { state.weekStart += 7; renderSeven(); });
+  document.getElementById('nextDayBtn7').addEventListener('click',        function() { state.weekStart++; renderSeven(); });
+  document.getElementById('nextWeekBtn').addEventListener('click',        function() { state.weekStart += 7; renderSeven(); });
 
   // Task modal
   document.getElementById('closeTaskModal').addEventListener('click', function() { closeModal('taskModal'); });
@@ -1002,7 +1644,6 @@ function initListeners() {
     renderCalendar();
   });
   document.getElementById('calWeekViewBtn').addEventListener('click', function() {
-    state.calView = 'month'; // week view coming soon — keep month for now
     alert('Week view coming soon!');
   });
 
@@ -1053,6 +1694,7 @@ async function loadHeaderHebrewDate() {
 
 function init() {
   seedRoutineIfEmpty();
+  seedFinancialIfEmpty();
   updateHeaderDate();
   loadHeaderHebrewDate();
   setInterval(updateHeaderDate, 60000);
