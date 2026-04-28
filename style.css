@@ -1050,6 +1050,170 @@ textarea.field { resize: vertical; }
 .mm-status.paused     { background: #fce7f3; color: #9d174d; }
 .mm-row-actions { display: flex; gap: 4px; flex-shrink: 0; }
 
+/* ===== CHESHBON ===== */
+.cheshbon-layout {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 20px;
+  align-items: start;
+}
+.cheshbon-panel {
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.cheshbon-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafaf8;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cheshbon-panel-title { font-size: 16px; font-weight: 700; }
+
+.cheshbon-section {
+  padding: 14px 18px;
+  border-bottom: 1px solid #f5f5f5;
+}
+.cheshbon-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+/* Reflection inputs */
+.refl-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+.refl-num {
+  font-size: 12px;
+  color: #ccc;
+  width: 18px;
+  flex-shrink: 0;
+  text-align: right;
+}
+.refl-input {
+  flex: 1;
+  border: none;
+  border-bottom: 1px solid #ebebeb;
+  outline: none;
+  font-size: 14px;
+  font-family: inherit;
+  padding: 5px 2px;
+  background: transparent;
+  color: #1a1a1a;
+  transition: border-color 0.15s;
+}
+.refl-input:focus { border-bottom-color: #1a1a1a; }
+
+/* Cheshbon HaNefesh table */
+.cheshbon-days-header {
+  display: flex;
+  align-items: center;
+  padding: 9px 14px 7px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #f9f8f5;
+}
+.cheshbon-col-item    { flex: 1; }
+.cheshbon-col-days {
+  display: flex;
+  width: 196px;
+  flex-shrink: 0;
+}
+.cheshbon-col-days span {
+  width: 28px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #bbb;
+  text-transform: uppercase;
+}
+.cheshbon-col-actions { width: 56px; flex-shrink: 0; }
+
+.cheshbon-item-row {
+  display: flex;
+  align-items: center;
+  padding: 11px 14px;
+  border-bottom: 1px solid #f7f7f7;
+  gap: 8px;
+}
+.cheshbon-item-row:last-child { border-bottom: none; }
+.cheshbon-item-text { flex: 1; font-size: 14px; color: #1a1a1a; line-height: 1.4; }
+.cheshbon-item-days {
+  display: flex;
+  width: 196px;
+  flex-shrink: 0;
+  align-items: center;
+}
+.cheshbon-day-cell {
+  width: 28px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.cheshbon-day-cell input[type="checkbox"] {
+  width: 16px; height: 16px;
+  appearance: none; -webkit-appearance: none;
+  border: 1.5px solid #ddd; border-radius: 4px;
+  cursor: pointer; background: #fff;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.cheshbon-day-cell input[type="checkbox"]:checked {
+  background: #1a1a1a; border-color: #1a1a1a;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6l3 3 5-5' stroke='white' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-size: 11px; background-repeat: no-repeat; background-position: center;
+}
+.cheshbon-item-actions { width: 56px; display: flex; gap: 2px; flex-shrink: 0; justify-content: flex-end; }
+.cheshbon-empty { padding: 20px 18px; font-size: 14px; color: #ccc; }
+
+/* Reflection history entries */
+.refl-hist-entry {
+  padding: 14px 18px;
+  border-bottom: 1px solid #f5f5f5;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.refl-hist-entry:last-child { border-bottom: none; }
+.refl-hist-entry:hover { background: #fafaf8; }
+.refl-hist-date    { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+.refl-hist-preview { font-size: 12px; color: #aaa; margin-top: 3px; }
+.refl-hist-expanded { margin-top: 12px; }
+.refl-hist-section { margin-bottom: 10px; }
+.refl-hist-section-title { font-size: 11px; font-weight: 700; color: #bbb; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.refl-hist-items   { font-size: 13px; color: #555; line-height: 1.7; }
+
+/* Cheshbon week history */
+.week-hist-entry   { padding: 14px 18px; border-bottom: 1px solid #f5f5f5; }
+.week-hist-entry:last-child { border-bottom: none; }
+.week-hist-date    { font-size: 13px; font-weight: 600; color: #1a1a1a; margin-bottom: 10px; }
+.week-hist-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0; border-bottom: 1px solid #fafafa; font-size: 13px;
+}
+.week-hist-row:last-child { border-bottom: none; }
+.week-hist-item    { flex: 1; color: #555; }
+.week-hist-days    { display: flex; gap: 4px; flex-shrink: 0; }
+.week-hist-day {
+  font-size: 10px; font-weight: 600; padding: 2px 5px;
+  border-radius: 4px; background: #f3f4f6; color: #bbb;
+}
+.week-hist-day.checked { background: #1a1a1a; color: #fff; }
+
+@media (max-width: 900px) {
+  .cheshbon-layout { grid-template-columns: 1fr; }
+}
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 900px) {
   .fin-sections { grid-template-columns: 1fr; }

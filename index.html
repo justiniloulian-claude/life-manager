@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 
@@ -98,10 +98,63 @@
 
   <!-- Cheshbon View -->
   <div id="cheshbonView" class="view">
-    <div class="placeholder-page">
-      <div style="font-size:52px;margin-bottom:16px">📊</div>
-      <h2>Daily Cheshbon</h2>
-      <p>Your daily accountability &amp; reflection section is coming soon.<br>You'll track, reflect, and grow here.</p>
+    <div class="cheshbon-layout">
+
+      <!-- LEFT: Daily Reflection -->
+      <div class="cheshbon-panel">
+        <div class="cheshbon-panel-header">
+          <h2 class="cheshbon-panel-title">Daily Reflection</h2>
+          <div style="display:flex;gap:8px;flex-shrink:0">
+            <button id="reflHistoryBtn" class="btn-secondary" style="font-size:12px;padding:6px 12px">📖 History</button>
+            <button id="reflRefreshBtn" class="btn-primary"   style="font-size:12px;padding:6px 12px">↺ New Entry</button>
+          </div>
+        </div>
+
+        <div class="cheshbon-section">
+          <div class="cheshbon-section-title">Gratitude</div>
+          <div id="gratitudeList"></div>
+        </div>
+
+        <div class="cheshbon-section">
+          <div class="cheshbon-section-title">Ayin Tov</div>
+          <div id="ayinTovList"></div>
+        </div>
+
+        <div class="cheshbon-section">
+          <div class="cheshbon-section-title">What did I learn today?</div>
+          <textarea id="learnedToday" class="field" rows="3" placeholder="Write 1–3 lines..." oninput="autoSaveLearned()" style="margin-bottom:0"></textarea>
+        </div>
+
+        <div class="cheshbon-section" style="border-bottom:none">
+          <div class="cheshbon-section-title">How do I feel?</div>
+          <textarea id="feelingToday" class="field" rows="3" placeholder="Write freely..." oninput="autoSaveFeeling()" style="margin-bottom:0"></textarea>
+        </div>
+      </div>
+
+      <!-- RIGHT: Cheshbon HaNefesh -->
+      <div class="cheshbon-panel">
+        <div class="cheshbon-panel-header">
+          <h2 class="cheshbon-panel-title">Cheshbon HaNefesh</h2>
+          <div style="display:flex;gap:8px;flex-shrink:0">
+            <button id="cheshbonWeekHistBtn" class="btn-secondary" style="font-size:12px;padding:6px 12px">📖 Past Weeks</button>
+            <button id="newWeekBtn"          class="btn-primary"   style="font-size:12px;padding:6px 12px">↺ New Week</button>
+          </div>
+        </div>
+
+        <!-- Day column headers -->
+        <div class="cheshbon-days-header">
+          <div class="cheshbon-col-item"></div>
+          <div class="cheshbon-col-days">
+            <span>Mon</span><span>Tue</span><span>Wed</span>
+            <span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+          </div>
+          <div class="cheshbon-col-actions"></div>
+        </div>
+
+        <div id="cheshbonItemsList"></div>
+        <button id="addCheshbonItemBtn" class="add-task-row">+ Add Item</button>
+      </div>
+
     </div>
   </div>
 
@@ -128,9 +181,7 @@
       <button id="calNextBtn" class="btn-nav">&#8594;</button>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
-      <button id="calMonthViewBtn" class="btn-secondary" style="font-size:13px;padding:6px 14px">Month</button>
-      <button id="calWeekViewBtn"  class="btn-secondary" style="font-size:13px;padding:6px 14px">Week</button>
-      <button id="addCalEventBtn"  class="btn-primary">+ Add Event</button>
+      <button id="addCalEventBtn" class="btn-primary">+ Add Event</button>
     </div>
   </div>
   <div class="cal-day-headers">
@@ -595,6 +646,46 @@
   </div>
 </div>
 
+<!-- Cheshbon Item Modal -->
+<div id="cheshbonItemModal" class="modal">
+  <div class="modal-box" style="max-width:400px">
+    <div class="modal-header">
+      <h2 id="cheshbonItemModalTitle">Add Item</h2>
+      <button class="modal-close" id="closeCheshbonItemModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Reflection area</label>
+      <input type="text" id="cheshbonItemText" class="field" placeholder="e.g. Did I daven with focus?">
+    </div>
+    <div class="modal-footer">
+      <button id="cancelCheshbonItem" class="btn-cancel">Cancel</button>
+      <button id="saveCheshbonItem"   class="btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reflection History Modal -->
+<div id="reflHistoryModal" class="modal">
+  <div class="modal-box modal-wide" style="max-width:560px">
+    <div class="modal-header">
+      <h2>Past Reflections</h2>
+      <button class="modal-close" id="closeReflHistoryModal">&times;</button>
+    </div>
+    <div class="modal-body" id="reflHistoryBody" style="padding:0;max-height:65vh;overflow-y:auto"></div>
+  </div>
+</div>
+
+<!-- Cheshbon Week History Modal -->
+<div id="cheshbonWeekHistModal" class="modal">
+  <div class="modal-box modal-wide" style="max-width:600px">
+    <div class="modal-header">
+      <h2>Past Weeks — Cheshbon HaNefesh</h2>
+      <button class="modal-close" id="closeCheshbonWeekHistModal">&times;</button>
+    </div>
+    <div class="modal-body" id="cheshbonWeekHistBody" style="padding:0;max-height:65vh;overflow-y:auto"></div>
+  </div>
+</div>
+
 <!-- Routine Override Modal (one-time edit for a specific day) -->
 <div id="routineOverrideModal" class="modal">
   <div class="modal-box" style="max-width:400px">
@@ -618,6 +709,6 @@
   </div>
 </div>
 
-<script src="app.js?v=7"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>

@@ -35,6 +35,7 @@ const state = {
   movingItemId: null,
   movingItemList: null,
   editReminderId: null,
+  editCheshbonItemId: null,
   learningDay: null,
   editLearningItemId: null,
   activeFinTab: 'finances',
@@ -78,7 +79,15 @@ function getData() {
     expenses:    JSON.parse(localStorage.getItem('dm_expenses')    || '[]'),
     shopping:    JSON.parse(localStorage.getItem('dm_shopping')    || '[]'),
     moneymaking:      JSON.parse(localStorage.getItem('dm_moneymaking')       || '[]'),
-    routineOverrides: JSON.parse(localStorage.getItem('dm_routine_overrides') || '{}'),
+    routineOverrides:      JSON.parse(localStorage.getItem('dm_routine_overrides'))          || {},
+    gratitude:             JSON.parse(localStorage.getItem('dm_gratitude'))                  || Array(10).fill(''),
+    ayinTov:               JSON.parse(localStorage.getItem('dm_ayin_tov'))                   || Array(5).fill(''),
+    learned:               localStorage.getItem('dm_learned')                                || '',
+    feeling:               localStorage.getItem('dm_feeling')                                || '',
+    reflHistory:           JSON.parse(localStorage.getItem('dm_refl_history'))               || [],
+    cheshbonItems:         JSON.parse(localStorage.getItem('dm_cheshbon_items'))             || [],
+    cheshbonChecks:        JSON.parse(localStorage.getItem('dm_cheshbon_checks'))            || {},
+    cheshbonWeekHistory:   JSON.parse(localStorage.getItem('dm_cheshbon_week_history'))      || [],
   };
 }
 function saveT(v)   { localStorage.setItem('dm_tasks',       JSON.stringify(v)); }
@@ -94,7 +103,15 @@ function saveInc(v) { localStorage.setItem('dm_income',      JSON.stringify(v));
 function saveExp(v) { localStorage.setItem('dm_expenses',    JSON.stringify(v)); }
 function saveSho(v) { localStorage.setItem('dm_shopping',    JSON.stringify(v)); }
 function saveMM(v)  { localStorage.setItem('dm_moneymaking',       JSON.stringify(v)); }
-function saveRO(v)  { localStorage.setItem('dm_routine_overrides', JSON.stringify(v)); }
+function saveRO(v)   { localStorage.setItem('dm_routine_overrides',      JSON.stringify(v)); }
+function saveGrat(v) { localStorage.setItem('dm_gratitude',              JSON.stringify(v)); }
+function saveAyin(v) { localStorage.setItem('dm_ayin_tov',               JSON.stringify(v)); }
+function saveLrnd(v) { localStorage.setItem('dm_learned',                v); }
+function saveFeel(v) { localStorage.setItem('dm_feeling',                v); }
+function saveRHist(v){ localStorage.setItem('dm_refl_history',           JSON.stringify(v)); }
+function saveChi(v)  { localStorage.setItem('dm_cheshbon_items',         JSON.stringify(v)); }
+function saveChk(v)  { localStorage.setItem('dm_cheshbon_checks',        JSON.stringify(v)); }
+function saveChWH(v) { localStorage.setItem('dm_cheshbon_week_history',  JSON.stringify(v)); }
 function uid()      { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 
 // ============================================================
@@ -521,6 +538,152 @@ function renderLongTerm() { renderSimpleList('longterm','longTermList');  }
 function renderFuture()   { renderShortTerm(); renderLongTerm(); }
 
 // ============================================================
+// RENDER — CHESHBON
+// ============================================================
+var CHESHBON_DAYS = ['mon','tue','wed','thu','fri','sat','sun'];
+var CHESHBON_DAY_LABELS = {mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat',sun:'Sun'};
+
+function renderCheshbonLeft() {
+  var data = getData();
+  // Pad arrays to correct lengths
+  var grat = data.gratitude.slice(); while(grat.length<10) grat.push('');
+  var ayin = data.ayinTov.slice();   while(ayin.length<5)  ayin.push('');
+  var gEl=document.getElementById('gratitudeList'); if(!gEl)return;
+  gEl.innerHTML=grat.map(function(v,i){
+    return '<div class="refl-input-row"><span class="refl-num">'+(i+1)+'.</span>'+
+      '<input type="text" class="refl-input" value="'+escHtml(v)+'" placeholder="I am grateful for..." oninput="autoSaveGratitude()"></div>';
+  }).join('');
+  var aEl=document.getElementById('ayinTovList'); if(!aEl)return;
+  aEl.innerHTML=ayin.map(function(v,i){
+    return '<div class="refl-input-row"><span class="refl-num">'+(i+1)+'.</span>'+
+      '<input type="text" class="refl-input" value="'+escHtml(v)+'" placeholder="Something good I noticed..." oninput="autoSaveAyinTov()"></div>';
+  }).join('');
+  var lEl=document.getElementById('learnedToday'); if(lEl) lEl.value=data.learned;
+  var fEl=document.getElementById('feelingToday'); if(fEl) fEl.value=data.feeling;
+}
+function renderCheshbonRight() {
+  var data=getData(); var el=document.getElementById('cheshbonItemsList'); if(!el)return;
+  if(!data.cheshbonItems.length){el.innerHTML='<div class="cheshbon-empty">No items yet. Click "+ Add Item" to add reflection areas.</div>';return;}
+  el.innerHTML=data.cheshbonItems.map(function(item){
+    var checks=data.cheshbonChecks[item.id]||{};
+    var dayBoxes=CHESHBON_DAYS.map(function(d){
+      return '<div class="cheshbon-day-cell"><input type="checkbox"'+(checks[d]?' checked':'')+
+        ' onchange="toggleCheshbonCheck(\''+item.id+'\',\''+d+'\')" title="'+CHESHBON_DAY_LABELS[d]+'"></div>';
+    }).join('');
+    return '<div class="cheshbon-item-row">'+
+      '<div class="cheshbon-item-text">'+escHtml(item.text)+'</div>'+
+      '<div class="cheshbon-item-days">'+dayBoxes+'</div>'+
+      '<div class="cheshbon-item-actions">'+
+        '<button class="btn-icon" onclick="openEditCheshbonItem(\''+item.id+'\')">✏️</button>'+
+        '<button class="btn-icon" onclick="removeCheshbonItem(\''+item.id+'\')">🗑</button>'+
+      '</div></div>';
+  }).join('');
+}
+function renderCheshbon() { renderCheshbonLeft(); renderCheshbonRight(); }
+
+// Auto-save (called inline from input oninput)
+window.autoSaveGratitude = function(){ saveGrat(Array.from(document.querySelectorAll('#gratitudeList .refl-input')).map(function(i){return i.value;})); };
+window.autoSaveAyinTov   = function(){ saveAyin(Array.from(document.querySelectorAll('#ayinTovList .refl-input')).map(function(i){return i.value;})); };
+window.autoSaveLearned   = function(){ var e=document.getElementById('learnedToday'); if(e)saveLrnd(e.value); };
+window.autoSaveFeeling   = function(){ var e=document.getElementById('feelingToday'); if(e)saveFeel(e.value); };
+
+// Refresh left panel — stores to history and clears
+window.refreshReflection = function() {
+  if(!confirm('Save this reflection to history and start a fresh entry?'))return;
+  var grat=Array.from(document.querySelectorAll('#gratitudeList .refl-input')).map(function(i){return i.value;});
+  var ayin=Array.from(document.querySelectorAll('#ayinTovList .refl-input')).map(function(i){return i.value;});
+  var learned=(document.getElementById('learnedToday')||{}).value||'';
+  var feeling=(document.getElementById('feelingToday')||{}).value||'';
+  var data=getData();
+  data.reflHistory.unshift({date:toDateStr(new Date()),gratitude:grat,ayinTov:ayin,learned:learned,feeling:feeling});
+  saveRHist(data.reflHistory);
+  saveGrat(Array(10).fill('')); saveAyin(Array(5).fill('')); saveLrnd(''); saveFeel('');
+  renderCheshbonLeft();
+};
+
+// History viewer — left panel
+window.openReflectionHistory = function() {
+  var data=getData(); var body=document.getElementById('reflHistoryBody'); if(!body)return;
+  if(!data.reflHistory.length){
+    body.innerHTML='<div style="padding:24px;color:#aaa;font-size:14px;text-align:center">No past reflections yet.</div>';
+  } else {
+    body.innerHTML=data.reflHistory.map(function(entry,idx){
+      var preview=entry.gratitude.filter(function(g){return g.trim();}).slice(0,2).join(' · ');
+      return '<div class="refl-hist-entry" onclick="toggleReflHistEntry(this,'+idx+')">'+
+        '<div class="refl-hist-date">'+fmtDateDisplay(entry.date)+'</div>'+
+        '<div class="refl-hist-preview">'+(preview?escHtml(preview):'—')+'</div>'+
+        '<div class="refl-hist-expanded" style="display:none"></div>'+
+        '</div>';
+    }).join('');
+  }
+  openModal('reflHistoryModal');
+};
+window.toggleReflHistEntry = function(el,idx) {
+  var exp=el.querySelector('.refl-hist-expanded'); if(!exp)return;
+  if(exp.style.display!=='none'){exp.style.display='none';return;}
+  var data=getData(); var entry=data.reflHistory[idx]; if(!entry)return;
+  var gratItems=entry.gratitude.filter(function(g){return g.trim();}).map(function(g,i){return (i+1)+'. '+escHtml(g);}).join('<br>');
+  var ayinItems=(entry.ayinTov||[]).filter(function(g){return g.trim();}).map(function(g,i){return (i+1)+'. '+escHtml(g);}).join('<br>');
+  exp.innerHTML=
+    (gratItems?'<div class="refl-hist-section"><div class="refl-hist-section-title">Gratitude</div><div class="refl-hist-items">'+gratItems+'</div></div>':'')+
+    (ayinItems?'<div class="refl-hist-section"><div class="refl-hist-section-title">Ayin Tov</div><div class="refl-hist-items">'+ayinItems+'</div></div>':'')+
+    (entry.learned?'<div class="refl-hist-section"><div class="refl-hist-section-title">What I Learned</div><div class="refl-hist-items">'+escHtml(entry.learned)+'</div></div>':'')+
+    (entry.feeling?'<div class="refl-hist-section"><div class="refl-hist-section-title">How I Felt</div><div class="refl-hist-items">'+escHtml(entry.feeling)+'</div></div>':'');
+  exp.style.display='';
+};
+
+// Cheshbon HaNefesh actions
+window.toggleCheshbonCheck = function(itemId,day){
+  var data=getData();
+  if(!data.cheshbonChecks[itemId]) data.cheshbonChecks[itemId]={};
+  data.cheshbonChecks[itemId][day]=!data.cheshbonChecks[itemId][day];
+  saveChk(data.cheshbonChecks);
+};
+window.openEditCheshbonItem = function(id){
+  var data=getData(); var item=data.cheshbonItems.find(function(i){return i.id===id;}); if(!item)return;
+  state.editCheshbonItemId=id;
+  document.getElementById('cheshbonItemModalTitle').textContent='Edit Item';
+  document.getElementById('cheshbonItemText').value=item.text;
+  openModal('cheshbonItemModal');
+  setTimeout(function(){document.getElementById('cheshbonItemText').focus();},80);
+};
+window.removeCheshbonItem = function(id){
+  if(!confirm('Remove this item?'))return;
+  var data=getData();
+  saveChi(data.cheshbonItems.filter(function(i){return i.id!==id;}));
+  delete data.cheshbonChecks[id]; saveChk(data.cheshbonChecks);
+  renderCheshbonRight();
+};
+window.newCheshbonWeek = function(){
+  if(!confirm('Start a new week? Current checkboxes will be saved to history and cleared.'))return;
+  var data=getData();
+  if(data.cheshbonItems.length){
+    var snap=data.cheshbonItems.map(function(item){return {text:item.text,checks:data.cheshbonChecks[item.id]||{}};});
+    data.cheshbonWeekHistory.unshift({weekOf:fmtDateDisplay(toDateStr(new Date())),items:snap});
+    saveChWH(data.cheshbonWeekHistory);
+  }
+  saveChk({}); renderCheshbonRight();
+};
+window.openCheshbonWeekHistory = function(){
+  var data=getData(); var body=document.getElementById('cheshbonWeekHistBody'); if(!body)return;
+  if(!data.cheshbonWeekHistory.length){
+    body.innerHTML='<div style="padding:24px;color:#aaa;font-size:14px;text-align:center">No past weeks yet.</div>';
+  } else {
+    body.innerHTML=data.cheshbonWeekHistory.map(function(week){
+      var rows=week.items.map(function(item){
+        var days=CHESHBON_DAYS.map(function(d){
+          return '<span class="week-hist-day'+(item.checks[d]?' checked':'')+'">'+CHESHBON_DAY_LABELS[d]+'</span>';
+        }).join('');
+        return '<div class="week-hist-row"><div class="week-hist-item">'+escHtml(item.text)+'</div>'+
+          '<div class="week-hist-days">'+days+'</div></div>';
+      }).join('');
+      return '<div class="week-hist-entry"><div class="week-hist-date">Week of '+escHtml(week.weekOf)+'</div>'+rows+'</div>';
+    }).join('');
+  }
+  openModal('cheshbonWeekHistModal');
+};
+
+// ============================================================
 // RENDER — REMINDERS
 // ============================================================
 function renderReminders() {
@@ -760,6 +923,7 @@ function setDashView(viewName) {
   if (viewName==='single')    renderSingle();
   if (viewName==='seven')     renderSeven();
   if (viewName==='future')    renderFuture();
+  if (viewName==='cheshbon')  renderCheshbon();
   if (viewName==='reminders') renderReminders();
 }
 
@@ -1219,6 +1383,37 @@ function initListeners() {
     state.movingItemList==='shortterm'?renderShortTerm():renderLongTerm();
   });
 
+  // Cheshbon HaNefesh
+  document.getElementById('reflRefreshBtn').addEventListener('click', refreshReflection);
+  document.getElementById('reflHistoryBtn').addEventListener('click', openReflectionHistory);
+  document.getElementById('newWeekBtn').addEventListener('click', newCheshbonWeek);
+  document.getElementById('cheshbonWeekHistBtn').addEventListener('click', openCheshbonWeekHistory);
+  document.getElementById('addCheshbonItemBtn').addEventListener('click', function(){
+    state.editCheshbonItemId=null;
+    document.getElementById('cheshbonItemModalTitle').textContent='Add Item';
+    document.getElementById('cheshbonItemText').value='';
+    openModal('cheshbonItemModal');
+    setTimeout(function(){document.getElementById('cheshbonItemText').focus();},80);
+  });
+  document.getElementById('closeCheshbonItemModal').addEventListener('click', function(){ closeModal('cheshbonItemModal'); });
+  document.getElementById('cancelCheshbonItem').addEventListener('click',     function(){ closeModal('cheshbonItemModal'); });
+  document.getElementById('saveCheshbonItem').addEventListener('click', function(){
+    var text=document.getElementById('cheshbonItemText').value.trim();
+    if(!text){document.getElementById('cheshbonItemText').classList.add('error');return;}
+    document.getElementById('cheshbonItemText').classList.remove('error');
+    var data=getData();
+    if(state.editCheshbonItemId){
+      var item=data.cheshbonItems.find(function(i){return i.id===state.editCheshbonItemId;});
+      if(item)item.text=text; saveChi(data.cheshbonItems); state.editCheshbonItemId=null;
+    } else {
+      data.cheshbonItems.push({id:uid(),text:text}); saveChi(data.cheshbonItems);
+    }
+    closeModal('cheshbonItemModal'); renderCheshbonRight();
+  });
+  document.getElementById('cheshbonItemText').addEventListener('keydown', function(e){ if(e.key==='Enter')document.getElementById('saveCheshbonItem').click(); });
+  document.getElementById('closeReflHistoryModal').addEventListener('click',      function(){ closeModal('reflHistoryModal'); });
+  document.getElementById('closeCheshbonWeekHistModal').addEventListener('click', function(){ closeModal('cheshbonWeekHistModal'); });
+
   // Reminders
   document.getElementById('addReminderBtn').addEventListener('click', function(){ state.editReminderId=null; document.getElementById('reminderModalTitle').textContent='Add Reminder'; document.getElementById('reminderText').value=''; document.getElementById('reminderCategory').value=''; openModal('reminderModal'); setTimeout(function(){document.getElementById('reminderText').focus();},80); });
   document.getElementById('closeReminderModal').addEventListener('click', function(){ closeModal('reminderModal'); });
@@ -1300,8 +1495,7 @@ function initListeners() {
   document.getElementById('cancelCalEvent').addEventListener('click',     function(){ closeModal('calEventModal'); });
   document.getElementById('saveCalEvent').addEventListener('click', saveCalEventModal);
   document.getElementById('closeDayDetailModal').addEventListener('click', function(){ closeModal('dayDetailModal'); });
-  document.getElementById('calMonthViewBtn').addEventListener('click', function(){ renderCalendar(); });
-  document.getElementById('calWeekViewBtn').addEventListener('click',  function(){ alert('Week view coming soon!'); });
+  document.getElementById('calMonthViewBtn') && document.getElementById('calMonthViewBtn').addEventListener('click', function(){ renderCalendar(); });
 
   // Notes
   document.getElementById('addNoteBtn').addEventListener('click', openNoteModal);
