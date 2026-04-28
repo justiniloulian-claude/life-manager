@@ -334,8 +334,10 @@ body {
 }
 .seven-day-grid .day-card      { max-width: none; margin: 0; }
 .seven-day-grid .day-card-name { font-size: 16px; }
-.seven-day-grid .task-title    { font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.seven-day-grid .task-title    { font-size: 13px; }
 .seven-day-grid .task-item     { padding: 7px 12px; }
+.seven-day-grid .task-meta     { flex-wrap: nowrap; overflow: hidden; }
+.seven-day-grid .task-meta .badge { overflow: hidden; text-overflow: ellipsis; }
 .seven-day-grid .day-card-head { padding: 12px 12px 9px; }
 .seven-day-grid .zmanim-strip  { padding: 7px 12px; }
 .seven-day-grid .add-task-row  { padding: 8px 12px; font-size: 13px; }

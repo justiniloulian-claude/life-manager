@@ -402,27 +402,31 @@ function buildColorPicker(containerId,selectedVal,onSelect) {
 // RENDER — TASK ITEM
 // Notes are hidden by default; the 📋 button reveals them inline
 // ============================================================
-function taskHTML(task, ds) {
+// noActions = true in 7-day compact cards (no edit/delete/notes buttons)
+function taskHTML(task, ds, noActions) {
   var isR = task.type === 'routine';
-  // Routine = italic (CSS). Non-routine = no background color differentiation.
   var itemCls = isR ? 'is-routine' : '';
-  // Priority weight applies to the title for non-routine tasks
   var priorityCls = isR ? '' : ('task-p-'+(task.priority||'standard'));
   var tb = task.time     ? '<span class="badge badge-time">'+fmt12(task.time)+'</span>'       : '';
   var lb = task.location ? '<span class="badge badge-loc">'+escHtml(task.location)+'</span>'  : '';
-  // Routine tasks get an override edit button; one-time tasks get normal edit + delete
-  var eb = isR
-    ? '<button class="btn-icon" onclick="openRoutineOverride(\''+ds+'\',\''+task.id+'\')">✏️</button>'
-    : '<button class="btn-icon" onclick="openEditTask(\''+ds+'\',\''+task.id+'\')">✏️</button>';
-  var db = !isR ? '<button class="btn-icon" onclick="removeTask(\''+ds+'\',\''+task.id+'\')">🗑</button>' : '';
-  var hasNotes = !isR && task.notes && task.notes.trim();
-  var nb = hasNotes ? '<button class="btn-icon task-notes-btn" onclick="toggleTaskNotes(this)" title="View notes">📋</button>' : '';
-  var notesPanel = hasNotes ? '<div class="task-notes-panel" style="display:none">'+escHtml(task.notes)+'</div>' : '';
+  var actionsHTML = '';
+  if (!noActions) {
+    var eb = isR
+      ? '<button class="btn-icon" onclick="openRoutineOverride(\''+ds+'\',\''+task.id+'\')">✏️</button>'
+      : '<button class="btn-icon" onclick="openEditTask(\''+ds+'\',\''+task.id+'\')">✏️</button>';
+    var db = !isR ? '<button class="btn-icon" onclick="removeTask(\''+ds+'\',\''+task.id+'\')">🗑</button>' : '';
+    var hasNotes = !isR && task.notes && task.notes.trim();
+    var nb = hasNotes ? '<button class="btn-icon task-notes-btn" onclick="toggleTaskNotes(this)" title="View notes">📋</button>' : '';
+    var notesPanel = hasNotes ? '<div class="task-notes-panel" style="display:none">'+escHtml(task.notes)+'</div>' : '';
+    actionsHTML = '<div class="task-actions">'+nb+eb+db+'</div>';
+  }
+  var notesPanel = (!noActions && !isR && task.notes && task.notes.trim())
+    ? '<div class="task-notes-panel" style="display:none">'+escHtml(task.notes)+'</div>' : '';
   return '<div class="task-item '+itemCls+(task.done?' is-done':'')+'" id="ti-'+task.id+'">' +
     '<input type="checkbox" class="task-check"'+(task.done?' checked':'')+' onchange="checkTask(\''+ds+'\',\''+task.id+'\','+isR+')">' +
     '<div class="task-body"><div class="task-title '+priorityCls+'">'+escHtml(task.title)+'</div>' +
     '<div class="task-meta">'+tb+lb+'</div>'+notesPanel+'</div>' +
-    '<div class="task-actions">'+nb+eb+db+'</div></div>';
+    actionsHTML+'</div>';
 }
 
 // ============================================================
@@ -439,7 +443,7 @@ function dayCardHTML(date, compact) {
     ? '<div class="day-card-name">'+shortDay(date)+chip+'</div><div class="day-card-label">'+shortMonthDay(date)+'</div><div class="day-card-hdate" id="hdate-'+ds+'">...</div>'
     : '<div class="day-card-name">'+dayName(date)+chip+'</div><div class="day-card-label">'+monthDay(date)+'</div><div class="day-card-hdate" id="hdate-'+ds+'">...</div>';
   var tHTML = tasks.length
-    ? tasks.map(function(t){return taskHTML(t,ds);}).join('')
+    ? tasks.map(function(t){return taskHTML(t,ds,compact);}).join('')
     : '<div class="empty-tasks">No tasks yet</div>';
 
   // In compact (7-day) mode: clickable header opens day popup, no zmanim strip
