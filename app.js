@@ -608,15 +608,15 @@ function renderNotes() {
 // ============================================================
 function showPage(pageId) {
   document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
-  document.querySelectorAll('.page-tab').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelectorAll('.header-nav-tab').forEach(function(t) { t.classList.remove('active'); });
   document.getElementById('page-' + pageId).classList.add('active');
-  var activeTab = document.querySelector('.page-tab[data-page="' + pageId + '"]');
+  var activeTab = document.querySelector('.header-nav-tab[data-page="' + pageId + '"]');
   if (activeTab) activeTab.classList.add('active');
-  // Show/hide dashboard-only header buttons
-  var toggleBtn  = document.getElementById('toggleViewBtn');
-  var routineBtn = document.getElementById('routineBtn');
-  if (toggleBtn)  toggleBtn.style.display  = pageId === 'dashboard' ? '' : 'none';
-  if (routineBtn) routineBtn.style.display = pageId === 'dashboard' ? '' : 'none';
+  // Show/hide dashboard-only buttons (7-Day View, My Routine)
+  var dashBtns = document.getElementById('dashButtons');
+  if (dashBtns) dashBtns.style.display = pageId === 'dashboard' ? 'flex' : 'none';
+  var divider = document.querySelector('.header-divider');
+  if (divider) divider.style.display = pageId === 'dashboard' ? '' : 'none';
   state.currentPage = pageId;
   if (pageId === 'calendar') renderCalendar();
   if (pageId === 'notes')    renderNotes();
@@ -939,7 +939,7 @@ function initSwipe() {
 // ============================================================
 function initListeners() {
   // Page navigation
-  document.querySelectorAll('.page-tab').forEach(function(tab) {
+  document.querySelectorAll('.header-nav-tab').forEach(function(tab) {
     tab.addEventListener('click', function() { showPage(tab.dataset.page); });
   });
 
@@ -1044,9 +1044,17 @@ function updateHeaderDate() {
   if (el) el.textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 }
 
+async function loadHeaderHebrewDate() {
+  var ds    = toDateStr(new Date());
+  var hdate = await fetchHebrewDate(ds);
+  var el    = document.getElementById('headerHdate');
+  if (el && hdate) el.textContent = hdate;
+}
+
 function init() {
   seedRoutineIfEmpty();
   updateHeaderDate();
+  loadHeaderHebrewDate();
   setInterval(updateHeaderDate, 60000);
   initListeners();
   initSwipe();

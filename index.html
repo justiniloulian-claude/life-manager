@@ -8,25 +8,29 @@
 </head>
 <body>
 
-<!-- ===== HEADER (same as original) ===== -->
+<!-- ===== HEADER ===== -->
 <header class="header">
   <div class="header-left">
     <h1 class="app-title">Dashboard</h1>
-    <span class="header-date" id="headerDate"></span>
+    <div class="header-dates">
+      <span class="header-date" id="headerDate"></span>
+      <span class="header-hdate" id="headerHdate"></span>
+    </div>
   </div>
   <div class="header-right">
-    <button id="toggleViewBtn" class="btn-secondary">7-Day View</button>
-    <button id="routineBtn" class="btn-secondary">My Routine</button>
+    <nav class="header-nav">
+      <button class="header-nav-tab active" data-page="dashboard">Dashboard</button>
+      <button class="header-nav-tab" data-page="calendar">Calendar</button>
+      <button class="header-nav-tab" data-page="notes">Notes</button>
+      <button class="header-nav-tab header-nav-dim" data-page="financial">Financial</button>
+    </nav>
+    <div class="header-divider"></div>
+    <div id="dashButtons" style="display:flex;gap:8px">
+      <button id="toggleViewBtn" class="btn-secondary">7-Day View</button>
+      <button id="routineBtn" class="btn-secondary">My Routine</button>
+    </div>
   </div>
 </header>
-
-<!-- ===== PAGE TABS (subtle row below header) ===== -->
-<nav class="page-tabs">
-  <button class="page-tab active" data-page="dashboard">Dashboard</button>
-  <button class="page-tab" data-page="calendar">Calendar</button>
-  <button class="page-tab" data-page="notes">Notes</button>
-  <button class="page-tab page-tab-dim" data-page="financial">Financial</button>
-</nav>
 
 <!-- ===== DASHBOARD PAGE ===== -->
 <div id="page-dashboard" class="page active">
