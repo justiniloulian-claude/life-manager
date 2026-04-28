@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- HEADER -->
+    <header class="header">
+      <div class="header-left">
+        <h1 class="app-title">Dashboard</h1>
+        <span class="header-date" id="headerDate"></span>
+      </div>
+      <div class="header-right">
+        <button id="toggleViewBtn" class="btn-secondary">7-Day View</button>
+        <button id="routineBtn" class="btn-secondary">My Routine</button>
+      </div>
+    </header>
+
+    <!-- SINGLE DAY VIEW -->
+    <div id="singleDayView" class="view active">
+      <div class="nav-bar">
+        <button id="prevDayBtn" class="btn-nav">&#8592; Previous</button>
+        <button id="backToTodayBtn" class="btn-today" style="display:none">Back to Today</button>
+        <button id="nextDayBtn" class="btn-nav">Next &#8594;</button>
+      </div>
+      <div id="singleDayContainer"></div>
+    </div>
+
+    <!-- 7-DAY VIEW -->
+    <div id="sevenDayView" class="view">
+      <div class="nav-bar">
+        <button id="prevWeekBtn" class="btn-nav" style="display:none">&#8592; Back</button>
+        <button id="backToTodayWeekBtn" class="btn-today">Back to Today</button>
+        <div class="week-nav-right">
+          <button id="nextWeekBtn" class="btn-nav">Next 7 Days &#8594;</button>
+          <button id="nextTwoWeeksBtn" class="btn-nav">Days 8&#8211;14 &#8594;</button>
+        </div>
+      </div>
+      <div id="sevenDayGrid" class="seven-day-grid"></div>
+    </div>
+
+  </div>
+
+  <!-- MODAL: Add / Edit Task -->
+  <div id="taskModal" class="modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 id="taskModalTitle">Add Task</h2>
+        <button class="modal-close" id="closeTaskModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label class="field-label">Task</label>
+        <input type="text" id="taskTitle" class="field" placeholder="What do you need to do?">
+        <label class="field-label">Time <span class="optional">optional</span></label>
+        <input type="time" id="taskTime" class="field">
+        <label class="field-label">Location <span class="optional">optional</span></label>
+        <input type="text" id="taskLocation" class="field" placeholder="e.g. Virtual, Office, Synagogue">
+        <label class="field-label">Notes <span class="optional">optional</span></label>
+        <textarea id="taskNotes" class="field" rows="3" placeholder="Any extra details..."></textarea>
+        <label class="field-label">Reminder <span class="optional">optional</span></label>
+        <select id="taskReminder" class="field">
+          <option value="">No reminder</option>
+          <option value="0">At time of event</option>
+          <option value="60">1 hour before</option>
+          <option value="120">2 hours before</option>
+          <option value="1440">1 day before</option>
+          <option value="2880">2 days before</option>
+          <option value="10080">1 week before</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button id="cancelTask" class="btn-cancel">Cancel</button>
+        <button id="saveTask" class="btn-primary">Save Task</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Manage Routine -->
+  <div id="routineModal" class="modal">
+    <div class="modal-box modal-wide">
+      <div class="modal-header">
+        <h2>My Routine</h2>
+        <button class="modal-close" id="closeRoutineModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-note">Routine tasks repeat automatically on the days you choose and appear on your dashboard every week.</p>
+        <button id="addRoutineItemBtn" class="btn-primary" style="margin-bottom:16px">+ Add Routine Task</button>
+        <div id="routineList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Add / Edit Routine Task -->
+  <div id="routineItemModal" class="modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 id="routineItemModalTitle">Add Routine Task</h2>
+        <button class="modal-close" id="closeRoutineItemModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label class="field-label">Task title</label>
+        <input type="text" id="routineTitle" class="field" placeholder="e.g. Shacharit">
+        <label class="field-label">Time <span class="optional">optional</span></label>
+        <input type="time" id="routineTime" class="field">
+        <label class="field-label">Location <span class="optional">optional</span></label>
+        <input type="text" id="routineLocation" class="field" placeholder="e.g. Synagogue">
+        <label class="field-label">Repeat on</label>
+        <div class="day-picker">
+          <label class="day-pick"><input type="checkbox" name="rDay" value="0"><span>Sun</span></label>
+          <label class="day-pick"><input type="checkbox" name="rDay" value="1"><span>Mon</span></label>
+          <label class="day-pick"><input type="checkbox" name="rDay" value="2"><span>Tue</span></label>
+          <label class="day-pick"><input type="checkbox" name="rDay" value="3"><span>Wed</span></label>
+          <label class="day-pick"><input type="checkbox" name="rDay" value="4"><span>Thu</span></label>
+          <label class="day-pick"><input type="checkbox" name="rDay" value="5"><span>Fri</span></label>
+          <label class="day-pick"><input type="checkbox" name="rDay" value="6"><span>Sat</span></label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="cancelRoutineItem" class="btn-cancel">Cancel</button>
+        <button id="saveRoutineItem" class="btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Zmanim Full View -->
+  <div id="zmanimModal" class="modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 id="zmanimModalDate">Zmanim</h2>
+        <button class="modal-close" id="closeZmanimModal">&times;</button>
+      </div>
+      <div class="modal-body" id="zmanimModalBody">
+        <p style="color:#aaa;text-align:center">Loading...</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
