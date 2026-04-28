@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 
@@ -38,8 +38,7 @@
       <button class="dash-pill" id="pillSeven">7-Day</button>
       <button class="dash-pill" id="pillRoutine">My Routine</button>
       <span class="dash-divider"></span>
-      <button class="dash-pill" id="pillShortTerm">Short Term</button>
-      <button class="dash-pill" id="pillLongTerm">Long Term</button>
+      <button class="dash-pill" id="pillFuture">Future</button>
       <button class="dash-pill" id="pillCheshbon">Cheshbon</button>
       <button class="dash-pill" id="pillReminders">Reminders</button>
     </div>
@@ -71,28 +70,30 @@
     <div id="sevenDayGrid" class="seven-day-grid"></div>
   </div>
 
-  <!-- Short Term View -->
-  <div id="shortTermView" class="view">
-    <div class="list-page-header">
-      <div>
-        <h2 class="list-page-title">Short Term</h2>
-        <p class="list-page-subtitle">Tasks and goals for the near future</p>
+  <!-- Future View (Short Term + Long Term side by side) -->
+  <div id="futureView" class="view">
+    <div class="future-layout">
+      <div class="future-section">
+        <div class="future-section-header">
+          <div>
+            <h2 class="list-page-title">Short Term</h2>
+            <p class="list-page-subtitle">Tasks for the near future</p>
+          </div>
+          <button id="addShortTermBtn" class="btn-primary" style="font-size:13px;padding:7px 14px">+ Add</button>
+        </div>
+        <div id="shortTermList" class="simple-task-list"></div>
       </div>
-      <button id="addShortTermBtn" class="btn-primary">+ Add Task</button>
-    </div>
-    <div id="shortTermList" class="simple-task-list"></div>
-  </div>
-
-  <!-- Long Term View -->
-  <div id="longTermView" class="view">
-    <div class="list-page-header">
-      <div>
-        <h2 class="list-page-title">Long Term</h2>
-        <p class="list-page-subtitle">Big goals and future plans</p>
+      <div class="future-section">
+        <div class="future-section-header">
+          <div>
+            <h2 class="list-page-title">Long Term</h2>
+            <p class="list-page-subtitle">Tasks and plans ahead</p>
+          </div>
+          <button id="addLongTermBtn" class="btn-primary" style="font-size:13px;padding:7px 14px">+ Add</button>
+        </div>
+        <div id="longTermList" class="simple-task-list"></div>
       </div>
-      <button id="addLongTermBtn" class="btn-primary">+ Add Goal</button>
     </div>
-    <div id="longTermList" class="simple-task-list"></div>
   </div>
 
   <!-- Cheshbon View -->
@@ -434,6 +435,8 @@
     <div class="modal-body">
       <label class="field-label" id="simpleItemLabel">Task</label>
       <input type="text" id="simpleItemText" class="field" placeholder="What is it?">
+      <label class="field-label">Notes <span class="optional">optional</span></label>
+      <textarea id="simpleItemNotes" class="field" rows="3" placeholder="Any details..."></textarea>
     </div>
     <div class="modal-footer">
       <button id="cancelSimpleItem" class="btn-cancel">Cancel</button>
@@ -615,6 +618,6 @@
   </div>
 </div>
 
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>

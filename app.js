@@ -297,7 +297,9 @@ function toggleNotePin(id){ var data=getData(); var n=data.notes.find(function(n
 // ============================================================
 // SHORT TERM / LONG TERM
 // ============================================================
-function addSimpleItem(list,text){ var data=getData(); var arr=data[list]; arr.push({id:uid(),title:text,done:false,doneAt:null,createdAt:new Date().toISOString()}); list==='shortterm'?saveST(arr):saveLT(arr); }
+function addSimpleItem(list,text,notes){ var data=getData(); var arr=data[list]; arr.push({id:uid(),title:text,notes:notes||'',done:false,doneAt:null,createdAt:new Date().toISOString()}); list==='shortterm'?saveST(arr):saveLT(arr); }
+function updateSimpleItem(list,id,text,notes){ var data=getData(); var item=data[list].find(function(i){return i.id===id;}); if(item){item.title=text;item.notes=notes||'';} list==='shortterm'?saveST(data[list]):saveLT(data[list]); }
+function reorderSimpleList(list,srcId,tgtId){ var data=getData(); var arr=data[list]; var si=arr.findIndex(function(i){return i.id===srcId;}),ti=arr.findIndex(function(i){return i.id===tgtId;}); if(si===-1||ti===-1||si===ti)return; var item=arr.splice(si,1)[0]; arr.splice(ti,0,item); list==='shortterm'?saveST(arr):saveLT(arr); }
 function toggleSimpleItem(list,id){ var data=getData(); var item=data[list].find(function(i){return i.id===id;}); if(item){item.done=!item.done;item.doneAt=item.done?new Date().toISOString():null;} list==='shortterm'?saveST(data[list]):saveLT(data[list]); }
 function deleteSimpleItem(list,id){ var data=getData(); var arr=data[list].filter(function(i){return i.id!==id;}); list==='shortterm'?saveST(arr):saveLT(arr); }
 function moveItemToDay(list,id,ds){ var data=getData(); var item=data[list].find(function(i){return i.id===id;}); if(!item)return; addTask(ds,{title:item.title}); deleteSimpleItem(list,id); }
@@ -494,20 +496,25 @@ function refreshDashDayModal() {
 // ============================================================
 function renderSimpleList(list,containerId) {
   var data=getData(); var items=data[list]; var el=document.getElementById(containerId); if(!el)return;
-  if (!items.length){ el.innerHTML='<div class="stl-empty">Nothing here yet. Add one above.</div>'; return; }
+  if (!items.length){ el.innerHTML='<div class="stl-empty">Nothing here yet. Hit + Add to get started.</div>'; return; }
   var inc=items.filter(function(i){return !i.done;}); var don=items.filter(function(i){return i.done;});
   el.innerHTML=inc.concat(don).map(function(item){
-    return '<div class="stl-item'+(item.done?' is-done':'')+'">' +
+    var notesHTML=item.notes&&item.notes.trim()?'<div class="stl-item-notes">'+escHtml(item.notes)+'</div>':'';
+    return '<div class="stl-item'+(item.done?' is-done':'')+'" draggable="true" data-id="'+item.id+'" data-list="'+list+'" '+
+      'ondragstart="stlDragStart(event)" ondragover="stlDragOver(event)" ondrop="stlDrop(event)" ondragleave="stlDragLeave(event)" ondragend="stlDragEnd(event)">' +
+      '<div class="stl-drag-handle" title="Drag to reorder">⠿</div>' +
       '<input type="checkbox" class="task-check"'+(item.done?' checked':'')+' onchange="toggleSTItem(\''+list+'\',\''+item.id+'\')">' +
-      '<span class="stl-item-title">'+escHtml(item.title)+'</span>' +
+      '<div class="stl-item-body"><div class="stl-item-title">'+escHtml(item.title)+'</div>'+notesHTML+'</div>' +
       '<div class="stl-actions">'+
-        (!item.done?'<button class="btn-move" onclick="openMoveToDay(\''+list+'\',\''+item.id+'\')">📅 Move to Day</button>':'')+
+        '<button class="btn-icon" onclick="openEditSTItem(\''+list+'\',\''+item.id+'\')">✏️</button>'+
+        (!item.done?'<button class="btn-move" onclick="openMoveToDay(\''+list+'\',\''+item.id+'\')">📅</button>':'')+
         '<button class="btn-icon" onclick="deleteSTItem(\''+list+'\',\''+item.id+'\')">🗑</button>'+
       '</div></div>';
   }).join('');
 }
 function renderShortTerm(){ renderSimpleList('shortterm','shortTermList'); }
 function renderLongTerm() { renderSimpleList('longterm','longTermList');  }
+function renderFuture()   { renderShortTerm(); renderLongTerm(); }
 
 // ============================================================
 // RENDER — REMINDERS
@@ -739,8 +746,8 @@ function renderDashDayModalBody(ds) {
 // DASHBOARD VIEW SWITCHING
 // ============================================================
 function setDashView(viewName) {
-  var viewMap = {single:'singleDayView',seven:'sevenDayView',shortterm:'shortTermView',longterm:'longTermView',cheshbon:'cheshbonView',reminders:'remindersView'};
-  var pillMap = {single:'pillDay',seven:'pillSeven',shortterm:'pillShortTerm',longterm:'pillLongTerm',cheshbon:'pillCheshbon',reminders:'pillReminders'};
+  var viewMap = {single:'singleDayView',seven:'sevenDayView',future:'futureView',cheshbon:'cheshbonView',reminders:'remindersView'};
+  var pillMap = {single:'pillDay',seven:'pillSeven',future:'pillFuture',cheshbon:'pillCheshbon',reminders:'pillReminders'};
   Object.values(viewMap).forEach(function(v){ var el=document.getElementById(v); if(el)el.classList.remove('active'); });
   Object.values(pillMap).forEach(function(p){ var el=document.getElementById(p); if(el)el.classList.remove('active'); });
   state.dashView=viewName;
@@ -748,8 +755,7 @@ function setDashView(viewName) {
   var pEl=document.getElementById(pillMap[viewName]); if(pEl)pEl.classList.add('active');
   if (viewName==='single')    renderSingle();
   if (viewName==='seven')     renderSeven();
-  if (viewName==='shortterm') renderShortTerm();
-  if (viewName==='longterm')  renderLongTerm();
+  if (viewName==='future')    renderFuture();
   if (viewName==='reminders') renderReminders();
 }
 
@@ -769,6 +775,42 @@ function showPage(pageId) {
   if (pageId==='learning')  renderLearning();
   if (pageId==='financial') renderFinancial();
 }
+
+// ============================================================
+// DRAG-AND-DROP (Simple Lists)
+// ============================================================
+var _stlDrag = { srcId: null, srcList: null };
+
+window.stlDragStart = function(e) {
+  _stlDrag.srcId   = e.currentTarget.dataset.id;
+  _stlDrag.srcList = e.currentTarget.dataset.list;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+};
+window.stlDragOver = function(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.classList.add('drag-over');
+};
+window.stlDragLeave = function(e) {
+  if (!e.currentTarget.contains(e.relatedTarget)) {
+    e.currentTarget.classList.remove('drag-over');
+  }
+};
+window.stlDragEnd = function(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.stl-item').forEach(function(el){ el.classList.remove('drag-over'); });
+};
+window.stlDrop = function(e) {
+  e.preventDefault();
+  var tgtId   = e.currentTarget.dataset.id;
+  var tgtList = e.currentTarget.dataset.list;
+  e.currentTarget.classList.remove('drag-over');
+  if (!_stlDrag.srcId || _stlDrag.srcId === tgtId || _stlDrag.srcList !== tgtList) return;
+  reorderSimpleList(tgtList, _stlDrag.srcId, tgtId);
+  _stlDrag.srcId = null; _stlDrag.srcList = null;
+  tgtList === 'shortterm' ? renderShortTerm() : renderLongTerm();
+};
 
 // ============================================================
 // GLOBAL CALLBACKS
@@ -895,6 +937,16 @@ window.removeCalEvent = function(id){ if(confirm('Delete this event?')){ deleteC
 window.toggleSTItem  = function(list,id){ toggleSimpleItem(list,id); list==='shortterm'?renderShortTerm():renderLongTerm(); };
 window.deleteSTItem  = function(list,id){ if(confirm('Delete this item?')){ deleteSimpleItem(list,id); list==='shortterm'?renderShortTerm():renderLongTerm(); } };
 window.openMoveToDay = function(list,id){ state.movingItemId=id; state.movingItemList=list; document.getElementById('moveToDayDate').value=toDateStr(new Date()); openModal('moveToDayModal'); };
+window.openEditSTItem = function(list,id) {
+  var data=getData(); var item=data[list].find(function(i){return i.id===id;}); if(!item)return;
+  state.simpleItemContext=list; state.editSimpleItemId=id;
+  document.getElementById('simpleItemModalTitle').textContent='Edit Task';
+  document.getElementById('simpleItemLabel').textContent='Task';
+  document.getElementById('simpleItemText').value=item.title;
+  document.getElementById('simpleItemNotes').value=item.notes||'';
+  openModal('simpleItemModal');
+  setTimeout(function(){document.getElementById('simpleItemText').focus();},80);
+};
 
 // Reminders
 window.openEditReminder = function(id) {
@@ -1061,9 +1113,8 @@ function initListeners() {
   document.getElementById('pillDay').addEventListener('click',       function(){ setDashView('single'); });
   document.getElementById('pillSeven').addEventListener('click',     function(){ setDashView('seven'); });
   document.getElementById('pillRoutine').addEventListener('click',   function(){ renderRoutineList(); openModal('routineModal'); });
-  document.getElementById('pillShortTerm').addEventListener('click', function(){ setDashView('shortterm'); });
-  document.getElementById('pillLongTerm').addEventListener('click',  function(){ setDashView('longterm'); });
-  document.getElementById('pillCheshbon').addEventListener('click',  function(){ setDashView('cheshbon'); });
+  document.getElementById('pillFuture').addEventListener('click',   function(){ setDashView('future'); });
+  document.getElementById('pillCheshbon').addEventListener('click', function(){ setDashView('cheshbon'); });
   document.getElementById('pillReminders').addEventListener('click', function(){ setDashView('reminders'); });
 
   // Date jump
@@ -1125,15 +1176,31 @@ function initListeners() {
   document.getElementById('closeZmanimModal').addEventListener('click', function(){ closeModal('zmanimModal'); });
 
   // Short/Long Term
-  document.getElementById('addShortTermBtn').addEventListener('click', function(){ state.simpleItemContext='shortterm'; state.editSimpleItemId=null; document.getElementById('simpleItemModalTitle').textContent='Add Short Term Task'; document.getElementById('simpleItemLabel').textContent='Task'; document.getElementById('simpleItemText').value=''; openModal('simpleItemModal'); setTimeout(function(){document.getElementById('simpleItemText').focus();},80); });
-  document.getElementById('addLongTermBtn').addEventListener('click',  function(){ state.simpleItemContext='longterm';  state.editSimpleItemId=null; document.getElementById('simpleItemModalTitle').textContent='Add Long Term Goal';  document.getElementById('simpleItemLabel').textContent='Goal'; document.getElementById('simpleItemText').value=''; openModal('simpleItemModal'); setTimeout(function(){document.getElementById('simpleItemText').focus();},80); });
+  function openAddSTModal(list, label) {
+    state.simpleItemContext=list; state.editSimpleItemId=null;
+    document.getElementById('simpleItemModalTitle').textContent='Add Task';
+    document.getElementById('simpleItemLabel').textContent=label||'Task';
+    document.getElementById('simpleItemText').value='';
+    document.getElementById('simpleItemNotes').value='';
+    openModal('simpleItemModal');
+    setTimeout(function(){document.getElementById('simpleItemText').focus();},80);
+  }
+  document.getElementById('addShortTermBtn').addEventListener('click', function(){ openAddSTModal('shortterm','Task'); });
+  document.getElementById('addLongTermBtn').addEventListener('click',  function(){ openAddSTModal('longterm','Task'); });
   document.getElementById('closeSimpleItemModal').addEventListener('click', function(){ closeModal('simpleItemModal'); });
   document.getElementById('cancelSimpleItem').addEventListener('click',     function(){ closeModal('simpleItemModal'); });
   document.getElementById('saveSimpleItem').addEventListener('click', function(){
     var text=document.getElementById('simpleItemText').value.trim();
+    var notes=document.getElementById('simpleItemNotes').value.trim();
     if (!text){ document.getElementById('simpleItemText').classList.add('error'); return; }
     document.getElementById('simpleItemText').classList.remove('error');
-    addSimpleItem(state.simpleItemContext,text); closeModal('simpleItemModal');
+    if (state.editSimpleItemId) {
+      updateSimpleItem(state.simpleItemContext,state.editSimpleItemId,text,notes);
+      state.editSimpleItemId=null;
+    } else {
+      addSimpleItem(state.simpleItemContext,text,notes);
+    }
+    closeModal('simpleItemModal');
     state.simpleItemContext==='shortterm'?renderShortTerm():renderLongTerm();
   });
   document.getElementById('simpleItemText').addEventListener('keydown', function(e){ if(e.key==='Enter')document.getElementById('saveSimpleItem').click(); });
