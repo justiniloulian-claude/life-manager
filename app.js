@@ -26,7 +26,10 @@ const state = {
   editTaskId: null,
   editTaskDate: null,
   editRoutineId: null,
+  routineOverrideDs: null,
+  routineOverrideId: null,
   selectedTaskColor: '',
+  selectedTaskPriority: 'standard',
   simpleItemContext: null,
   editSimpleItemId: null,
   movingItemId: null,
@@ -74,7 +77,8 @@ function getData() {
     income:      JSON.parse(localStorage.getItem('dm_income')      || '[]'),
     expenses:    JSON.parse(localStorage.getItem('dm_expenses')    || '[]'),
     shopping:    JSON.parse(localStorage.getItem('dm_shopping')    || '[]'),
-    moneymaking: JSON.parse(localStorage.getItem('dm_moneymaking') || '[]'),
+    moneymaking:      JSON.parse(localStorage.getItem('dm_moneymaking')       || '[]'),
+    routineOverrides: JSON.parse(localStorage.getItem('dm_routine_overrides') || '{}'),
   };
 }
 function saveT(v)   { localStorage.setItem('dm_tasks',       JSON.stringify(v)); }
@@ -89,7 +93,8 @@ function saveLrn(v) { localStorage.setItem('dm_learning',    JSON.stringify(v));
 function saveInc(v) { localStorage.setItem('dm_income',      JSON.stringify(v)); }
 function saveExp(v) { localStorage.setItem('dm_expenses',    JSON.stringify(v)); }
 function saveSho(v) { localStorage.setItem('dm_shopping',    JSON.stringify(v)); }
-function saveMM(v)  { localStorage.setItem('dm_moneymaking', JSON.stringify(v)); }
+function saveMM(v)  { localStorage.setItem('dm_moneymaking',       JSON.stringify(v)); }
+function saveRO(v)  { localStorage.setItem('dm_routine_overrides', JSON.stringify(v)); }
 function uid()      { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 
 // ============================================================
@@ -213,7 +218,14 @@ function getTasksForDate(ds) {
   var completions=(data.tasks[ds]||[]).filter(function(t){return t._rc;});
   var routineTasks=data.routine.filter(function(r){return r.days.includes(dow);}).map(function(r){
     var c=completions.find(function(c){return c._rc===r.id;});
-    return {id:r.id,title:r.title,time:r.time,location:r.location,color:'',type:'routine',done:c?c.done:false};
+    var ov=data.routineOverrides[ds+'_'+r.id]||{};
+    return {
+      id:       r.id,
+      title:    ov.title    !== undefined ? ov.title    : r.title,
+      time:     ov.time     !== undefined ? ov.time     : r.time,
+      location: ov.location !== undefined ? ov.location : r.location,
+      color:'', type:'routine', done: c ? c.done : false
+    };
   });
   var oneTasks=(data.tasks[ds]||[]).filter(function(t){return !t._rc;});
   var all=routineTasks.concat(oneTasks);
@@ -238,13 +250,13 @@ function toggleDone(ds,id,isRoutine) {
 function addTask(ds,d) {
   var data=getData();
   if (!data.tasks[ds]) data.tasks[ds]=[];
-  data.tasks[ds].push({id:uid(),type:'once',title:d.title,time:d.time||'',location:d.location||'',notes:d.notes||'',reminder:d.reminder||'',color:d.color||'',done:false,createdAt:new Date().toISOString()});
+  data.tasks[ds].push({id:uid(),type:'once',title:d.title,time:d.time||'',location:d.location||'',notes:d.notes||'',reminder:d.reminder||'',color:d.color||'',priority:d.priority||'standard',done:false,createdAt:new Date().toISOString()});
   saveT(data.tasks);
 }
 function updateTask(ds,id,d) {
   var data=getData();
   var t=(data.tasks[ds]||[]).find(function(t){return t.id===id;});
-  if (t){t.title=d.title;t.time=d.time||'';t.location=d.location||'';t.notes=d.notes||'';t.reminder=d.reminder||'';t.color=d.color||'';}
+  if (t){t.title=d.title;t.time=d.time||'';t.location=d.location||'';t.notes=d.notes||'';t.reminder=d.reminder||'';t.color=d.color||'';t.priority=d.priority||'standard';}
   saveT(data.tasks);
 }
 function deleteTask(ds,id) {
@@ -390,18 +402,23 @@ function buildColorPicker(containerId,selectedVal,onSelect) {
 // ============================================================
 function taskHTML(task, ds) {
   var isR = task.type === 'routine';
-  var colorObj = colorByValue(task.color||'');
-  var colorClass = isR ? 'is-routine' : (colorObj.taskCls||'');
+  // Routine = italic (CSS). Non-routine = no background color differentiation.
+  var itemCls = isR ? 'is-routine' : '';
+  // Priority weight applies to the title for non-routine tasks
+  var priorityCls = isR ? '' : ('task-p-'+(task.priority||'standard'));
   var tb = task.time     ? '<span class="badge badge-time">'+fmt12(task.time)+'</span>'       : '';
   var lb = task.location ? '<span class="badge badge-loc">'+escHtml(task.location)+'</span>'  : '';
-  var eb = !isR ? '<button class="btn-icon" onclick="openEditTask(\''+ds+'\',\''+task.id+'\')">✏️</button>' : '';
-  var db = !isR ? '<button class="btn-icon" onclick="removeTask(\''+ds+'\',\''+task.id+'\')">🗑</button>'  : '';
+  // Routine tasks get an override edit button; one-time tasks get normal edit + delete
+  var eb = isR
+    ? '<button class="btn-icon" onclick="openRoutineOverride(\''+ds+'\',\''+task.id+'\')">✏️</button>'
+    : '<button class="btn-icon" onclick="openEditTask(\''+ds+'\',\''+task.id+'\')">✏️</button>';
+  var db = !isR ? '<button class="btn-icon" onclick="removeTask(\''+ds+'\',\''+task.id+'\')">🗑</button>' : '';
   var hasNotes = !isR && task.notes && task.notes.trim();
   var nb = hasNotes ? '<button class="btn-icon task-notes-btn" onclick="toggleTaskNotes(this)" title="View notes">📋</button>' : '';
   var notesPanel = hasNotes ? '<div class="task-notes-panel" style="display:none">'+escHtml(task.notes)+'</div>' : '';
-  return '<div class="task-item '+colorClass+(task.done?' is-done':'')+'" id="ti-'+task.id+'">' +
+  return '<div class="task-item '+itemCls+(task.done?' is-done':'')+'" id="ti-'+task.id+'">' +
     '<input type="checkbox" class="task-check"'+(task.done?' checked':'')+' onchange="checkTask(\''+ds+'\',\''+task.id+'\','+isR+')">' +
-    '<div class="task-body"><div class="task-title">'+escHtml(task.title)+'</div>' +
+    '<div class="task-body"><div class="task-title '+priorityCls+'">'+escHtml(task.title)+'</div>' +
     '<div class="task-meta">'+tb+lb+'</div>'+notesPanel+'</div>' +
     '<div class="task-actions">'+nb+eb+db+'</div></div>';
 }
@@ -746,6 +763,7 @@ function showPage(pageId) {
   var activeTab=document.querySelector('.header-nav-tab[data-page="'+pageId+'"]');
   if (activeTab) activeTab.classList.add('active');
   state.currentPage=pageId;
+  if (pageId==='dashboard') setDashView('seven');
   if (pageId==='calendar')  renderCalendar();
   if (pageId==='notes')     renderNotes();
   if (pageId==='learning')  renderLearning();
@@ -765,7 +783,7 @@ window.toggleTaskNotes = function(btn) {
 };
 
 window.openAddTask = function(ds) {
-  state.editTaskId=null; state.editTaskDate=ds; state.selectedTaskColor='';
+  state.editTaskId=null; state.editTaskDate=ds; state.selectedTaskColor=''; state.selectedTaskPriority='standard';
   document.getElementById('taskModalTitle').textContent='Add Task or Event';
   document.getElementById('taskTitle').value='';
   document.getElementById('taskTime').value='';
@@ -773,13 +791,14 @@ window.openAddTask = function(ds) {
   document.getElementById('taskNotes').value='';
   document.getElementById('taskReminder').value='';
   document.getElementById('taskAddToCalendar').checked=false;
+  document.querySelectorAll('.priority-btn').forEach(function(b){b.classList.toggle('active',b.dataset.priority==='standard');});
   buildColorPicker('taskColorPicker','',function(v){state.selectedTaskColor=v;});
   openModal('taskModal');
   setTimeout(function(){document.getElementById('taskTitle').focus();},80);
 };
 window.openEditTask = function(ds,id) {
   var data=getData(); var t=(data.tasks[ds]||[]).find(function(t){return t.id===id;}); if(!t)return;
-  state.editTaskId=id; state.editTaskDate=ds; state.selectedTaskColor=t.color||'';
+  state.editTaskId=id; state.editTaskDate=ds; state.selectedTaskColor=t.color||''; state.selectedTaskPriority=t.priority||'standard';
   document.getElementById('taskModalTitle').textContent='Edit Task';
   document.getElementById('taskTitle').value=t.title;
   document.getElementById('taskTime').value=t.time||'';
@@ -787,6 +806,7 @@ window.openEditTask = function(ds,id) {
   document.getElementById('taskNotes').value=t.notes||'';
   document.getElementById('taskReminder').value=t.reminder||'';
   document.getElementById('taskAddToCalendar').checked=false;
+  document.querySelectorAll('.priority-btn').forEach(function(b){b.classList.toggle('active',b.dataset.priority===(t.priority||'standard'));});
   buildColorPicker('taskColorPicker',t.color||'',function(v){state.selectedTaskColor=v;});
   openModal('taskModal');
 };
@@ -798,6 +818,36 @@ window.openZmanim = async function(ds) {
   var times=await fetchZmanim(ds);
   var body=document.getElementById('zmanimModalBody'); if(body)body.innerHTML=zmanimFullHTML(times);
 };
+// Open the one-time routine override modal for a specific date
+window.openRoutineOverride = function(ds, routineId) {
+  var data=getData();
+  var r=data.routine.find(function(r){return r.id===routineId;}); if(!r)return;
+  var ov=data.routineOverrides[ds+'_'+routineId]||{};
+  state.routineOverrideDs=ds; state.routineOverrideId=routineId;
+  var date=fromDateStr(ds);
+  document.getElementById('routineOverrideModalTitle').textContent='Edit "'+r.title+'" — '+shortMonthDay(date)+' only';
+  document.getElementById('routineOverrideTitle').value=ov.title!==undefined?ov.title:r.title;
+  document.getElementById('routineOverrideTime').value=ov.time!==undefined?ov.time:(r.time||'');
+  document.getElementById('routineOverrideLocation').value=ov.location!==undefined?ov.location:(r.location||'');
+  openModal('routineOverrideModal');
+  setTimeout(function(){document.getElementById('routineOverrideTitle').focus();},80);
+};
+function saveRoutineOverrideModal() {
+  var title=document.getElementById('routineOverrideTitle').value.trim();
+  if (!title){document.getElementById('routineOverrideTitle').classList.add('error');document.getElementById('routineOverrideTitle').focus();return;}
+  document.getElementById('routineOverrideTitle').classList.remove('error');
+  var data=getData();
+  var key=state.routineOverrideDs+'_'+state.routineOverrideId;
+  data.routineOverrides[key]={
+    title:title,
+    time:document.getElementById('routineOverrideTime').value,
+    location:document.getElementById('routineOverrideLocation').value.trim()
+  };
+  saveRO(data.routineOverrides);
+  closeModal('routineOverrideModal');
+  refresh(); refreshDashDayModal();
+}
+
 window.openEditRoutineItem = function(id) {
   var data=getData(); var r=data.routine.find(function(r){return r.id===id;}); if(!r)return;
   state.editRoutineId=id;
@@ -888,7 +938,7 @@ function saveTaskModal() {
   var title=document.getElementById('taskTitle').value.trim();
   if (!title){ document.getElementById('taskTitle').classList.add('error'); document.getElementById('taskTitle').focus(); return; }
   document.getElementById('taskTitle').classList.remove('error');
-  var d={title:title,time:document.getElementById('taskTime').value,location:document.getElementById('taskLocation').value.trim(),notes:document.getElementById('taskNotes').value.trim(),reminder:document.getElementById('taskReminder').value,color:state.selectedTaskColor};
+  var d={title:title,time:document.getElementById('taskTime').value,location:document.getElementById('taskLocation').value.trim(),notes:document.getElementById('taskNotes').value.trim(),reminder:document.getElementById('taskReminder').value,color:state.selectedTaskColor,priority:state.selectedTaskPriority};
   var addToCal=document.getElementById('taskAddToCalendar').checked;
   state.editTaskId ? updateTask(state.editTaskDate,state.editTaskId,d) : addTask(state.editTaskDate,d);
   if (addToCal) addCalEvent({title:d.title,date:state.editTaskDate,time:d.time,color:d.color});
@@ -1045,6 +1095,18 @@ function initListeners() {
   document.getElementById('cancelTask').addEventListener('click',     function(){ closeModal('taskModal'); });
   document.getElementById('saveTask').addEventListener('click', saveTaskModal);
   document.getElementById('taskTitle').addEventListener('keydown', function(e){ if(e.key==='Enter')saveTaskModal(); });
+  // Priority picker
+  document.querySelectorAll('.priority-btn').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      document.querySelectorAll('.priority-btn').forEach(function(b){b.classList.remove('active');});
+      btn.classList.add('active'); state.selectedTaskPriority=btn.dataset.priority;
+    });
+  });
+
+  // Routine override modal
+  document.getElementById('closeRoutineOverrideModal').addEventListener('click', function(){ closeModal('routineOverrideModal'); });
+  document.getElementById('cancelRoutineOverride').addEventListener('click',     function(){ closeModal('routineOverrideModal'); });
+  document.getElementById('saveRoutineOverride').addEventListener('click', saveRoutineOverrideModal);
 
   // Routine modals
   document.getElementById('closeRoutineModal').addEventListener('click',     function(){ closeModal('routineModal'); });

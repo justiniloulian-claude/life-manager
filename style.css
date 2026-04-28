@@ -190,19 +190,20 @@ body {
 }
 .btn-type.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
 
-/* ===== DAY CARD (original) ===== */
+/* ===== DAY CARD ===== */
 .day-card {
-  background: #fff;
-  border: 1px solid #e8e8e8;
+  background: #F9F8F5;
+  border: 1px solid #E8E6E0;
   border-radius: 14px;
   overflow: hidden;
   max-width: 660px;
   margin: 0 auto;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 .day-card.is-today {
-  border: 2px solid #1a1a1a;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  background: #FFFBF0;
+  border: 2px solid #E8B24A;
+  box-shadow: 0 4px 20px rgba(232,178,74,0.15);
 }
 
 .day-card-head {
@@ -271,12 +272,9 @@ body {
 .task-item:hover .task-actions { opacity: 1; }
 .task-item.is-done { opacity: 0.38; }
 
-/* Routine = warm amber row */
-.task-item.is-routine {
-  background: #fffbeb;
-  border-left-color: #f59e0b;
-}
-.task-item.is-routine:hover { background: #fff8e1; }
+/* Routine = italicized title only */
+.task-item.is-routine { background: transparent; border-left-color: transparent; }
+.task-item.is-routine .task-title { font-style: italic; }
 
 /* Color options for one-time tasks */
 .task-item.tc-yellow   { background: #fef9c3; border-left-color: #eab308; }
@@ -336,7 +334,7 @@ body {
 }
 .seven-day-grid .day-card      { max-width: none; margin: 0; }
 .seven-day-grid .day-card-name { font-size: 16px; }
-.seven-day-grid .task-title    { font-size: 13px; }
+.seven-day-grid .task-title    { font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .seven-day-grid .task-item     { padding: 7px 12px; }
 .seven-day-grid .day-card-head { padding: 12px 12px 9px; }
 .seven-day-grid .zmanim-strip  { padding: 7px 12px; }
@@ -707,6 +705,32 @@ textarea.field { resize: vertical; }
   border-left: 2px solid #e0e0e0;
 }
 .task-notes-btn.active { color: #f59e0b !important; }
+
+/* ===== TASK PRIORITY WEIGHTS ===== */
+.task-p-standard { font-weight: 400; }
+.task-p-priority { font-weight: 700; }
+.task-p-mustdo   { font-weight: 900; }
+
+/* ===== PRIORITY PICKER (in task modal) ===== */
+.priority-picker {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+  margin-top: 4px;
+}
+.priority-btn {
+  padding: 6px 16px;
+  border: 1px solid #e0e0e0;
+  background: #fff;
+  color: #888;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.priority-btn:hover { background: #f5f5f5; color: #1a1a1a; }
+.priority-btn.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
 
 /* ===== DASHBOARD SUB-NAV ===== */
 .dash-subnav {

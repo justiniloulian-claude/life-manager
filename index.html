@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 
@@ -239,6 +239,12 @@
         <option value="2880">2 days before</option>
         <option value="10080">1 week before</option>
       </select>
+      <label class="field-label">Priority</label>
+      <div class="priority-picker" id="taskPriorityPicker">
+        <button type="button" class="priority-btn active" data-priority="standard">Standard</button>
+        <button type="button" class="priority-btn" data-priority="priority">Priority</button>
+        <button type="button" class="priority-btn" data-priority="mustdo">Must Do</button>
+      </div>
       <label class="field-label">Color <span class="optional">optional</span></label>
       <div class="color-picker" id="taskColorPicker"></div>
       <div class="field-check-row">
@@ -586,6 +592,29 @@
   </div>
 </div>
 
-<script src="app.js?v=4"></script>
+<!-- Routine Override Modal (one-time edit for a specific day) -->
+<div id="routineOverrideModal" class="modal">
+  <div class="modal-box" style="max-width:400px">
+    <div class="modal-header">
+      <h2 id="routineOverrideModalTitle">Edit for This Day</h2>
+      <button class="modal-close" id="closeRoutineOverrideModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-note">This change only applies to this one day. Your routine stays the same for every other week.</p>
+      <label class="field-label">Task title</label>
+      <input type="text" id="routineOverrideTitle" class="field" placeholder="e.g. Mincha">
+      <label class="field-label">Time <span class="optional">optional</span></label>
+      <input type="time" id="routineOverrideTime" class="field">
+      <label class="field-label">Location <span class="optional">optional</span></label>
+      <input type="text" id="routineOverrideLocation" class="field" placeholder="e.g. Different shul">
+    </div>
+    <div class="modal-footer">
+      <button id="cancelRoutineOverride" class="btn-cancel">Cancel</button>
+      <button id="saveRoutineOverride" class="btn-primary">Save for This Day</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js?v=5"></script>
 </body>
 </html>
