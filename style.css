@@ -113,6 +113,10 @@ body {
   background: #1a1a1a; color: #fff;
   padding: 2px 9px; border-radius: 20px;
 }
+.day-card-hdate {
+  font-size: 12px; color: #aaa;
+  margin-top: 3px; font-style: italic;
+}
 
 /* ===== ZMANIM STRIP ===== */
 .zmanim-strip {

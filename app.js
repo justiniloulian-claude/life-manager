@@ -11,6 +11,7 @@ const state = {
   editTaskDate: null,
   editRoutineId: null,
   zmanimCache: {},
+  hebrewCache: {},
   location: null,
 };
 
@@ -146,6 +147,30 @@ function zmanimFullHTML(times) {
       '<span class="zmanim-row-time">' + fmtISO(r[1]) + '</span>' +
       '</div>';
   }).join('');
+}
+
+// ============================================================
+// HEBREW DATE — fetches from Hebcal converter
+// ============================================================
+async function fetchHebrewDate(ds) {
+  if (state.hebrewCache[ds]) return state.hebrewCache[ds];
+  const [y, m, d] = ds.split('-');
+  try {
+    const url = 'https://www.hebcal.com/converter?cfg=json&gy=' + y + '&gm=' + m + '&gd=' + d + '&g2h=1';
+    const res  = await fetch(url);
+    const json = await res.json();
+    const result = json.hd + ' ' + json.hm + ' ' + json.hy;
+    state.hebrewCache[ds] = result;
+    return result;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function loadHebrewDate(ds) {
+  const hdate = await fetchHebrewDate(ds);
+  const el = document.getElementById('hdate-' + ds);
+  if (el && hdate) el.textContent = hdate;
 }
 
 // ============================================================
@@ -297,9 +322,11 @@ function dayCardHTML(date, compact) {
   const chip = today ? ' <span class="today-chip">Today</span>' : '';
   const head = compact
     ? '<div class="day-card-label">' + shortMonthDay(date) + '</div>' +
-      '<div class="day-card-name">'  + shortDay(date) + chip + '</div>'
-    : '<div class="day-card-label">' + monthDay(date) + '</div>' +
-      '<div class="day-card-name">'  + dayName(date)  + chip + '</div>';
+      '<div class="day-card-name">'  + shortDay(date) + chip + '</div>' +
+      '<div class="day-card-hdate" id="hdate-' + ds + '">...</div>'
+    : '<div class="day-card-name">'  + dayName(date)  + chip + '</div>' +
+      '<div class="day-card-label" style="margin-top:3px">' + monthDay(date) + '</div>' +
+      '<div class="day-card-hdate" id="hdate-' + ds + '">...</div>';
 
   const tHTML = tasks.length
     ? tasks.map(function(t) { return taskHTML(t, ds); }).join('')
@@ -323,8 +350,10 @@ function dayCardHTML(date, compact) {
 // ============================================================
 function renderSingle() {
   const date = dateFromOffset(state.dayOffset);
+  const ds   = toDateStr(date);
   document.getElementById('singleDayContainer').innerHTML = dayCardHTML(date, false);
-  loadZstrip(toDateStr(date));
+  loadZstrip(ds);
+  loadHebrewDate(ds);
   document.getElementById('backToTodayBtn').style.display = state.dayOffset === 0 ? 'none' : '';
 }
 
@@ -338,7 +367,7 @@ function renderSeven() {
     html += dayCardHTML(d, true);
   }
   document.getElementById('sevenDayGrid').innerHTML = html;
-  dates.forEach(function(d) { loadZstrip(toDateStr(d)); });
+  dates.forEach(function(d) { loadZstrip(toDateStr(d)); loadHebrewDate(toDateStr(d)); });
   document.getElementById('nextWeekBtn').textContent     = 'Days ' + (s + 2) + '–' + (s + 8) + ' →';
   document.getElementById('nextTwoWeeksBtn').textContent = 'Days ' + (s + 8) + '–' + (s + 14) + ' →';
   document.getElementById('prevWeekBtn').style.display   = s <= 0 ? 'none' : '';
@@ -512,7 +541,7 @@ function saveRoutineModal() {
 function toggleView() {
   if (state.view === 'single') {
     state.view      = 'seven';
-    state.weekStart = Math.max(0, state.dayOffset);
+    state.weekStart = 0;
     document.getElementById('singleDayView').classList.remove('active');
     document.getElementById('sevenDayView').classList.add('active');
     document.getElementById('toggleViewBtn').textContent = 'Today View';
@@ -634,9 +663,28 @@ function initListeners() {
 }
 
 // ============================================================
+// SEED ROUTINE — adds default prayers if routine is empty
+// ============================================================
+function seedRoutineIfEmpty() {
+  const data = getData();
+  if (data.routine.length > 0) return; // already has routine, skip
+  const allDays = [0, 1, 2, 3, 4, 5, 6];
+  const seeds = [
+    { title: 'Shacharit', time: '07:00', location: '', days: allDays },
+    { title: 'Mincha',    time: '13:30', location: '', days: allDays },
+    { title: 'Maariv',    time: '21:30', location: '', days: allDays },
+  ];
+  seeds.forEach(function(s) {
+    data.routine.push({ id: uid(), title: s.title, time: s.time, location: s.location, days: s.days });
+  });
+  saveR(data.routine);
+}
+
+// ============================================================
 // INIT — runs when the page first loads
 // ============================================================
 function init() {
+  seedRoutineIfEmpty();
   updateHeaderDate();
   setInterval(updateHeaderDate, 60000);
   initListeners();
