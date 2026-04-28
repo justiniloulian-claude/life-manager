@@ -686,6 +686,28 @@ textarea.field { resize: vertical; }
 .placeholder-page h2 { font-size: 22px; color: #1a1a1a; margin-bottom: 10px; }
 .placeholder-page p  { font-size: 15px; line-height: 1.6; }
 
+/* ===== 7-DAY CARD CLICKABLE HEADER ===== */
+.day-card-head-clickable {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.day-card-head-clickable:hover { background: #fafaf8; }
+
+/* ===== TASK NOTES PANEL ===== */
+.task-notes-panel {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: #fafaf8;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #555;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-left: 2px solid #e0e0e0;
+}
+.task-notes-btn.active { color: #f59e0b !important; }
+
 /* ===== DASHBOARD SUB-NAV ===== */
 .dash-subnav {
   display: flex;
