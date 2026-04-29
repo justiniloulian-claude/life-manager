@@ -620,7 +620,7 @@ window.openReflectionHistory = function() {
     body.innerHTML=data.reflHistory.map(function(entry,idx){
       var preview=entry.gratitude.filter(function(g){return g.trim();}).slice(0,2).join(' · ');
       return '<div class="refl-hist-entry" onclick="toggleReflHistEntry(this,'+idx+')">'+
-        '<div class="refl-hist-date">'+fmtDateDisplay(entry.date)+'</div>'+
+        '<div class="refl-hist-date">'+dayName(fromDateStr(entry.date))+', '+monthDay(fromDateStr(entry.date))+'</div>'+
         '<div class="refl-hist-preview">'+(preview?escHtml(preview):'—')+'</div>'+
         '<div class="refl-hist-expanded" style="display:none"></div>'+
         '</div>';
