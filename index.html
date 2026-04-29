@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=9">
+  <link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
 
@@ -161,10 +161,44 @@
 
   <!-- Physical Health View -->
   <div id="healthView" class="view">
-    <div class="placeholder-page">
-      <div style="font-size:52px;margin-bottom:16px">💪</div>
-      <h2>Physical Health</h2>
-      <p>Your physical health tracker is coming soon.<br>We'll build this section out together.</p>
+    <div class="health-nav-bar">
+      <button id="healthPrevDayBtn" class="btn-nav">&#8592; Prev</button>
+      <button id="healthBackTodayBtn" class="btn-today" style="display:none">Today</button>
+      <span id="healthDateLabel" class="health-date-label"></span>
+      <button id="healthNextDayBtn" class="btn-nav">Next &#8594;</button>
+    </div>
+    <div class="health-layout">
+
+      <!-- Diet Panel -->
+      <div class="health-panel">
+        <div class="health-panel-header">
+          <h2 class="health-panel-title">🥗 Diet</h2>
+          <button id="addHealthFoodBtn" class="btn-primary" style="font-size:13px;padding:7px 14px">+ Log Meal</button>
+        </div>
+        <div class="health-water-section">
+          <div class="health-section-label">Water Intake</div>
+          <div class="water-picker" id="waterPicker">
+            <button class="water-btn" data-level="not_enough">Not enough</button>
+            <button class="water-btn" data-level="little_more">A little more</button>
+            <button class="water-btn" data-level="fine">Fine</button>
+            <button class="water-btn" data-level="great">Great amount</button>
+          </div>
+        </div>
+        <div id="healthDietList" class="health-meals-list"></div>
+        <div class="health-coming-soon"><span>🎯</span><span>Targets — coming soon</span></div>
+      </div>
+
+      <!-- Physical Activity Panel -->
+      <div class="health-panel">
+        <div class="health-panel-header">
+          <h2 class="health-panel-title">🏃 Physical Activity</h2>
+          <button id="addHealthActivityBtn" class="btn-primary" style="font-size:13px;padding:7px 14px">+ Log Activity</button>
+        </div>
+        <div id="healthActivityList" class="health-activity-list"></div>
+        <div class="health-coming-soon"><span>📅</span><span>Activity Planner — coming soon</span></div>
+        <div class="health-coming-soon"><span>🏆</span><span>Goals — coming soon</span></div>
+      </div>
+
     </div>
   </div>
 
@@ -446,8 +480,8 @@
           </div>
         </div>
         <div style="flex:1;min-width:140px">
-          <label class="field-label">Folders <span class="optional">optional</span></label>
-          <div id="noteFolderPicker" class="folder-picker" style="margin-top:6px"></div>
+          <label class="field-label">Folder <span class="optional">optional</span></label>
+          <select id="noteFolderSelect" class="field" style="margin-bottom:0;margin-top:4px"></select>
         </div>
       </div>
       <label class="field-label" style="margin-top:14px">Color</label>
@@ -721,6 +755,62 @@
   </div>
 </div>
 
-<script src="app.js?v=9"></script>
+<!-- Health Food Modal -->
+<div id="healthFoodModal" class="modal">
+  <div class="modal-box" style="max-width:400px">
+    <div class="modal-header">
+      <h2 id="healthFoodModalTitle">Log Meal</h2>
+      <button class="modal-close" id="closeHealthFoodModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Meal</label>
+      <select id="healthFoodMealType" class="field">
+        <option value="breakfast">🌅 Breakfast</option>
+        <option value="lunch">☀️ Lunch</option>
+        <option value="dinner">🌙 Dinner</option>
+        <option value="snacks">🍎 Snacks</option>
+      </select>
+      <label class="field-label">What did you eat?</label>
+      <textarea id="healthFoodDescription" class="field" rows="4" placeholder="Describe what you had..."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button id="cancelHealthFood" class="btn-cancel">Cancel</button>
+      <button id="saveHealthFood" class="btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Health Activity Modal -->
+<div id="healthActivityModal" class="modal">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-header">
+      <h2 id="healthActivityModalTitle">Log Activity</h2>
+      <button class="modal-close" id="closeHealthActivityModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Activity Type</label>
+      <div class="activity-type-picker" id="activityTypePicker">
+        <button type="button" class="activity-type-btn" data-type="Cardio">Cardio</button>
+        <button type="button" class="activity-type-btn" data-type="PT">PT</button>
+        <button type="button" class="activity-type-btn" data-type="Stretching">Stretching</button>
+        <button type="button" class="activity-type-btn" data-type="Basketball">Basketball</button>
+        <button type="button" class="activity-type-btn" data-type="Biking">Biking</button>
+        <button type="button" class="activity-type-btn" data-type="Ab Workouts">Ab Workouts</button>
+      </div>
+      <label class="field-label">Custom activity <span class="optional">optional</span></label>
+      <input type="text" id="healthActivityCustom" class="field" placeholder="e.g. Swimming, Yoga...">
+      <label class="field-label">Duration <span class="optional">optional</span></label>
+      <input type="text" id="healthActivityDuration" class="field" placeholder="e.g. 30 min, 1 hour">
+      <label class="field-label">Notes <span class="optional">optional</span></label>
+      <textarea id="healthActivityNotes" class="field" rows="2" placeholder="Any details..."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button id="cancelHealthActivity" class="btn-cancel">Cancel</button>
+      <button id="saveHealthActivity" class="btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js?v=11"></script>
 </body>
 </html>

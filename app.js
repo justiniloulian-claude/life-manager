@@ -36,6 +36,10 @@ const state = {
   movingItemList: null,
   editReminderId: null,
   editCheshbonItemId: null,
+  healthDate: toDateStr(new Date()),
+  editHealthFoodId: null,
+  editHealthActivityId: null,
+  selectedActivityType: '',
   learningDay: null,
   editLearningItemId: null,
   activeFinTab: 'finances',
@@ -52,7 +56,6 @@ const state = {
   activeFolderId: 'all',
   editNoteId: null,
   selectedNoteColor: '',
-  selectedNoteFolderIds: [],
   selectedFolderColor: '',
   noteType: 'text',
   noteCheckItems: [],
@@ -90,6 +93,9 @@ function getData() {
     cheshbonItems:         JSON.parse(localStorage.getItem('dm_cheshbon_items'))             || [],
     cheshbonChecks:        JSON.parse(localStorage.getItem('dm_cheshbon_checks'))            || {},
     cheshbonWeekHistory:   JSON.parse(localStorage.getItem('dm_cheshbon_week_history'))      || [],
+    healthDiet:            JSON.parse(localStorage.getItem('dm_health_diet'))                || {},
+    healthActivity:        JSON.parse(localStorage.getItem('dm_health_activity'))            || {},
+    healthWater:           JSON.parse(localStorage.getItem('dm_health_water'))               || {},
   };
 }
 function saveT(v)   { localStorage.setItem('dm_tasks',       JSON.stringify(v)); }
@@ -114,6 +120,9 @@ function saveRHist(v){ localStorage.setItem('dm_refl_history',           JSON.st
 function saveChi(v)  { localStorage.setItem('dm_cheshbon_items',         JSON.stringify(v)); }
 function saveChk(v)  { localStorage.setItem('dm_cheshbon_checks',        JSON.stringify(v)); }
 function saveChWH(v) { localStorage.setItem('dm_cheshbon_week_history',  JSON.stringify(v)); }
+function saveHD(v)   { localStorage.setItem('dm_health_diet',             JSON.stringify(v)); }
+function saveHA(v)   { localStorage.setItem('dm_health_activity',         JSON.stringify(v)); }
+function saveHW(v)   { localStorage.setItem('dm_health_water',            JSON.stringify(v)); }
 function uid()      { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 
 // ============================================================
@@ -360,6 +369,41 @@ function deleteShoppingItem(id){ var data=getData(); saveSho(data.shopping.filte
 function addMoneyIdea(d){ var data=getData(); data.moneymaking.push({id:uid(),idea:d.idea,status:d.status||'idea',notes:d.notes||'',createdAt:new Date().toISOString()}); saveMM(data.moneymaking); }
 function updateMoneyIdea(id,d){ var data=getData(); var item=data.moneymaking.find(function(i){return i.id===id;}); if(item){item.idea=d.idea;item.status=d.status||'idea';item.notes=d.notes||'';} saveMM(data.moneymaking); }
 function deleteMoneyIdea(id){ var data=getData(); saveMM(data.moneymaking.filter(function(i){return i.id!==id;})); }
+
+// ============================================================
+// HEALTH DATA
+// ============================================================
+function addHealthFood(ds, d) {
+  var data=getData(); if(!data.healthDiet[ds])data.healthDiet[ds]=[];
+  data.healthDiet[ds].push({id:uid(),mealType:d.mealType,description:d.description,createdAt:new Date().toISOString()});
+  saveHD(data.healthDiet);
+}
+function updateHealthFood(ds, id, d) {
+  var data=getData(); var arr=data.healthDiet[ds]||[];
+  var item=arr.find(function(i){return i.id===id;});
+  if(item){item.mealType=d.mealType;item.description=d.description;} saveHD(data.healthDiet);
+}
+function deleteHealthFood(ds, id) {
+  var data=getData(); if(!data.healthDiet[ds])return;
+  data.healthDiet[ds]=data.healthDiet[ds].filter(function(i){return i.id!==id;}); saveHD(data.healthDiet);
+}
+function addHealthActivity(ds, d) {
+  var data=getData(); if(!data.healthActivity[ds])data.healthActivity[ds]=[];
+  data.healthActivity[ds].push({id:uid(),activityType:d.activityType,duration:d.duration||'',notes:d.notes||'',createdAt:new Date().toISOString()});
+  saveHA(data.healthActivity);
+}
+function updateHealthActivity(ds, id, d) {
+  var data=getData(); var arr=data.healthActivity[ds]||[];
+  var item=arr.find(function(i){return i.id===id;});
+  if(item){item.activityType=d.activityType;item.duration=d.duration||'';item.notes=d.notes||'';} saveHA(data.healthActivity);
+}
+function deleteHealthActivity(ds, id) {
+  var data=getData(); if(!data.healthActivity[ds])return;
+  data.healthActivity[ds]=data.healthActivity[ds].filter(function(i){return i.id!==id;}); saveHA(data.healthActivity);
+}
+function setHealthWater(ds, level) {
+  var data=getData(); data.healthWater[ds]=level; saveHW(data.healthWater);
+}
 
 // ============================================================
 // SEED DATA
@@ -694,6 +738,111 @@ window.openCheshbonWeekHistory = function(){
 };
 
 // ============================================================
+// RENDER — PHYSICAL HEALTH
+// ============================================================
+var MEAL_LABELS = {breakfast:'🌅 Breakfast',lunch:'☀️ Lunch',dinner:'🌙 Dinner',snacks:'🍎 Snacks'};
+var MEAL_TYPES  = ['breakfast','lunch','dinner','snacks'];
+
+function renderHealth() {
+  var ds = state.healthDate;
+  var date = fromDateStr(ds);
+  // Nav label
+  var label = document.getElementById('healthDateLabel');
+  if (label) label.textContent = dayName(date) + ', ' + monthDay(date);
+  // Today button
+  var todayBtn = document.getElementById('healthBackTodayBtn');
+  if (todayBtn) todayBtn.style.display = (ds === toDateStr(new Date())) ? 'none' : '';
+  // Diet
+  renderHealthDiet(ds);
+  // Activity
+  renderHealthActivity(ds);
+  // Water
+  renderHealthWater(ds);
+}
+
+function renderHealthWater(ds) {
+  var data = getData(); var level = data.healthWater[ds] || '';
+  document.querySelectorAll('.water-btn').forEach(function(btn){
+    btn.classList.toggle('active', btn.dataset.level === level);
+  });
+}
+
+function renderHealthDiet(ds) {
+  var data = getData(); var items = (data.healthDiet[ds] || []);
+  var el = document.getElementById('healthDietList'); if(!el)return;
+  if (!items.length) { el.innerHTML='<div class="health-meals-empty">No meals logged yet.</div>'; return; }
+  var html = '';
+  MEAL_TYPES.forEach(function(mtype) {
+    var group = items.filter(function(i){return i.mealType===mtype;});
+    if (!group.length) return;
+    html += '<div class="health-meal-group">';
+    html += '<div class="health-meal-group-header"><span class="health-meal-type-label">'+(MEAL_LABELS[mtype]||mtype)+'</span></div>';
+    group.forEach(function(item){
+      html += '<div class="health-meal-item">'+
+        '<div class="health-meal-text">'+escHtml(item.description)+'</div>'+
+        '<div class="health-meal-actions">'+
+          '<button class="btn-icon" onclick="openEditHealthFood(\''+ds+'\',\''+item.id+'\')">✏️</button>'+
+          '<button class="btn-icon" onclick="removeHealthFood(\''+ds+'\',\''+item.id+'\')">🗑</button>'+
+        '</div></div>';
+    });
+    html += '</div>';
+  });
+  el.innerHTML = html;
+}
+
+function renderHealthActivity(ds) {
+  var data = getData(); var items = (data.healthActivity[ds] || []);
+  var el = document.getElementById('healthActivityList'); if(!el)return;
+  if (!items.length) { el.innerHTML='<div class="health-activity-empty">No activities logged yet.</div>'; return; }
+  el.innerHTML = items.map(function(item){
+    return '<div class="health-activity-item">'+
+      '<div class="health-activity-body">'+
+        '<span class="health-activity-type">'+escHtml(item.activityType)+'</span>'+
+        (item.duration?'<span class="health-activity-duration">'+escHtml(item.duration)+'</span>':'')+
+        (item.notes?'<div class="health-activity-notes">'+escHtml(item.notes)+'</div>':'')+
+      '</div>'+
+      '<div class="health-activity-actions">'+
+        '<button class="btn-icon" onclick="openEditHealthActivity(\''+ds+'\',\''+item.id+'\')">✏️</button>'+
+        '<button class="btn-icon" onclick="removeHealthActivity(\''+ds+'\',\''+item.id+'\')">🗑</button>'+
+      '</div></div>';
+  }).join('');
+}
+
+// Health window callbacks
+window.openEditHealthFood = function(ds, id) {
+  var data=getData(); var item=(data.healthDiet[ds]||[]).find(function(i){return i.id===id;}); if(!item)return;
+  state.editHealthFoodId=id;
+  document.getElementById('healthFoodModalTitle').textContent='Edit Meal';
+  document.getElementById('healthFoodMealType').value=item.mealType||'breakfast';
+  document.getElementById('healthFoodDescription').value=item.description||'';
+  openModal('healthFoodModal');
+  setTimeout(function(){document.getElementById('healthFoodDescription').focus();},80);
+};
+window.removeHealthFood = function(ds, id){
+  if(!confirm('Delete this meal entry?'))return;
+  deleteHealthFood(ds,id); renderHealthDiet(ds);
+};
+window.openEditHealthActivity = function(ds, id) {
+  var data=getData(); var item=(data.healthActivity[ds]||[]).find(function(i){return i.id===id;}); if(!item)return;
+  state.editHealthActivityId=id;
+  document.getElementById('healthActivityModalTitle').textContent='Edit Activity';
+  // Set type buttons
+  state.selectedActivityType=item.activityType;
+  document.querySelectorAll('.activity-type-btn').forEach(function(btn){
+    btn.classList.toggle('active', btn.dataset.type===item.activityType);
+  });
+  var isPreset=['Cardio','PT','Stretching','Basketball','Biking','Ab Workouts'].indexOf(item.activityType)!==-1;
+  document.getElementById('healthActivityCustom').value=isPreset?'':item.activityType;
+  document.getElementById('healthActivityDuration').value=item.duration||'';
+  document.getElementById('healthActivityNotes').value=item.notes||'';
+  openModal('healthActivityModal');
+};
+window.removeHealthActivity = function(ds, id){
+  if(!confirm('Delete this activity?'))return;
+  deleteHealthActivity(ds,id); renderHealthActivity(ds);
+};
+
+// ============================================================
 // RENDER — REMINDERS
 // ============================================================
 function renderReminders() {
@@ -896,11 +1045,11 @@ function noteCardHTML(note) {
     return '<span class="note-folder-badge" style="'+bg+'">'+escHtml(f.name)+'</span>';
   }).filter(Boolean).join('');
   var badgesHTML=badges?'<div class="note-folder-badges">'+badges+'</div>':'';
-  return '<div class="note-card'+colorClass+(note.pinned?' is-pinned':'')+'">'+(note.pinned?'<span class="note-pin-flag">📌</span>':'')+
+  return '<div class="note-card'+colorClass+(note.pinned?' is-pinned':'')+'" onclick="openEditNote(\''+note.id+'\')">'+(note.pinned?'<span class="note-pin-flag">📌</span>':'')+
     (note.title?'<div class="note-card-title">'+escHtml(note.title)+'</div>':'')+contentHTML+badgesHTML+
-    '<div class="note-card-actions"><button class="btn-icon" onclick="openEditNote(\''+note.id+'\')" title="Edit">✏️</button>'+
-    '<button class="btn-icon" onclick="pinNote(\''+note.id+'\')" title="Pin">'+(note.pinned?'📌':'📍')+'</button>'+
-    '<button class="btn-icon" onclick="removeNote(\''+note.id+'\')" title="Delete">🗑</button></div></div>';
+    '<div class="note-card-actions">'+
+    '<button class="btn-icon" onclick="event.stopPropagation();pinNote(\''+note.id+'\')" title="Pin">'+(note.pinned?'📌':'📍')+'</button>'+
+    '<button class="btn-icon" onclick="event.stopPropagation();removeNote(\''+note.id+'\')" title="Delete">🗑</button></div></div>';
 }
 function renderNotes(){ renderNotesSidebar(); renderNotesMain(); }
 
@@ -944,6 +1093,7 @@ function setDashView(viewName) {
   if (viewName==='seven')     renderSeven();
   if (viewName==='future')    renderFuture();
   if (viewName==='cheshbon')  renderCheshbon();
+  if (viewName==='health')    renderHealth();
   if (viewName==='reminders') renderReminders();
 }
 
@@ -1093,7 +1243,7 @@ window.setNoteFolder    = function(id){ state.activeFolderId=id; renderNotes(); 
 window.openEditNote = function(id) {
   var data=getData(); var n=data.notes.find(function(n){return n.id===id;}); if(!n)return;
   state.editNoteId=id; state.selectedNoteColor=n.color||''; state.noteType=n.type;
-  state.selectedNoteFolderIds = getNoteFolderIds(n).slice();
+  var currentFolderId=getNoteFolderIds(n)[0]||'';
   document.getElementById('noteModalTitle').textContent='Edit Note';
   document.getElementById('noteTitle').value=n.title||'';
   document.getElementById('notePinned').checked=n.pinned||false;
@@ -1102,7 +1252,7 @@ window.openEditNote = function(id) {
   state.noteCheckItems=(n.items||[]).map(function(i){return {id:uid(),text:i.text,done:i.done};});
   renderCheckItems();
   buildColorPicker('noteColorPicker',n.color||'',function(v){state.selectedNoteColor=v;});
-  renderFolderPicker(state.selectedNoteFolderIds);
+  populateFolderSelect(currentFolderId);
   openModal('noteModal');
 };
 window.pinNote       = function(id){ toggleNotePin(id); renderNotes(); };
@@ -1246,36 +1396,24 @@ window.toggleCheckItem = function(i){ state.noteCheckItems[i].done=!state.noteCh
 window.updateCheckItem = function(i,v){ state.noteCheckItems[i].text=v; };
 window.removeCheckItem = function(i){ state.noteCheckItems.splice(i,1); renderCheckItems(); };
 
-function renderFolderPicker(selectedIds) {
-  var data=getData(); var el=document.getElementById('noteFolderPicker'); if(!el)return;
-  if(!data.folders.length){el.innerHTML='<span class="folder-picker-empty">No folders yet</span>';return;}
-  el.innerHTML=data.folders.map(function(f){
-    var sel=(selectedIds||[]).indexOf(f.id)!==-1;
-    var bg=f.color&&sel?'background:'+f.color+';border-color:'+f.color+';color:#fff;':'';
-    return '<button type="button" class="folder-chip'+(sel?' active':'')+'" data-id="'+f.id+'" style="'+bg+'" onclick="toggleFolderChip(this,\''+f.id+'\')">'+escHtml(f.name)+'</button>';
-  }).join('');
+function populateFolderSelect(selectedFolderId) {
+  var data=getData(); var sel=document.getElementById('noteFolderSelect'); if(!sel)return;
+  sel.innerHTML='<option value="">No folder</option>';
+  data.folders.forEach(function(f){
+    var opt=document.createElement('option');
+    opt.value=f.id; opt.textContent=f.name;
+    if(f.id===selectedFolderId)opt.selected=true;
+    sel.appendChild(opt);
+  });
 }
-window.toggleFolderChip = function(btn,folderId){
-  var idx=state.selectedNoteFolderIds.indexOf(folderId);
-  if(idx===-1) state.selectedNoteFolderIds.push(folderId);
-  else state.selectedNoteFolderIds.splice(idx,1);
-  btn.classList.toggle('active',idx===-1);
-  // Apply folder color when selected
-  var data=getData(); var f=data.folders.find(function(f){return f.id===folderId;});
-  if(f&&f.color){
-    btn.style.background  = idx===-1 ? f.color : '';
-    btn.style.borderColor = idx===-1 ? f.color : '';
-    btn.style.color       = idx===-1 ? '#fff'  : '';
-  }
-};
 function openNoteModal() {
   state.editNoteId=null; state.selectedNoteColor=''; state.noteType='text'; state.noteCheckItems=[];
-  state.selectedNoteFolderIds = (state.activeFolderId!=='all'&&state.activeFolderId!=='pinned') ? [state.activeFolderId] : [];
+  var initFolder=(state.activeFolderId!=='all'&&state.activeFolderId!=='pinned')?state.activeFolderId:'';
   document.getElementById('noteModalTitle').textContent='New Note';
   document.getElementById('noteTitle').value=''; document.getElementById('noteContent').value=''; document.getElementById('notePinned').checked=false;
   setNoteType('text'); renderCheckItems();
   buildColorPicker('noteColorPicker','',function(v){state.selectedNoteColor=v;});
-  renderFolderPicker(state.selectedNoteFolderIds);
+  populateFolderSelect(initFolder);
   openModal('noteModal'); setTimeout(function(){document.getElementById('noteTitle').focus();},80);
 }
 function saveNoteModal() {
@@ -1283,7 +1421,10 @@ function saveNoteModal() {
   var title=document.getElementById('noteTitle').value.trim();
   if (!title&&!content&&!state.noteCheckItems.length){ document.getElementById('noteTitle').classList.add('error'); return; }
   document.getElementById('noteTitle').classList.remove('error');
-  var d={type:state.noteType,title:title,content:content,items:state.noteType==='checklist'?state.noteCheckItems.filter(function(i){return i.text.trim();}):[], folderIds:state.selectedNoteFolderIds.slice(),color:state.selectedNoteColor,pinned:document.getElementById('notePinned').checked};
+  var selFolderEl=document.getElementById('noteFolderSelect');
+  var selectedFolderId=selFolderEl?selFolderEl.value:'';
+  var folderIds=selectedFolderId?[selectedFolderId]:[];
+  var d={type:state.noteType,title:title,content:content,items:state.noteType==='checklist'?state.noteCheckItems.filter(function(i){return i.text.trim();}):[], folderIds:folderIds,color:state.selectedNoteColor,pinned:document.getElementById('notePinned').checked};
   state.editNoteId?updateNote(state.editNoteId,d):addNote(d);
   state.editNoteId=null; closeModal('noteModal'); renderNotes();
 }
@@ -1454,6 +1595,80 @@ function initListeners() {
   document.getElementById('cheshbonItemText').addEventListener('keydown', function(e){ if(e.key==='Enter')document.getElementById('saveCheshbonItem').click(); });
   document.getElementById('closeReflHistoryModal').addEventListener('click',      function(){ closeModal('reflHistoryModal'); });
   document.getElementById('closeCheshbonWeekHistModal').addEventListener('click', function(){ closeModal('cheshbonWeekHistModal'); });
+
+  // Physical Health nav
+  document.getElementById('healthPrevDayBtn').addEventListener('click', function(){
+    var d=fromDateStr(state.healthDate); d.setDate(d.getDate()-1); state.healthDate=toDateStr(d); renderHealth();
+  });
+  document.getElementById('healthNextDayBtn').addEventListener('click', function(){
+    var d=fromDateStr(state.healthDate); d.setDate(d.getDate()+1); state.healthDate=toDateStr(d); renderHealth();
+  });
+  document.getElementById('healthBackTodayBtn').addEventListener('click', function(){
+    state.healthDate=toDateStr(new Date()); renderHealth();
+  });
+
+  // Water picker
+  document.getElementById('waterPicker').addEventListener('click', function(e){
+    var btn=e.target.closest('.water-btn'); if(!btn)return;
+    var level=btn.dataset.level; var ds=state.healthDate;
+    var data=getData(); var current=data.healthWater[ds]||'';
+    setHealthWater(ds, current===level?'':level); renderHealthWater(ds);
+  });
+
+  // Health Food modal
+  document.getElementById('addHealthFoodBtn').addEventListener('click', function(){
+    state.editHealthFoodId=null;
+    document.getElementById('healthFoodModalTitle').textContent='Log Meal';
+    document.getElementById('healthFoodMealType').value='breakfast';
+    document.getElementById('healthFoodDescription').value='';
+    openModal('healthFoodModal');
+    setTimeout(function(){document.getElementById('healthFoodDescription').focus();},80);
+  });
+  document.getElementById('closeHealthFoodModal').addEventListener('click', function(){ closeModal('healthFoodModal'); });
+  document.getElementById('cancelHealthFood').addEventListener('click',     function(){ closeModal('healthFoodModal'); });
+  document.getElementById('saveHealthFood').addEventListener('click', function(){
+    var desc=document.getElementById('healthFoodDescription').value.trim();
+    if(!desc){document.getElementById('healthFoodDescription').classList.add('error');return;}
+    document.getElementById('healthFoodDescription').classList.remove('error');
+    var d={mealType:document.getElementById('healthFoodMealType').value,description:desc};
+    var ds=state.healthDate;
+    state.editHealthFoodId?updateHealthFood(ds,state.editHealthFoodId,d):addHealthFood(ds,d);
+    state.editHealthFoodId=null; closeModal('healthFoodModal'); renderHealthDiet(ds);
+  });
+
+  // Health Activity modal
+  document.getElementById('addHealthActivityBtn').addEventListener('click', function(){
+    state.editHealthActivityId=null; state.selectedActivityType='';
+    document.getElementById('healthActivityModalTitle').textContent='Log Activity';
+    document.querySelectorAll('.activity-type-btn').forEach(function(btn){btn.classList.remove('active');});
+    document.getElementById('healthActivityCustom').value='';
+    document.getElementById('healthActivityDuration').value='';
+    document.getElementById('healthActivityNotes').value='';
+    openModal('healthActivityModal');
+  });
+  document.getElementById('activityTypePicker').addEventListener('click', function(e){
+    var btn=e.target.closest('.activity-type-btn'); if(!btn)return;
+    document.querySelectorAll('.activity-type-btn').forEach(function(b){b.classList.remove('active');});
+    btn.classList.add('active'); state.selectedActivityType=btn.dataset.type;
+    document.getElementById('healthActivityCustom').value=''; // clear custom when preset chosen
+  });
+  document.getElementById('healthActivityCustom').addEventListener('input', function(){
+    if(this.value.trim()){
+      document.querySelectorAll('.activity-type-btn').forEach(function(b){b.classList.remove('active');});
+      state.selectedActivityType='';
+    }
+  });
+  document.getElementById('closeHealthActivityModal').addEventListener('click', function(){ closeModal('healthActivityModal'); });
+  document.getElementById('cancelHealthActivity').addEventListener('click',     function(){ closeModal('healthActivityModal'); });
+  document.getElementById('saveHealthActivity').addEventListener('click', function(){
+    var custom=document.getElementById('healthActivityCustom').value.trim();
+    var actType=custom||state.selectedActivityType;
+    if(!actType){alert('Please select or enter an activity type.');return;}
+    var d={activityType:actType,duration:document.getElementById('healthActivityDuration').value.trim(),notes:document.getElementById('healthActivityNotes').value.trim()};
+    var ds=state.healthDate;
+    state.editHealthActivityId?updateHealthActivity(ds,state.editHealthActivityId,d):addHealthActivity(ds,d);
+    state.editHealthActivityId=null; state.selectedActivityType=''; closeModal('healthActivityModal'); renderHealthActivity(ds);
+  });
 
   // Reminders
   document.getElementById('addReminderBtn').addEventListener('click', function(){ state.editReminderId=null; document.getElementById('reminderModalTitle').textContent='Add Reminder'; document.getElementById('reminderText').value=''; document.getElementById('reminderCategory').value=''; openModal('reminderModal'); setTimeout(function(){document.getElementById('reminderText').focus();},80); });

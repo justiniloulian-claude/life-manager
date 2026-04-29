@@ -1264,6 +1264,183 @@ textarea.field { resize: vertical; }
   .cheshbon-layout { grid-template-columns: 1fr; }
 }
 
+/* ===== PHYSICAL HEALTH ===== */
+.health-nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.health-date-label {
+  flex: 1;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.health-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 780px) {
+  .health-layout { grid-template-columns: 1fr; }
+}
+
+.health-panel {
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.health-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafaf8;
+  gap: 10px;
+}
+.health-panel-title { font-size: 16px; font-weight: 700; }
+
+.health-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #bbb;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+/* Water intake */
+.health-water-section {
+  padding: 14px 18px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.water-picker {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.water-btn {
+  padding: 6px 13px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 20px;
+  background: #fff;
+  color: #888;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.water-btn:hover { background: #f5f5f5; color: #1a1a1a; }
+.water-btn.active[data-level="not_enough"] { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+.water-btn.active[data-level="little_more"]{ background: #fef9c3; border-color: #fde68a; color: #92400e; }
+.water-btn.active[data-level="fine"]       { background: #d1fae5; border-color: #6ee7b7; color: #065f46; }
+.water-btn.active[data-level="great"]      { background: #dbeafe; border-color: #93c5fd; color: #1e40af; }
+
+/* Meal items */
+.health-meals-list { padding: 6px 0; }
+.health-meal-group { border-bottom: 1px solid #f5f5f5; }
+.health-meal-group:last-child { border-bottom: none; }
+.health-meal-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 18px 5px;
+}
+.health-meal-type-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #bbb;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.health-meal-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 18px 10px;
+}
+.health-meal-text {
+  flex: 1;
+  font-size: 14px;
+  color: #1a1a1a;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.health-meal-actions { display: flex; gap: 2px; flex-shrink: 0; opacity: 0; transition: opacity 0.15s; }
+.health-meal-item:hover .health-meal-actions { opacity: 1; }
+.health-meals-empty { padding: 20px 18px; font-size: 14px; color: #ccc; text-align: center; }
+
+/* Activity items */
+.health-activity-list { padding: 6px 0; min-height: 40px; }
+.health-activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 18px;
+  border-bottom: 1px solid #f7f7f7;
+}
+.health-activity-item:last-child { border-bottom: none; }
+.health-activity-body { flex: 1; min-width: 0; }
+.health-activity-type {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: #eef1ff;
+  color: #4a5af7;
+  display: inline-block;
+  margin-bottom: 4px;
+}
+.health-activity-duration { font-size: 12px; color: #aaa; margin-left: 6px; }
+.health-activity-notes { font-size: 13px; color: #888; margin-top: 3px; line-height: 1.4; }
+.health-activity-actions { display: flex; gap: 2px; flex-shrink: 0; opacity: 0; transition: opacity 0.15s; }
+.health-activity-item:hover .health-activity-actions { opacity: 1; }
+.health-activity-empty { padding: 20px 18px; font-size: 14px; color: #ccc; text-align: center; }
+
+/* Coming soon rows */
+.health-coming-soon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  font-size: 13px;
+  color: #ccc;
+  border-top: 1px solid #f5f5f5;
+  font-style: italic;
+}
+
+/* Activity type picker (modal) */
+.activity-type-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+  margin-top: 4px;
+}
+.activity-type-btn {
+  padding: 6px 14px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 20px;
+  background: #fff;
+  color: #888;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.activity-type-btn:hover { background: #f5f5f5; color: #1a1a1a; }
+.activity-type-btn.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 900px) {
   .fin-sections { grid-template-columns: 1fr; }
