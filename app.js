@@ -55,6 +55,7 @@ const state = {
   pendingCalDate: null,
   activeFolderId: 'all',
   editNoteId: null,
+  editFolderId: null,
   selectedNoteColor: '',
   selectedFolderColor: '',
   noteType: 'text',
@@ -312,6 +313,8 @@ function deleteCalEvent(id){ var data=getData(); saveCE(data.calEvents.filter(fu
 // NOTES & FOLDERS
 // ============================================================
 function addFolder(name,parentId,color){ var data=getData(); data.folders.push({id:uid(),name:name,parentId:parentId||null,color:color||''}); saveF(data.folders); }
+function updateFolder(id,name,color){ var data=getData(); var f=data.folders.find(function(f){return f.id===id;}); if(f){f.name=name;f.color=color||'';} saveF(data.folders); }
+function reorderFolders(srcId,tgtId){ var data=getData(); var arr=data.folders; var si=arr.findIndex(function(f){return f.id===srcId;}),ti=arr.findIndex(function(f){return f.id===tgtId;}); if(si===-1||ti===-1||si===ti)return; var item=arr.splice(si,1)[0]; arr.splice(ti,0,item); saveF(data.folders); }
 function deleteFolder(id){
   var data=getData();
   data.notes.forEach(function(n){
@@ -1000,12 +1003,24 @@ function renderNotesSidebar() {
   html+='<hr class="sidebar-divider">';
   data.folders.filter(function(f){return !f.parentId;}).forEach(function(f){
     var dot = f.color ? '<span class="folder-color-dot" style="background:'+f.color+'"></span>' : '📁 ';
-    html+='<div class="sidebar-item folder-item'+(active===f.id?' active':'')+'" onclick="setNoteFolder(\''+f.id+'\')">'+ dot+escHtml(f.name)+
-      '<button class="btn-icon" style="margin-left:auto;font-size:12px;opacity:0.5" onclick="event.stopPropagation();removeFolder(\''+f.id+'\')">✕</button></div>';
+    html+='<div class="sidebar-item folder-item'+(active===f.id?' active':'')+'" '+
+      'draggable="true" data-fid="'+f.id+'" '+
+      'onclick="setNoteFolder(\''+f.id+'\')" '+
+      'ondragstart="folderDragStart(event)" ondragover="folderDragOver(event)" '+
+      'ondragleave="folderDragLeave(event)" ondragend="folderDragEnd(event)" ondrop="folderDrop(event)">'+
+      '<span class="folder-drag-handle" title="Drag to reorder">⠿</span>'+
+      dot+escHtml(f.name)+
+      '<div class="folder-item-actions">'+
+        '<button class="btn-icon" style="font-size:12px" onclick="event.stopPropagation();openEditFolder(\''+f.id+'\')">✏️</button>'+
+        '<button class="btn-icon" style="font-size:12px" onclick="event.stopPropagation();removeFolder(\''+f.id+'\')">✕</button>'+
+      '</div></div>';
     data.folders.filter(function(sf){return sf.parentId===f.id;}).forEach(function(sf){
       var sdot = sf.color ? '<span class="folder-color-dot" style="background:'+sf.color+'"></span>' : '';
       html+='<div class="sidebar-item subfolder-item'+(active===sf.id?' active':'')+'" onclick="setNoteFolder(\''+sf.id+'\')">'+'↳ '+sdot+escHtml(sf.name)+
-        '<button class="btn-icon" style="margin-left:auto;font-size:12px;opacity:0.5" onclick="event.stopPropagation();removeFolder(\''+sf.id+'\')">✕</button></div>';
+        '<div class="folder-item-actions">'+
+          '<button class="btn-icon" style="font-size:12px" onclick="event.stopPropagation();openEditFolder(\''+sf.id+'\')">✏️</button>'+
+          '<button class="btn-icon" style="font-size:12px" onclick="event.stopPropagation();removeFolder(\''+sf.id+'\')">✕</button>'+
+        '</div></div>';
     });
   });
   html+='<hr class="sidebar-divider">';
@@ -1118,6 +1133,7 @@ function showPage(pageId) {
 // DRAG-AND-DROP (Simple Lists)
 // ============================================================
 var _stlDrag = { srcId: null, srcList: null };
+var _folderDrag = { srcId: null };
 
 window.stlDragStart = function(e) {
   _stlDrag.srcId   = e.currentTarget.dataset.id;
@@ -1148,6 +1164,38 @@ window.stlDrop = function(e) {
   reorderSimpleList(tgtList, _stlDrag.srcId, tgtId);
   _stlDrag.srcId = null; _stlDrag.srcList = null;
   tgtList === 'shortterm' ? renderShortTerm() : renderLongTerm();
+};
+
+// ============================================================
+// DRAG-AND-DROP (Folders sidebar)
+// ============================================================
+window.folderDragStart = function(e) {
+  _folderDrag.srcId = e.currentTarget.dataset.fid;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+};
+window.folderDragOver = function(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.classList.add('drag-over');
+};
+window.folderDragLeave = function(e) {
+  if (!e.currentTarget.contains(e.relatedTarget)) {
+    e.currentTarget.classList.remove('drag-over');
+  }
+};
+window.folderDragEnd = function(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.folder-item').forEach(function(el){ el.classList.remove('drag-over'); });
+};
+window.folderDrop = function(e) {
+  e.preventDefault();
+  var tgtId = e.currentTarget.dataset.fid;
+  e.currentTarget.classList.remove('drag-over');
+  if (!_folderDrag.srcId || _folderDrag.srcId === tgtId) return;
+  reorderFolders(_folderDrag.srcId, tgtId);
+  _folderDrag.srcId = null;
+  renderNotesSidebar();
 };
 
 // ============================================================
@@ -1258,6 +1306,17 @@ window.openEditNote = function(id) {
 window.pinNote       = function(id){ toggleNotePin(id); renderNotes(); };
 window.removeNote    = function(id){ if(confirm('Delete this note?')){ deleteNote(id); renderNotes(); } };
 window.removeFolder  = function(id){ if(confirm('Delete this folder? Notes inside will be moved to All Notes.')){ deleteFolder(id); renderNotes(); } };
+window.openEditFolder = function(id) {
+  var data=getData(); var f=data.folders.find(function(f){return f.id===id;}); if(!f)return;
+  state.editFolderId=id; state.selectedFolderColor=f.color||'';
+  document.getElementById('folderModalTitle').textContent='Edit Folder';
+  document.getElementById('saveFolder').textContent='Save Changes';
+  document.getElementById('folderName').value=f.name;
+  document.getElementById('folderParentGroup').style.display='none';
+  buildColorPicker('folderColorPicker',f.color||'',function(v){state.selectedFolderColor=v;});
+  openModal('folderModal');
+  setTimeout(function(){document.getElementById('folderName').focus();},80);
+};
 window.openDayDetail = function(ds) {
   var date=fromDateStr(ds);
   document.getElementById('dayDetailTitle').textContent=date.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
@@ -1429,7 +1488,12 @@ function saveNoteModal() {
   state.editNoteId=null; closeModal('noteModal'); renderNotes();
 }
 function openFolderModal() {
-  var data=getData(); document.getElementById('folderName').value=''; state.selectedFolderColor='';
+  state.editFolderId=null; state.selectedFolderColor='';
+  var data=getData();
+  document.getElementById('folderModalTitle').textContent='New Folder';
+  document.getElementById('saveFolder').textContent='Create Folder';
+  document.getElementById('folderName').value='';
+  document.getElementById('folderParentGroup').style.display='';
   var sel=document.getElementById('folderParent'); sel.innerHTML='<option value="">None (top-level)</option>';
   data.folders.filter(function(f){return !f.parentId;}).forEach(function(f){ var opt=document.createElement('option'); opt.value=f.id; opt.textContent=f.name; sel.appendChild(opt); });
   buildColorPicker('folderColorPicker','',function(v){state.selectedFolderColor=v;});
@@ -1439,7 +1503,13 @@ function saveFolderModal() {
   var name=document.getElementById('folderName').value.trim();
   if (!name){ document.getElementById('folderName').classList.add('error'); return; }
   document.getElementById('folderName').classList.remove('error');
-  addFolder(name,document.getElementById('folderParent').value||null,state.selectedFolderColor); closeModal('folderModal'); renderNotes();
+  if (state.editFolderId) {
+    updateFolder(state.editFolderId,name,state.selectedFolderColor);
+    state.editFolderId=null;
+  } else {
+    addFolder(name,document.getElementById('folderParent').value||null,state.selectedFolderColor);
+  }
+  closeModal('folderModal'); renderNotes();
 }
 
 // ============================================================

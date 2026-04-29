@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=11">
+  <link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
 
@@ -502,16 +502,18 @@
 <div id="folderModal" class="modal">
   <div class="modal-box" style="max-width:360px">
     <div class="modal-header">
-      <h2>New Folder</h2>
+      <h2 id="folderModalTitle">New Folder</h2>
       <button class="modal-close" id="closeFolderModal">&times;</button>
     </div>
     <div class="modal-body">
       <label class="field-label">Folder name</label>
       <input type="text" id="folderName" class="field" placeholder="e.g. Law School, Personal">
-      <label class="field-label">Parent folder <span class="optional">optional</span></label>
-      <select id="folderParent" class="field">
-        <option value="">None (top-level)</option>
-      </select>
+      <div id="folderParentGroup">
+        <label class="field-label">Parent folder <span class="optional">optional</span></label>
+        <select id="folderParent" class="field">
+          <option value="">None (top-level)</option>
+        </select>
+      </div>
       <label class="field-label">Label color <span class="optional">optional</span></label>
       <div class="color-picker" id="folderColorPicker"></div>
     </div>
@@ -811,6 +813,6 @@
   </div>
 </div>
 
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>

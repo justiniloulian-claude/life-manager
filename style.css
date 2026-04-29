@@ -1050,6 +1050,34 @@ textarea.field { resize: vertical; }
 .mm-status.paused     { background: #fce7f3; color: #9d174d; }
 .mm-row-actions { display: flex; gap: 4px; flex-shrink: 0; }
 
+/* ===== FOLDER SIDEBAR DRAG + EDIT ===== */
+.folder-drag-handle {
+  font-size: 14px;
+  color: #ddd;
+  cursor: grab;
+  flex-shrink: 0;
+  margin-right: 2px;
+  user-select: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.folder-item:hover .folder-drag-handle { opacity: 1; }
+.folder-drag-handle:active { cursor: grabbing; }
+
+.folder-item { position: relative; }
+.folder-item.dragging   { opacity: 0.35; border-style: dashed; }
+.folder-item.drag-over  { border-top: 2px solid #1a1a1a; border-radius: 0; }
+
+.folder-item-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+.sidebar-item:hover .folder-item-actions { opacity: 1; }
+
 /* ===== FOLDER COLOR DOT (sidebar) ===== */
 .folder-color-dot {
   width: 10px; height: 10px;
