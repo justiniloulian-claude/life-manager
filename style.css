@@ -1292,41 +1292,88 @@ textarea.field { resize: vertical; }
   .cheshbon-layout { grid-template-columns: 1fr; }
 }
 
-/* ===== NOTE VIEW MODAL (read-only enlarged) ===== */
-.note-view-content {
-  font-size: 15px;
-  color: #1a1a1a;
-  line-height: 1.7;
-  white-space: pre-wrap;
-  word-break: break-word;
+/* ===== NOTE VIEW MODAL (Google Keep style — inline editable) ===== */
+.note-view-box {
+  max-width: 560px;
+  padding: 0 !important; /* override modal-box padding */
 }
-.note-view-checklist { display: flex; flex-direction: column; gap: 8px; }
-.note-view-check-item {
+/* Inherit note color inside view box */
+.note-view-box.nc-yellow   { background: #fef9c3; }
+.note-view-box.nc-green    { background: #d1fae5; }
+.note-view-box.nc-teal     { background: #ccfbf1; }
+.note-view-box.nc-blue     { background: #dbeafe; }
+.note-view-box.nc-lavender { background: #ede9fe; }
+.note-view-box.nc-pink     { background: #fce7f3; }
+.note-view-box.nc-stone    { background: #f3f4f6; }
+
+.note-view-header {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
+  padding: 18px 20px 10px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.note-view-title-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 17px;
+  font-weight: 700;
+  color: #1a1a1a;
+  font-family: inherit;
+  background: transparent;
+  line-height: 1.3;
+  min-width: 0;
+}
+.note-view-title-input::placeholder { color: #ccc; font-weight: 400; }
+
+.note-view-body { padding: 12px 20px 8px; }
+.note-view-textarea {
+  width: 100%;
+  border: none;
+  outline: none;
   font-size: 15px;
   color: #1a1a1a;
-  line-height: 1.5;
+  font-family: inherit;
+  resize: none;
+  background: transparent;
+  line-height: 1.65;
+  min-height: 120px;
+  display: block;
+  overflow: hidden;
 }
-.note-view-check-item.done { color: #bbb; text-decoration: line-through; }
-.note-view-check-box {
-  width: 18px; height: 18px;
-  border: 1.5px solid #ccc;
-  border-radius: 4px;
-  flex-shrink: 0;
+.note-view-textarea::placeholder { color: #ccc; }
+
+/* Checklist rows in view modal */
+.note-view-check-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  color: #fff;
-  background: #fff;
-  margin-top: 2px;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
 }
-.note-view-check-item.done .note-view-check-box {
-  background: #1a1a1a;
-  border-color: #1a1a1a;
+.note-view-check-row:last-child { border-bottom: none; }
+.note-view-check-row input[type="checkbox"] {
+  width: 16px; height: 16px; flex-shrink: 0;
+  accent-color: #1a1a1a; cursor: pointer;
+}
+.note-view-check-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  font-family: inherit;
+  background: transparent;
+  color: #1a1a1a;
+  padding: 2px 0;
+}
+.note-view-check-row.is-done .note-view-check-input { text-decoration: line-through; color: #bbb; }
+
+.note-view-footer {
+  padding: 6px 20px 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 /* ===== PHYSICAL HEALTH ===== */

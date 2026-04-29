@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=14">
+  <link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
 
@@ -458,17 +458,26 @@
   </div>
 </div>
 
-<!-- Note View Modal (read-only enlarged view) -->
+<!-- Note View Modal (Google Keep style — inline editable) -->
 <div id="noteViewModal" class="modal">
-  <div class="modal-box modal-wide">
-    <div class="modal-header">
-      <h2 id="noteViewTitle" style="font-size:18px;font-weight:700;flex:1;margin-right:12px;word-break:break-word"></h2>
-      <div style="display:flex;gap:6px;flex-shrink:0">
-        <button id="noteViewEditBtn" class="btn-secondary" style="font-size:13px;padding:6px 14px">✏️ Edit</button>
-        <button class="modal-close" id="closeNoteViewModal">&times;</button>
+  <div class="modal-box note-view-box">
+    <div class="note-view-header">
+      <input type="text" id="noteViewTitleInput" class="note-view-title-input" placeholder="Title">
+      <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+        <button id="noteViewOptionsBtn" class="btn-secondary" style="font-size:12px;padding:5px 12px">⚙️ Options</button>
+        <button id="closeNoteViewModal" class="modal-close">&times;</button>
       </div>
     </div>
-    <div class="modal-body" id="noteViewBody" style="min-height:120px"></div>
+    <div class="note-view-body">
+      <div id="noteViewTextWrap">
+        <textarea id="noteViewContent" class="note-view-textarea" placeholder="Take a note..."></textarea>
+      </div>
+      <div id="noteViewCheckWrap" style="display:none">
+        <div id="noteViewCheckItems"></div>
+        <button id="noteViewAddCheckItem" class="btn-add-item" style="padding:4px 20px 12px">+ Add item</button>
+      </div>
+    </div>
+    <div id="noteViewFooter" class="note-view-footer"></div>
   </div>
 </div>
 
@@ -831,6 +840,6 @@
   </div>
 </div>
 
-<script src="app.js?v=14"></script>
+<script src="app.js?v=15"></script>
 </body>
 </html>

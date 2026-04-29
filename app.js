@@ -56,6 +56,8 @@ const state = {
   selectedCalEventColor: '',
   pendingCalDate: null,
   activeFolderId: 'all',
+  viewingNoteId: null,
+  viewNoteCheckItems: [],
   editNoteId: null,
   editFolderId: null,
   selectedNoteColor: '',
@@ -1408,44 +1410,78 @@ window.openEditNote = function(id) {
   populateFolderSelect(currentFolderId);
   openModal('noteModal');
 };
+// Save whatever is currently typed in the view modal back to localStorage
+function saveNoteViewModal() {
+  var id=state.viewingNoteId; if(!id)return;
+  var data=getData(); var n=data.notes.find(function(n){return n.id===id;}); if(!n)return;
+  n.title=document.getElementById('noteViewTitleInput').value.trim();
+  if(n.type==='checklist'){
+    n.items=state.viewNoteCheckItems.filter(function(i){return i.text.trim();});
+  } else {
+    n.content=document.getElementById('noteViewContent').value;
+  }
+  n.updatedAt=new Date().toISOString();
+  saveN(data.notes);
+}
+
+function renderNoteViewChecklist() {
+  var el=document.getElementById('noteViewCheckItems'); if(!el)return;
+  el.innerHTML=state.viewNoteCheckItems.map(function(item,i){
+    return '<div class="note-view-check-row'+(item.done?' is-done':'')+'">' +
+      '<input type="checkbox"'+(item.done?' checked':'')+' onchange="nvToggle('+i+')">' +
+      '<input type="text" class="note-view-check-input" value="'+escHtml(item.text)+'" placeholder="List item..." oninput="nvUpdate('+i+',this.value)">' +
+      '<button class="btn-icon" style="font-size:12px;opacity:0.4" onclick="nvRemove('+i+')">✕</button>' +
+      '</div>';
+  }).join('');
+}
+window.nvToggle = function(i){ state.viewNoteCheckItems[i].done=!state.viewNoteCheckItems[i].done; renderNoteViewChecklist(); };
+window.nvUpdate = function(i,v){ state.viewNoteCheckItems[i].text=v; };
+window.nvRemove = function(i){ state.viewNoteCheckItems.splice(i,1); renderNoteViewChecklist(); };
+
 window.openNoteView = function(id) {
   var data=getData(); var n=data.notes.find(function(n){return n.id===id;}); if(!n)return;
-  // Title
-  var titleEl=document.getElementById('noteViewTitle');
-  if (titleEl) titleEl.textContent=n.title||'Untitled';
-  titleEl.style.display=n.title?'':'none';
-  // Body
-  var body=document.getElementById('noteViewBody'); if(!body)return;
-  var html='';
-  // Folder badges
-  var folderIds=getNoteFolderIds(n);
-  if(folderIds.length){
-    var badges=folderIds.map(function(fid){
-      var f=data.folders.find(function(f){return f.id===fid;}); if(!f)return '';
-      var bg=f.color?'background:'+f.color+';':'';
-      return '<span class="note-folder-badge" style="'+bg+'">'+escHtml(f.name)+'</span>';
-    }).filter(Boolean).join('');
-    if(badges)html+='<div class="note-folder-badges" style="margin-bottom:14px">'+badges+'</div>';
+  state.viewingNoteId=id;
+  state.viewNoteCheckItems=(n.items||[]).map(function(i){return {id:i.id||uid(),text:i.text,done:!!i.done};});
+
+  // Apply note color to the box
+  var box=document.querySelector('#noteViewModal .note-view-box');
+  if(box){
+    COLORS.forEach(function(c){ if(c.noteCls)box.classList.remove(c.noteCls); });
+    var c=colorByValue(n.color); if(c.noteCls)box.classList.add(c.noteCls);
   }
+
+  // Title
+  document.getElementById('noteViewTitleInput').value=n.title||'';
+
   // Content
   if(n.type==='checklist'){
-    html+='<div class="note-view-checklist">';
-    (n.items||[]).forEach(function(item){
-      html+='<div class="note-view-check-item'+(item.done?' done':'')+'">'+
-        '<span class="note-view-check-box">'+(item.done?'✓':'')+'</span>'+
-        '<span>'+escHtml(item.text)+'</span></div>';
-    });
-    html+='</div>';
+    document.getElementById('noteViewTextWrap').style.display='none';
+    document.getElementById('noteViewCheckWrap').style.display='';
+    renderNoteViewChecklist();
   } else {
-    var lines=escHtml(n.content||'').replace(/\n/g,'<br>');
-    html+='<div class="note-view-content">'+(lines||'<span style="color:#ccc">No content</span>')+'</div>';
+    document.getElementById('noteViewTextWrap').style.display='';
+    document.getElementById('noteViewCheckWrap').style.display='none';
+    var ta=document.getElementById('noteViewContent');
+    ta.value=n.content||'';
+    // Reset height then grow to fit content
+    setTimeout(function(){ ta.style.height='auto'; ta.style.height=Math.max(120,ta.scrollHeight)+'px'; },50);
   }
-  body.innerHTML=html;
-  // Wire edit button
-  document.getElementById('noteViewEditBtn').onclick=function(){
-    closeModal('noteViewModal'); openEditNote(id);
-  };
+
+  // Folder badges in footer
+  var footer=document.getElementById('noteViewFooter');
+  var folderIds=getNoteFolderIds(n);
+  var badges=folderIds.map(function(fid){
+    var f=data.folders.find(function(f){return f.id===fid;}); if(!f)return '';
+    var bg=f.color?'background:'+f.color+';':'';
+    return '<span class="note-folder-badge" style="'+bg+'">'+escHtml(f.name)+'</span>';
+  }).filter(Boolean).join('');
+  if(footer){ footer.innerHTML=badges; footer.style.display=badges?'':'none'; }
+
   openModal('noteViewModal');
+  setTimeout(function(){
+    if(n.type!=='checklist') document.getElementById('noteViewContent').focus();
+    else document.getElementById('noteViewTitleInput').focus();
+  },80);
 };
 window.pinNote       = function(id){ toggleNotePin(id); renderNotes(); };
 window.removeNote    = function(id){ if(confirm('Delete this note?')){ deleteNote(id); renderNotes(); } };
@@ -1963,8 +1999,21 @@ function initListeners() {
   document.getElementById('closeDayDetailModal').addEventListener('click', function(){ closeModal('dayDetailModal'); });
   document.getElementById('calMonthViewBtn') && document.getElementById('calMonthViewBtn').addEventListener('click', function(){ renderCalendar(); });
 
-  // Notes
-  document.getElementById('closeNoteViewModal').addEventListener('click', function(){ closeModal('noteViewModal'); });
+  // Note view modal (inline editable)
+  function closeNoteView() { saveNoteViewModal(); closeModal('noteViewModal'); renderNotes(); }
+  document.getElementById('closeNoteViewModal').addEventListener('click', closeNoteView);
+  document.getElementById('noteViewModal').addEventListener('click', function(e){ if(e.target===this) closeNoteView(); });
+  document.getElementById('noteViewOptionsBtn').addEventListener('click', function(){
+    saveNoteViewModal(); closeModal('noteViewModal'); openEditNote(state.viewingNoteId);
+  });
+  document.getElementById('noteViewContent').addEventListener('input', function(){
+    this.style.height='auto'; this.style.height=Math.max(120,this.scrollHeight)+'px';
+  });
+  document.getElementById('noteViewAddCheckItem').addEventListener('click', function(){
+    state.viewNoteCheckItems.push({id:uid(),text:'',done:false}); renderNoteViewChecklist();
+    var inputs=document.getElementById('noteViewCheckItems').querySelectorAll('.note-view-check-input');
+    if(inputs.length) inputs[inputs.length-1].focus();
+  });
   document.getElementById('addNoteBtn').addEventListener('click', openNoteModal);
   document.getElementById('closeNoteModal').addEventListener('click', function(){ closeModal('noteModal'); });
   document.getElementById('cancelNote').addEventListener('click',     function(){ closeModal('noteModal'); });
@@ -1984,8 +2033,11 @@ function initListeners() {
   document.getElementById('saveFolder').addEventListener('click', saveFolderModal);
   document.getElementById('folderName').addEventListener('keydown', function(e){ if(e.key==='Enter')saveFolderModal(); });
 
-  // Close modals on backdrop
-  document.querySelectorAll('.modal').forEach(function(m){ m.addEventListener('click',function(e){if(e.target===m)m.classList.remove('open');}); });
+  // Close modals on backdrop (noteViewModal handled separately above so it saves first)
+  document.querySelectorAll('.modal').forEach(function(m){
+    if(m.id==='noteViewModal')return;
+    m.addEventListener('click',function(e){if(e.target===m)m.classList.remove('open');});
+  });
 }
 
 // ============================================================
