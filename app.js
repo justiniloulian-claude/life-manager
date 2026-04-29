@@ -38,8 +38,10 @@ const state = {
   editCheshbonItemId: null,
   healthDate: toDateStr(new Date()),
   editHealthFoodId: null,
-  editHealthActivityId: null,
-  selectedActivityType: '',
+  plannerWeekOffset: 0,
+  editActivityPlanDay: null,
+  editActivityPlanId: null,
+  selectedPlanActivityType: '',
   learningDay: null,
   editLearningItemId: null,
   activeFinTab: 'finances',
@@ -95,8 +97,9 @@ function getData() {
     cheshbonChecks:        JSON.parse(localStorage.getItem('dm_cheshbon_checks'))            || {},
     cheshbonWeekHistory:   JSON.parse(localStorage.getItem('dm_cheshbon_week_history'))      || [],
     healthDiet:            JSON.parse(localStorage.getItem('dm_health_diet'))                || {},
-    healthActivity:        JSON.parse(localStorage.getItem('dm_health_activity'))            || {},
     healthWater:           JSON.parse(localStorage.getItem('dm_health_water'))               || {},
+    activityPlan:          JSON.parse(localStorage.getItem('dm_activity_plan'))              || {},
+    activityDone:          JSON.parse(localStorage.getItem('dm_activity_done'))              || {},
   };
 }
 function saveT(v)   { localStorage.setItem('dm_tasks',       JSON.stringify(v)); }
@@ -121,9 +124,10 @@ function saveRHist(v){ localStorage.setItem('dm_refl_history',           JSON.st
 function saveChi(v)  { localStorage.setItem('dm_cheshbon_items',         JSON.stringify(v)); }
 function saveChk(v)  { localStorage.setItem('dm_cheshbon_checks',        JSON.stringify(v)); }
 function saveChWH(v) { localStorage.setItem('dm_cheshbon_week_history',  JSON.stringify(v)); }
-function saveHD(v)   { localStorage.setItem('dm_health_diet',             JSON.stringify(v)); }
-function saveHA(v)   { localStorage.setItem('dm_health_activity',         JSON.stringify(v)); }
-function saveHW(v)   { localStorage.setItem('dm_health_water',            JSON.stringify(v)); }
+function saveHD(v)   { localStorage.setItem('dm_health_diet',     JSON.stringify(v)); }
+function saveHW(v)   { localStorage.setItem('dm_health_water',    JSON.stringify(v)); }
+function saveAP(v)   { localStorage.setItem('dm_activity_plan',   JSON.stringify(v)); }
+function saveAD(v)   { localStorage.setItem('dm_activity_done',   JSON.stringify(v)); }
 function uid()      { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 
 // ============================================================
@@ -376,6 +380,37 @@ function deleteMoneyIdea(id){ var data=getData(); saveMM(data.moneymaking.filter
 // ============================================================
 // HEALTH DATA
 // ============================================================
+// Activity plan (weekly repeating template)
+var PLAN_DAYS      = ['mon','tue','wed','thu','fri','sat','sun'];
+var PLAN_DAY_SHORT = {mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat',sun:'Sun'};
+var PLAN_DAY_FULL  = {mon:'Monday',tue:'Tuesday',wed:'Wednesday',thu:'Thursday',fri:'Friday',sat:'Saturday',sun:'Sunday'};
+
+function getPlannerWeekMonday() {
+  var now=new Date(); var dow=now.getDay();
+  var daysToMon=dow===0?-6:1-dow;
+  var mon=new Date(now); mon.setDate(now.getDate()+daysToMon+state.plannerWeekOffset*7); mon.setHours(0,0,0,0);
+  return mon;
+}
+function addActivityPlanItem(day,d){
+  var data=getData(); if(!data.activityPlan[day])data.activityPlan[day]=[];
+  data.activityPlan[day].push({id:uid(),activityType:d.activityType,time:d.time||'',duration:d.duration||''});
+  saveAP(data.activityPlan);
+}
+function updateActivityPlanItem(day,id,d){
+  var data=getData(); var item=(data.activityPlan[day]||[]).find(function(i){return i.id===id;}); if(!item)return;
+  item.activityType=d.activityType; item.time=d.time||''; item.duration=d.duration||'';
+  saveAP(data.activityPlan);
+}
+function deleteActivityPlanItem(day,id){
+  var data=getData(); if(!data.activityPlan[day])return;
+  data.activityPlan[day]=data.activityPlan[day].filter(function(i){return i.id!==id;});
+  saveAP(data.activityPlan);
+}
+function toggleActivityPlanDone(weekKey,itemId){
+  var data=getData(); var key=weekKey+'_'+itemId;
+  data.activityDone[key]=!data.activityDone[key]; saveAD(data.activityDone);
+}
+
 function addHealthFood(ds, d) {
   var data=getData(); if(!data.healthDiet[ds])data.healthDiet[ds]=[];
   data.healthDiet[ds].push({id:uid(),mealType:d.mealType,description:d.description,createdAt:new Date().toISOString()});
@@ -749,18 +784,54 @@ var MEAL_TYPES  = ['breakfast','lunch','dinner','snacks'];
 function renderHealth() {
   var ds = state.healthDate;
   var date = fromDateStr(ds);
-  // Nav label
   var label = document.getElementById('healthDateLabel');
   if (label) label.textContent = dayName(date) + ', ' + monthDay(date);
-  // Today button
   var todayBtn = document.getElementById('healthBackTodayBtn');
   if (todayBtn) todayBtn.style.display = (ds === toDateStr(new Date())) ? 'none' : '';
-  // Diet
   renderHealthDiet(ds);
-  // Activity
-  renderHealthActivity(ds);
-  // Water
   renderHealthWater(ds);
+  renderActivityPlanner();
+}
+
+function renderActivityPlanner() {
+  var grid = document.getElementById('activityPlannerGrid'); if (!grid) return;
+  var data = getData();
+  var monday = getPlannerWeekMonday();
+  var weekKey = toDateStr(monday);
+  var endDate = new Date(monday); endDate.setDate(monday.getDate()+6);
+  // Week label
+  var wLabel = document.getElementById('plannerWeekLabel');
+  if (wLabel) wLabel.textContent = shortMonthDay(monday) + ' – ' + shortMonthDay(endDate);
+  // This week button
+  var twBtn = document.getElementById('plannerThisWeekBtn');
+  if (twBtn) twBtn.style.display = state.plannerWeekOffset === 0 ? 'none' : '';
+  var today = toDateStr(new Date());
+  grid.innerHTML = PLAN_DAYS.map(function(day, idx) {
+    var colDate = new Date(monday); colDate.setDate(monday.getDate()+idx);
+    var colDs = toDateStr(colDate); var isToday = colDs === today;
+    var items = data.activityPlan[day] || [];
+    var itemsHTML = items.map(function(item) {
+      var doneKey = weekKey+'_'+item.id; var isDone = !!data.activityDone[doneKey];
+      var meta = [item.time ? fmt12(item.time) : '', item.duration].filter(Boolean).join(' · ');
+      return '<div class="planner-item'+(isDone?' is-done':'')+'">' +
+        '<input type="checkbox" class="planner-item-check"'+(isDone?' checked':'')+
+        ' onchange="togglePlanDone(\''+weekKey+'\',\''+item.id+'\')">' +
+        '<div class="planner-item-body">' +
+          '<div class="planner-item-type">'+escHtml(item.activityType)+'</div>' +
+          (meta?'<div class="planner-item-meta">'+escHtml(meta)+'</div>':'')+
+        '</div>' +
+        '<div class="planner-item-actions">' +
+          '<button class="btn-icon" style="font-size:11px" onclick="openEditPlanItem(\''+day+'\',\''+item.id+'\')">✏️</button>' +
+          '<button class="btn-icon" style="font-size:11px" onclick="removePlanItem(\''+day+'\',\''+item.id+'\')">🗑</button>' +
+        '</div></div>';
+    }).join('');
+    return '<div class="planner-day-col'+(isToday?' is-today':'')+'">' +
+      '<div class="planner-day-header">'+PLAN_DAY_SHORT[day]+
+        '<div class="planner-day-date">'+shortMonthDay(colDate)+'</div></div>' +
+      '<div class="planner-day-body">'+(itemsHTML||'<div class="planner-day-empty">—</div>')+'</div>' +
+      '<button class="planner-add-row" onclick="openAddPlanItem(\''+day+'\')">+ Add</button>' +
+      '</div>';
+  }).join('');
 }
 
 function renderHealthWater(ds) {
@@ -810,6 +881,39 @@ function renderHealthActivity(ds) {
       '</div></div>';
   }).join('');
 }
+
+// Activity planner window callbacks
+window.togglePlanDone = function(weekKey, itemId) {
+  toggleActivityPlanDone(weekKey, itemId); renderActivityPlanner();
+};
+window.openAddPlanItem = function(day) {
+  state.editActivityPlanDay=day; state.editActivityPlanId=null; state.selectedPlanActivityType='';
+  document.getElementById('activityPlanModalTitle').textContent='Add — '+PLAN_DAY_FULL[day];
+  document.getElementById('planActivitySave').textContent='Add';
+  document.querySelectorAll('.plan-activity-type-btn').forEach(function(b){b.classList.remove('active');});
+  document.getElementById('planActivityCustom').value='';
+  document.getElementById('planActivityTime').value='';
+  document.getElementById('planActivityDuration').value='';
+  openModal('activityPlanModal');
+};
+window.openEditPlanItem = function(day, id) {
+  var data=getData(); var item=(data.activityPlan[day]||[]).find(function(i){return i.id===id;}); if(!item)return;
+  state.editActivityPlanDay=day; state.editActivityPlanId=id; state.selectedPlanActivityType=item.activityType;
+  document.getElementById('activityPlanModalTitle').textContent='Edit Activity';
+  document.getElementById('planActivitySave').textContent='Save';
+  var isPreset=['Cardio','PT','Stretching','Basketball','Biking','Ab Workouts'].indexOf(item.activityType)!==-1;
+  document.querySelectorAll('.plan-activity-type-btn').forEach(function(b){
+    b.classList.toggle('active', b.dataset.type===item.activityType);
+  });
+  document.getElementById('planActivityCustom').value=isPreset?'':item.activityType;
+  document.getElementById('planActivityTime').value=item.time||'';
+  document.getElementById('planActivityDuration').value=item.duration||'';
+  openModal('activityPlanModal');
+};
+window.removePlanItem = function(day, id) {
+  if(!confirm('Remove this activity?'))return;
+  deleteActivityPlanItem(day,id); renderActivityPlanner();
+};
 
 // Health window callbacks
 window.openEditHealthFood = function(ds, id) {
@@ -1746,39 +1850,35 @@ function initListeners() {
     state.editHealthFoodId=null; closeModal('healthFoodModal'); renderHealthDiet(ds);
   });
 
-  // Health Activity modal
-  document.getElementById('addHealthActivityBtn').addEventListener('click', function(){
-    state.editHealthActivityId=null; state.selectedActivityType='';
-    document.getElementById('healthActivityModalTitle').textContent='Log Activity';
-    document.querySelectorAll('.activity-type-btn').forEach(function(btn){btn.classList.remove('active');});
-    document.getElementById('healthActivityCustom').value='';
-    document.getElementById('healthActivityDuration').value='';
-    document.getElementById('healthActivityNotes').value='';
-    openModal('healthActivityModal');
+  // Activity Plan modal
+  document.getElementById('planActivityTypePicker').addEventListener('click', function(e){
+    var btn=e.target.closest('.plan-activity-type-btn'); if(!btn)return;
+    document.querySelectorAll('.plan-activity-type-btn').forEach(function(b){b.classList.remove('active');});
+    btn.classList.add('active'); state.selectedPlanActivityType=btn.dataset.type;
+    document.getElementById('planActivityCustom').value='';
   });
-  document.getElementById('activityTypePicker').addEventListener('click', function(e){
-    var btn=e.target.closest('.activity-type-btn'); if(!btn)return;
-    document.querySelectorAll('.activity-type-btn').forEach(function(b){b.classList.remove('active');});
-    btn.classList.add('active'); state.selectedActivityType=btn.dataset.type;
-    document.getElementById('healthActivityCustom').value=''; // clear custom when preset chosen
-  });
-  document.getElementById('healthActivityCustom').addEventListener('input', function(){
+  document.getElementById('planActivityCustom').addEventListener('input', function(){
     if(this.value.trim()){
-      document.querySelectorAll('.activity-type-btn').forEach(function(b){b.classList.remove('active');});
-      state.selectedActivityType='';
+      document.querySelectorAll('.plan-activity-type-btn').forEach(function(b){b.classList.remove('active');});
+      state.selectedPlanActivityType='';
     }
   });
-  document.getElementById('closeHealthActivityModal').addEventListener('click', function(){ closeModal('healthActivityModal'); });
-  document.getElementById('cancelHealthActivity').addEventListener('click',     function(){ closeModal('healthActivityModal'); });
-  document.getElementById('saveHealthActivity').addEventListener('click', function(){
-    var custom=document.getElementById('healthActivityCustom').value.trim();
-    var actType=custom||state.selectedActivityType;
-    if(!actType){alert('Please select or enter an activity type.');return;}
-    var d={activityType:actType,duration:document.getElementById('healthActivityDuration').value.trim(),notes:document.getElementById('healthActivityNotes').value.trim()};
-    var ds=state.healthDate;
-    state.editHealthActivityId?updateHealthActivity(ds,state.editHealthActivityId,d):addHealthActivity(ds,d);
-    state.editHealthActivityId=null; state.selectedActivityType=''; closeModal('healthActivityModal'); renderHealthActivity(ds);
+  document.getElementById('closeActivityPlanModal').addEventListener('click', function(){ closeModal('activityPlanModal'); });
+  document.getElementById('cancelActivityPlan').addEventListener('click',     function(){ closeModal('activityPlanModal'); });
+  document.getElementById('planActivitySave').addEventListener('click', function(){
+    var custom=document.getElementById('planActivityCustom').value.trim();
+    var actType=custom||state.selectedPlanActivityType;
+    if(!actType){alert('Please select or type an activity.');return;}
+    var d={activityType:actType,time:document.getElementById('planActivityTime').value,duration:document.getElementById('planActivityDuration').value.trim()};
+    var day=state.editActivityPlanDay;
+    state.editActivityPlanId?updateActivityPlanItem(day,state.editActivityPlanId,d):addActivityPlanItem(day,d);
+    state.editActivityPlanId=null; state.selectedPlanActivityType='';
+    closeModal('activityPlanModal'); renderActivityPlanner();
   });
+  // Planner week nav
+  document.getElementById('plannerPrevWeekBtn').addEventListener('click', function(){ state.plannerWeekOffset--; renderActivityPlanner(); });
+  document.getElementById('plannerNextWeekBtn').addEventListener('click', function(){ state.plannerWeekOffset++; renderActivityPlanner(); });
+  document.getElementById('plannerThisWeekBtn').addEventListener('click', function(){ state.plannerWeekOffset=0; renderActivityPlanner(); });
 
   // Reminders
   document.getElementById('addReminderBtn').addEventListener('click', function(){ state.editReminderId=null; document.getElementById('reminderModalTitle').textContent='Add Reminder'; document.getElementById('reminderText').value=''; document.getElementById('reminderCategory').value=''; openModal('reminderModal'); setTimeout(function(){document.getElementById('reminderText').focus();},80); });

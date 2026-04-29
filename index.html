@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=13">
+  <link rel="stylesheet" href="style.css?v=14">
 </head>
 <body>
 
@@ -161,20 +161,20 @@
 
   <!-- Physical Health View -->
   <div id="healthView" class="view">
-    <div class="health-nav-bar">
-      <button id="healthPrevDayBtn" class="btn-nav">&#8592; Prev</button>
-      <button id="healthBackTodayBtn" class="btn-today" style="display:none">Today</button>
-      <span id="healthDateLabel" class="health-date-label"></span>
-      <button id="healthNextDayBtn" class="btn-nav">Next &#8594;</button>
-    </div>
-    <div class="health-layout">
 
-      <!-- Diet Panel -->
-      <div class="health-panel">
-        <div class="health-panel-header">
-          <h2 class="health-panel-title">🥗 Diet</h2>
-          <button id="addHealthFoodBtn" class="btn-primary" style="font-size:13px;padding:7px 14px">+ Log Meal</button>
+    <!-- Diet Section (day-navigated log) -->
+    <div class="health-section-block">
+      <div class="health-section-topbar">
+        <h2 class="health-section-heading">🥗 Diet</h2>
+        <div class="health-date-nav">
+          <button id="healthPrevDayBtn" class="btn-nav">&#8592; Prev</button>
+          <button id="healthBackTodayBtn" class="btn-today" style="display:none">Today</button>
+          <span id="healthDateLabel" class="health-date-label"></span>
+          <button id="healthNextDayBtn" class="btn-nav">Next &#8594;</button>
         </div>
+        <button id="addHealthFoodBtn" class="btn-primary" style="font-size:13px;padding:7px 14px">+ Log Meal</button>
+      </div>
+      <div class="health-panel health-diet-panel">
         <div class="health-water-section">
           <div class="health-section-label">Water Intake</div>
           <div class="water-picker" id="waterPicker">
@@ -187,19 +187,22 @@
         <div id="healthDietList" class="health-meals-list"></div>
         <div class="health-coming-soon"><span>🎯</span><span>Targets — coming soon</span></div>
       </div>
-
-      <!-- Physical Activity Panel -->
-      <div class="health-panel">
-        <div class="health-panel-header">
-          <h2 class="health-panel-title">🏃 Physical Activity</h2>
-          <button id="addHealthActivityBtn" class="btn-primary" style="font-size:13px;padding:7px 14px">+ Log Activity</button>
-        </div>
-        <div id="healthActivityList" class="health-activity-list"></div>
-        <div class="health-coming-soon"><span>📅</span><span>Activity Planner — coming soon</span></div>
-        <div class="health-coming-soon"><span>🏆</span><span>Goals — coming soon</span></div>
-      </div>
-
     </div>
+
+    <!-- Activity Planner Section (weekly grid) -->
+    <div class="health-section-block" style="margin-top:28px">
+      <div class="health-section-topbar">
+        <h2 class="health-section-heading">🏃 Activity Planner</h2>
+        <div class="planner-week-nav">
+          <button id="plannerPrevWeekBtn" class="btn-nav">&#8592; Prev Week</button>
+          <span id="plannerWeekLabel" class="planner-week-label"></span>
+          <button id="plannerThisWeekBtn" class="btn-today" style="display:none">This Week</button>
+          <button id="plannerNextWeekBtn" class="btn-nav">Next Week &#8594;</button>
+        </div>
+      </div>
+      <div class="activity-planner-grid" id="activityPlannerGrid"></div>
+    </div>
+
   </div>
 
   <!-- Reminders View -->
@@ -797,36 +800,37 @@
 </div>
 
 <!-- Health Activity Modal -->
-<div id="healthActivityModal" class="modal">
+<!-- Activity Plan Modal -->
+<div id="activityPlanModal" class="modal">
   <div class="modal-box" style="max-width:420px">
     <div class="modal-header">
-      <h2 id="healthActivityModalTitle">Log Activity</h2>
-      <button class="modal-close" id="closeHealthActivityModal">&times;</button>
+      <h2 id="activityPlanModalTitle">Add Activity</h2>
+      <button class="modal-close" id="closeActivityPlanModal">&times;</button>
     </div>
     <div class="modal-body">
       <label class="field-label">Activity Type</label>
-      <div class="activity-type-picker" id="activityTypePicker">
-        <button type="button" class="activity-type-btn" data-type="Cardio">Cardio</button>
-        <button type="button" class="activity-type-btn" data-type="PT">PT</button>
-        <button type="button" class="activity-type-btn" data-type="Stretching">Stretching</button>
-        <button type="button" class="activity-type-btn" data-type="Basketball">Basketball</button>
-        <button type="button" class="activity-type-btn" data-type="Biking">Biking</button>
-        <button type="button" class="activity-type-btn" data-type="Ab Workouts">Ab Workouts</button>
+      <div class="activity-type-picker" id="planActivityTypePicker">
+        <button type="button" class="plan-activity-type-btn activity-type-btn" data-type="Cardio">Cardio</button>
+        <button type="button" class="plan-activity-type-btn activity-type-btn" data-type="PT">PT</button>
+        <button type="button" class="plan-activity-type-btn activity-type-btn" data-type="Stretching">Stretching</button>
+        <button type="button" class="plan-activity-type-btn activity-type-btn" data-type="Basketball">Basketball</button>
+        <button type="button" class="plan-activity-type-btn activity-type-btn" data-type="Biking">Biking</button>
+        <button type="button" class="plan-activity-type-btn activity-type-btn" data-type="Ab Workouts">Ab Workouts</button>
       </div>
       <label class="field-label">Custom activity <span class="optional">optional</span></label>
-      <input type="text" id="healthActivityCustom" class="field" placeholder="e.g. Swimming, Yoga...">
+      <input type="text" id="planActivityCustom" class="field" placeholder="e.g. Swimming, Yoga...">
+      <label class="field-label">Time <span class="optional">optional</span></label>
+      <input type="time" id="planActivityTime" class="field">
       <label class="field-label">Duration <span class="optional">optional</span></label>
-      <input type="text" id="healthActivityDuration" class="field" placeholder="e.g. 30 min, 1 hour">
-      <label class="field-label">Notes <span class="optional">optional</span></label>
-      <textarea id="healthActivityNotes" class="field" rows="2" placeholder="Any details..."></textarea>
+      <input type="text" id="planActivityDuration" class="field" placeholder="e.g. 30 min, 1 hour">
     </div>
     <div class="modal-footer">
-      <button id="cancelHealthActivity" class="btn-cancel">Cancel</button>
-      <button id="saveHealthActivity" class="btn-primary">Save</button>
+      <button id="cancelActivityPlan" class="btn-cancel">Cancel</button>
+      <button id="planActivitySave" class="btn-primary">Add</button>
     </div>
   </div>
 </div>
 
-<script src="app.js?v=13"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>
