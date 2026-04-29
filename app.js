@@ -1060,9 +1060,10 @@ function noteCardHTML(note) {
     return '<span class="note-folder-badge" style="'+bg+'">'+escHtml(f.name)+'</span>';
   }).filter(Boolean).join('');
   var badgesHTML=badges?'<div class="note-folder-badges">'+badges+'</div>':'';
-  return '<div class="note-card'+colorClass+(note.pinned?' is-pinned':'')+'" onclick="openEditNote(\''+note.id+'\')">'+(note.pinned?'<span class="note-pin-flag">📌</span>':'')+
+  return '<div class="note-card'+colorClass+(note.pinned?' is-pinned':'')+'" onclick="openNoteView(\''+note.id+'\')">'+(note.pinned?'<span class="note-pin-flag">📌</span>':'')+
     (note.title?'<div class="note-card-title">'+escHtml(note.title)+'</div>':'')+contentHTML+badgesHTML+
     '<div class="note-card-actions">'+
+    '<button class="btn-icon" onclick="event.stopPropagation();openEditNote(\''+note.id+'\')" title="Edit">✏️</button>'+
     '<button class="btn-icon" onclick="event.stopPropagation();pinNote(\''+note.id+'\')" title="Pin">'+(note.pinned?'📌':'📍')+'</button>'+
     '<button class="btn-icon" onclick="event.stopPropagation();removeNote(\''+note.id+'\')" title="Delete">🗑</button></div></div>';
 }
@@ -1302,6 +1303,45 @@ window.openEditNote = function(id) {
   buildColorPicker('noteColorPicker',n.color||'',function(v){state.selectedNoteColor=v;});
   populateFolderSelect(currentFolderId);
   openModal('noteModal');
+};
+window.openNoteView = function(id) {
+  var data=getData(); var n=data.notes.find(function(n){return n.id===id;}); if(!n)return;
+  // Title
+  var titleEl=document.getElementById('noteViewTitle');
+  if (titleEl) titleEl.textContent=n.title||'Untitled';
+  titleEl.style.display=n.title?'':'none';
+  // Body
+  var body=document.getElementById('noteViewBody'); if(!body)return;
+  var html='';
+  // Folder badges
+  var folderIds=getNoteFolderIds(n);
+  if(folderIds.length){
+    var badges=folderIds.map(function(fid){
+      var f=data.folders.find(function(f){return f.id===fid;}); if(!f)return '';
+      var bg=f.color?'background:'+f.color+';':'';
+      return '<span class="note-folder-badge" style="'+bg+'">'+escHtml(f.name)+'</span>';
+    }).filter(Boolean).join('');
+    if(badges)html+='<div class="note-folder-badges" style="margin-bottom:14px">'+badges+'</div>';
+  }
+  // Content
+  if(n.type==='checklist'){
+    html+='<div class="note-view-checklist">';
+    (n.items||[]).forEach(function(item){
+      html+='<div class="note-view-check-item'+(item.done?' done':'')+'">'+
+        '<span class="note-view-check-box">'+(item.done?'✓':'')+'</span>'+
+        '<span>'+escHtml(item.text)+'</span></div>';
+    });
+    html+='</div>';
+  } else {
+    var lines=escHtml(n.content||'').replace(/\n/g,'<br>');
+    html+='<div class="note-view-content">'+(lines||'<span style="color:#ccc">No content</span>')+'</div>';
+  }
+  body.innerHTML=html;
+  // Wire edit button
+  document.getElementById('noteViewEditBtn').onclick=function(){
+    closeModal('noteViewModal'); openEditNote(id);
+  };
+  openModal('noteViewModal');
 };
 window.pinNote       = function(id){ toggleNotePin(id); renderNotes(); };
 window.removeNote    = function(id){ if(confirm('Delete this note?')){ deleteNote(id); renderNotes(); } };
@@ -1824,6 +1864,7 @@ function initListeners() {
   document.getElementById('calMonthViewBtn') && document.getElementById('calMonthViewBtn').addEventListener('click', function(){ renderCalendar(); });
 
   // Notes
+  document.getElementById('closeNoteViewModal').addEventListener('click', function(){ closeModal('noteViewModal'); });
   document.getElementById('addNoteBtn').addEventListener('click', openNoteModal);
   document.getElementById('closeNoteModal').addEventListener('click', function(){ closeModal('noteModal'); });
   document.getElementById('cancelNote').addEventListener('click',     function(){ closeModal('noteModal'); });

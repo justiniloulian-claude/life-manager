@@ -1292,6 +1292,43 @@ textarea.field { resize: vertical; }
   .cheshbon-layout { grid-template-columns: 1fr; }
 }
 
+/* ===== NOTE VIEW MODAL (read-only enlarged) ===== */
+.note-view-content {
+  font-size: 15px;
+  color: #1a1a1a;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.note-view-checklist { display: flex; flex-direction: column; gap: 8px; }
+.note-view-check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 15px;
+  color: #1a1a1a;
+  line-height: 1.5;
+}
+.note-view-check-item.done { color: #bbb; text-decoration: line-through; }
+.note-view-check-box {
+  width: 18px; height: 18px;
+  border: 1.5px solid #ccc;
+  border-radius: 4px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: #fff;
+  margin-top: 2px;
+}
+.note-view-check-item.done .note-view-check-box {
+  background: #1a1a1a;
+  border-color: #1a1a1a;
+}
+
 /* ===== PHYSICAL HEALTH ===== */
 .health-nav-bar {
   display: flex;

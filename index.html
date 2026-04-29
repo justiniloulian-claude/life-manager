@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=12">
+  <link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
 
@@ -455,6 +455,20 @@
   </div>
 </div>
 
+<!-- Note View Modal (read-only enlarged view) -->
+<div id="noteViewModal" class="modal">
+  <div class="modal-box modal-wide">
+    <div class="modal-header">
+      <h2 id="noteViewTitle" style="font-size:18px;font-weight:700;flex:1;margin-right:12px;word-break:break-word"></h2>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button id="noteViewEditBtn" class="btn-secondary" style="font-size:13px;padding:6px 14px">✏️ Edit</button>
+        <button class="modal-close" id="closeNoteViewModal">&times;</button>
+      </div>
+    </div>
+    <div class="modal-body" id="noteViewBody" style="min-height:120px"></div>
+  </div>
+</div>
+
 <!-- Note Modal -->
 <div id="noteModal" class="modal">
   <div class="modal-box modal-wide">
@@ -813,6 +827,6 @@
   </div>
 </div>
 
-<script src="app.js?v=12"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>
