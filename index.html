@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=15">
+  <link rel="stylesheet" href="style.css?v=16">
 </head>
 <body>
 
@@ -344,8 +344,6 @@
         <button type="button" class="priority-btn" data-priority="priority">Priority</button>
         <button type="button" class="priority-btn" data-priority="mustdo">Must Do</button>
       </div>
-      <label class="field-label">Color <span class="optional">optional</span></label>
-      <div class="color-picker" id="taskColorPicker"></div>
       <div class="field-check-row">
         <input type="checkbox" id="taskAddToCalendar">
         <label for="taskAddToCalendar">Also add to Calendar</label>
@@ -430,6 +428,21 @@
       <input type="date" id="calEventDate" class="field">
       <label class="field-label">Time <span class="optional">optional</span></label>
       <input type="time" id="calEventTime" class="field">
+      <label class="field-label">Location <span class="optional">optional</span></label>
+      <input type="text" id="calEventLocation" class="field" placeholder="e.g. Synagogue, Online">
+      <label class="field-label">Notes <span class="optional">optional</span></label>
+      <textarea id="calEventNotes" class="field" rows="2" placeholder="Any extra details..."></textarea>
+      <label class="field-label">Recurring <span class="optional">optional</span></label>
+      <select id="calEventRecurring" class="field">
+        <option value="none">Does not repeat</option>
+        <option value="weekly">Weekly</option>
+        <option value="biweekly">Every 2 weeks</option>
+        <option value="monthly">Monthly (same date)</option>
+      </select>
+      <div id="calEventUntilGroup" style="display:none">
+        <label class="field-label">End date <span class="optional">optional</span></label>
+        <input type="date" id="calEventUntil" class="field">
+      </div>
       <label class="field-label">Color <span class="optional">optional</span></label>
       <div class="color-picker" id="calEventColorPicker"></div>
       <div class="field-check-row">
@@ -464,6 +477,8 @@
     <div class="note-view-header">
       <input type="text" id="noteViewTitleInput" class="note-view-title-input" placeholder="Title">
       <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+        <button id="noteViewPinBtn" class="btn-icon" style="font-size:18px;opacity:0.4" title="Pin note">📌</button>
+        <button id="noteViewTrashBtn" class="btn-icon" style="font-size:18px;opacity:0.5" title="Delete note">🗑</button>
         <button id="noteViewOptionsBtn" class="btn-secondary" style="font-size:12px;padding:5px 12px">⚙️ Options</button>
         <button id="closeNoteViewModal" class="modal-close">&times;</button>
       </div>
@@ -619,6 +634,8 @@
     <div class="modal-body">
       <label class="field-label">Subject</label>
       <input type="text" id="learningSubject" class="field" placeholder="e.g. Gemara, Halacha, Chumash">
+      <label class="field-label">Time <span class="optional">optional</span></label>
+      <input type="time" id="learningTime" class="field">
       <label class="field-label">Source <span class="optional">optional</span></label>
       <input type="text" id="learningSource" class="field" placeholder="e.g. Bava Metzia 12a, Shulchan Aruch OC 1">
       <label class="field-label">Notes <span class="optional">optional</span></label>
@@ -647,6 +664,13 @@
       <input type="date" id="finEntryDate" class="field">
       <label class="field-label">Category <span class="optional">optional</span></label>
       <input type="text" id="finEntryCategory" class="field" placeholder="e.g. Housing, Food, Education">
+      <label class="field-label">Recurring <span class="optional">optional</span></label>
+      <select id="finEntryRecurring" class="field">
+        <option value="">One-time</option>
+        <option value="weekly">Weekly</option>
+        <option value="biweekly">Every 2 weeks</option>
+        <option value="monthly">Monthly</option>
+      </select>
     </div>
     <div class="modal-footer">
       <button id="cancelFinEntry" class="btn-cancel">Cancel</button>
@@ -667,10 +691,16 @@
       <input type="text" id="shoppingItemName" class="field" placeholder="e.g. Milk, Laptop charger">
       <label class="field-label">Quantity <span class="optional">optional</span></label>
       <input type="number" id="shoppingItemQty" class="field" placeholder="1" min="1" value="1">
+      <label class="field-label">Price <span class="optional">optional</span></label>
+      <input type="text" id="shoppingItemPrice" class="field" placeholder="e.g. $12.99 or $10–$15">
+      <label class="field-label">Link <span class="optional">optional</span></label>
+      <input type="url" id="shoppingItemLink" class="field" placeholder="https://...">
+      <label class="field-label">Notes <span class="optional">optional</span></label>
+      <textarea id="shoppingItemNotes" class="field" rows="2" placeholder="Any extra details..."></textarea>
     </div>
     <div class="modal-footer">
       <button id="cancelShopping" class="btn-cancel">Cancel</button>
-      <button id="saveShopping" class="btn-primary">Add Item</button>
+      <button id="saveShopping" class="btn-primary">Save Item</button>
     </div>
   </div>
 </div>
@@ -778,6 +808,7 @@
     </div>
     <div class="modal-footer">
       <button id="cancelRoutineOverride" class="btn-cancel">Cancel</button>
+      <button id="skipRoutineDay" class="btn-secondary" style="color:#e53e3e;border-color:#feb2b2">Skip This Day</button>
       <button id="saveRoutineOverride" class="btn-primary">Save for This Day</button>
     </div>
   </div>
@@ -840,6 +871,6 @@
   </div>
 </div>
 
-<script src="app.js?v=15"></script>
+<script src="app.js?v=16"></script>
 </body>
 </html>

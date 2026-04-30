@@ -5,13 +5,17 @@
 // ============================================================
 const COLORS = [
   { name: 'Default',  value: '',        cls: 'cd-default', chipCls: '' },
-  { name: 'Yellow',   value: '#fef9c3', cls: '', chipCls: 'cc-yellow',   taskCls: 'tc-yellow',   noteCls: 'nc-yellow'   },
-  { name: 'Green',    value: '#d1fae5', cls: '', chipCls: 'cc-green',    taskCls: 'tc-green',    noteCls: 'nc-green'    },
-  { name: 'Teal',     value: '#ccfbf1', cls: '', chipCls: 'cc-teal',     taskCls: 'tc-teal',     noteCls: 'nc-teal'     },
-  { name: 'Blue',     value: '#dbeafe', cls: '', chipCls: 'cc-blue',     taskCls: 'tc-blue',     noteCls: 'nc-blue'     },
-  { name: 'Lavender', value: '#ede9fe', cls: '', chipCls: 'cc-lavender', taskCls: 'tc-lavender', noteCls: 'nc-lavender' },
-  { name: 'Pink',     value: '#fce7f3', cls: '', chipCls: 'cc-pink',     taskCls: 'tc-pink',     noteCls: 'nc-pink'     },
-  { name: 'Stone',    value: '#f3f4f6', cls: '', chipCls: 'cc-stone',    taskCls: 'tc-stone',    noteCls: 'nc-stone'    },
+  { name: 'Yellow',   value: '#fef9c3', cls: '', chipCls: 'cc-yellow',  taskCls: 'tc-yellow',  noteCls: 'nc-yellow'  },
+  { name: 'Peach',    value: '#fde68a', cls: '', chipCls: 'cc-peach',   taskCls: 'tc-peach',   noteCls: 'nc-peach'   },
+  { name: 'Orange',   value: '#fed7aa', cls: '', chipCls: 'cc-orange',  taskCls: 'tc-orange',  noteCls: 'nc-orange'  },
+  { name: 'Coral',    value: '#fecaca', cls: '', chipCls: 'cc-coral',   taskCls: 'tc-coral',   noteCls: 'nc-coral'   },
+  { name: 'Pink',     value: '#fce7f3', cls: '', chipCls: 'cc-pink',    taskCls: 'tc-pink',    noteCls: 'nc-pink'    },
+  { name: 'Lavender', value: '#ede9fe', cls: '', chipCls: 'cc-lavender',taskCls: 'tc-lavender',noteCls: 'nc-lavender'},
+  { name: 'Blue',     value: '#dbeafe', cls: '', chipCls: 'cc-blue',    taskCls: 'tc-blue',    noteCls: 'nc-blue'    },
+  { name: 'Sky',      value: '#e0f2fe', cls: '', chipCls: 'cc-sky',     taskCls: 'tc-sky',     noteCls: 'nc-sky'     },
+  { name: 'Teal',     value: '#ccfbf1', cls: '', chipCls: 'cc-teal',    taskCls: 'tc-teal',    noteCls: 'nc-teal'    },
+  { name: 'Green',    value: '#d1fae5', cls: '', chipCls: 'cc-green',   taskCls: 'tc-green',   noteCls: 'nc-green'   },
+  { name: 'Stone',    value: '#f3f4f6', cls: '', chipCls: 'cc-stone',   taskCls: 'tc-stone',   noteCls: 'nc-stone'   },
 ];
 function colorByValue(val) { return COLORS.find(function(c){ return c.value===val; }) || COLORS[0]; }
 
@@ -34,6 +38,8 @@ const state = {
   editSimpleItemId: null,
   movingItemId: null,
   movingItemList: null,
+  movingFromFutureId: null,
+  movingFromFutureList: null,
   editReminderId: null,
   editCheshbonItemId: null,
   healthDate: toDateStr(new Date()),
@@ -48,6 +54,7 @@ const state = {
   finEntryType: null,
   editFinEntryId: null,
   editShoppingId: null,
+  editShoppingItemId: null,
   editMoneyIdeaId: null,
   calYear: new Date().getFullYear(),
   calMonth: new Date().getMonth(),
@@ -254,6 +261,7 @@ function getTasksForDate(ds) {
   var routineTasks=data.routine.filter(function(r){return r.days.includes(dow);}).map(function(r){
     var c=completions.find(function(c){return c._rc===r.id;});
     var ov=data.routineOverrides[ds+'_'+r.id]||{};
+    if(ov.skipped) return null;
     return {
       id:       r.id,
       title:    ov.title    !== undefined ? ov.title    : r.title,
@@ -261,7 +269,7 @@ function getTasksForDate(ds) {
       location: ov.location !== undefined ? ov.location : r.location,
       color:'', type:'routine', done: c ? c.done : false
     };
-  });
+  }).filter(Boolean);
   var oneTasks=(data.tasks[ds]||[]).filter(function(t){return !t._rc;});
   var all=routineTasks.concat(oneTasks);
   var inc=all.filter(function(t){return !t.done;});
@@ -310,9 +318,42 @@ function deleteRoutineItem(id){ var data=getData(); saveR(data.routine.filter(fu
 // ============================================================
 // CALENDAR EVENTS
 // ============================================================
-function getEventsForDate(ds){ return getData().calEvents.filter(function(e){return e.date===ds;}); }
-function addCalEvent(d){ var data=getData(); data.calEvents.push({id:uid(),title:d.title,date:d.date,time:d.time||'',color:d.color||'',fromTask:false}); saveCE(data.calEvents); }
-function updateCalEvent(id,d){ var data=getData(); var e=data.calEvents.find(function(e){return e.id===id;}); if(e){e.title=d.title;e.date=d.date;e.time=d.time||'';e.color=d.color||'';} saveCE(data.calEvents); }
+function isRecurringOccurrence(ev, ds) {
+  var start=fromDateStr(ev.date), check=fromDateStr(ds);
+  if(check<start)return false;
+  if(ev.recurringUntil&&check>fromDateStr(ev.recurringUntil))return false;
+  if((ev.exceptions||[]).indexOf(ds)!==-1)return false;
+  var diffDays=Math.round((check-start)/(1000*60*60*24));
+  if(ev.recurring==='weekly')   return diffDays%7===0;
+  if(ev.recurring==='biweekly') return diffDays%14===0;
+  if(ev.recurring==='monthly')  return check.getDate()===start.getDate();
+  return false;
+}
+function getEventsForDate(ds){
+  var data=getData(); var result=[];
+  data.calEvents.forEach(function(ev){
+    if(ev._overrideFor){ if(ev._overrideDate===ds)result.push(ev); return; }
+    var rec=ev.recurring||'none';
+    if(rec==='none'){ if(ev.date===ds)result.push(ev); }
+    else {
+      if(isRecurringOccurrence(ev,ds)){
+        var ov=data.calEvents.find(function(o){return o._overrideFor===ev.id&&o._overrideDate===ds;});
+        if(!ov)result.push(Object.assign({},ev,{_occurrenceDate:ds}));
+      }
+    }
+  });
+  return result;
+}
+function addCalEvent(d){
+  var data=getData();
+  data.calEvents.push({id:uid(),title:d.title,date:d.date,time:d.time||'',location:d.location||'',notes:d.notes||'',color:d.color||'',recurring:d.recurring||'none',recurringUntil:d.recurringUntil||null,exceptions:[],fromTask:false});
+  saveCE(data.calEvents);
+}
+function updateCalEvent(id,d){
+  var data=getData(); var e=data.calEvents.find(function(e){return e.id===id;});
+  if(e){e.title=d.title;e.date=d.date;e.time=d.time||'';e.location=d.location||'';e.notes=d.notes||'';e.color=d.color||'';e.recurring=d.recurring||'none';e.recurringUntil=d.recurringUntil||null;}
+  saveCE(data.calEvents);
+}
 function deleteCalEvent(id){ var data=getData(); saveCE(data.calEvents.filter(function(e){return e.id!==id;})); }
 
 // ============================================================
@@ -336,7 +377,30 @@ function getNoteFolderIds(note) {
 }
 function addNote(d){ var data=getData(); data.notes.push({id:uid(),type:d.type,title:d.title,content:d.content||'',items:d.items||[],folderId:(d.folderIds||[])[0]||null,folderIds:d.folderIds||[],color:d.color||'',pinned:d.pinned||false,archived:false,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()}); saveN(data.notes); }
 function updateNote(id,d){ var data=getData(); var n=data.notes.find(function(n){return n.id===id;}); if(n){n.type=d.type;n.title=d.title;n.content=d.content||'';n.items=d.items||[];n.folderIds=d.folderIds||[];n.folderId=(d.folderIds||[])[0]||null;n.color=d.color||'';n.pinned=d.pinned||false;n.updatedAt=new Date().toISOString();} saveN(data.notes); }
-function deleteNote(id){ var data=getData(); saveN(data.notes.filter(function(n){return n.id!==id;})); }
+function deleteNote(id){
+  var data=getData();
+  var n=data.notes.find(function(n){return n.id===id;});
+  if(n){n.deleted=true;n.deletedAt=new Date().toISOString();}
+  saveN(data.notes);
+}
+function restoreNote(id){
+  var data=getData();
+  var n=data.notes.find(function(n){return n.id===id;});
+  if(n){delete n.deleted;delete n.deletedAt;}
+  saveN(data.notes);
+}
+function purgeNoteById(id){
+  var data=getData();
+  saveN(data.notes.filter(function(n){return n.id!==id;}));
+}
+function purgeOldDeletedNotes(){
+  var data=getData(); var cutoff=new Date(); cutoff.setDate(cutoff.getDate()-7);
+  var kept=data.notes.filter(function(n){
+    if(!n.deleted)return true;
+    return n.deletedAt&&new Date(n.deletedAt)>cutoff;
+  });
+  if(kept.length!==data.notes.length)saveN(kept);
+}
 function toggleNotePin(id){ var data=getData(); var n=data.notes.find(function(n){return n.id===id;}); if(n)n.pinned=!n.pinned; saveN(data.notes); }
 
 // ============================================================
@@ -361,18 +425,19 @@ function deleteReminder(id){ var data=getData(); saveRem(data.reminders.filter(f
 // ============================================================
 var LEARNING_DAYS = ['mon','tue','wed','thu','fri','sat','sun'];
 var LEARNING_DAY_LABELS = {mon:'Monday',tue:'Tuesday',wed:'Wednesday',thu:'Thursday',fri:'Friday',sat:'Saturday',sun:'Sunday'};
-function addLearningItem(day,d){ var data=getData(); if(!data.learning[day])data.learning[day]=[]; data.learning[day].push({id:uid(),subject:d.subject,source:d.source||'',notes:d.notes||''}); saveLrn(data.learning); }
-function updateLearningItem(day,id,d){ var data=getData(); if(!data.learning[day])return; var item=data.learning[day].find(function(i){return i.id===id;}); if(item){item.subject=d.subject;item.source=d.source||'';item.notes=d.notes||'';} saveLrn(data.learning); }
+function addLearningItem(day,d){ var data=getData(); if(!data.learning[day])data.learning[day]=[]; data.learning[day].push({id:uid(),subject:d.subject,source:d.source||'',notes:d.notes||'',time:d.time||''}); saveLrn(data.learning); }
+function updateLearningItem(day,id,d){ var data=getData(); if(!data.learning[day])return; var item=data.learning[day].find(function(i){return i.id===id;}); if(item){item.subject=d.subject;item.source=d.source||'';item.notes=d.notes||'';item.time=d.time||'';} saveLrn(data.learning); }
 function deleteLearningItem(day,id){ var data=getData(); if(!data.learning[day])return; data.learning[day]=data.learning[day].filter(function(i){return i.id!==id;}); saveLrn(data.learning); }
 
 // ============================================================
 // FINANCIAL DATA
 // ============================================================
-function addIncome(d){ var data=getData(); data.income.push({id:uid(),name:d.name,amount:+d.amount,date:d.date,category:d.category||''}); saveInc(data.income); }
+function addIncome(d){ var data=getData(); data.income.push({id:uid(),name:d.name,amount:+d.amount,date:d.date,category:d.category||'',recurring:d.recurring||''}); saveInc(data.income); }
 function deleteIncome(id){ var data=getData(); saveInc(data.income.filter(function(i){return i.id!==id;})); }
-function addExpense(d){ var data=getData(); data.expenses.push({id:uid(),name:d.name,amount:+d.amount,date:d.date,category:d.category||''}); saveExp(data.expenses); }
+function addExpense(d){ var data=getData(); data.expenses.push({id:uid(),name:d.name,amount:+d.amount,date:d.date,category:d.category||'',recurring:d.recurring||''}); saveExp(data.expenses); }
 function deleteExpense(id){ var data=getData(); saveExp(data.expenses.filter(function(e){return e.id!==id;})); }
-function addShoppingItem(name,qty){ var data=getData(); data.shopping.push({id:uid(),name:name,qty:+qty||1,done:false}); saveSho(data.shopping); }
+function addShoppingItem(d){ var data=getData(); data.shopping.push({id:uid(),name:d.name,qty:+d.qty||1,price:d.price||'',link:d.link||'',notes:d.notes||'',done:false}); saveSho(data.shopping); }
+function updateShoppingItem(id,d){ var data=getData(); var item=data.shopping.find(function(i){return i.id===id;}); if(item){item.name=d.name;item.qty=+d.qty||1;item.price=d.price||'';item.link=d.link||'';item.notes=d.notes||'';} saveSho(data.shopping); }
 function toggleShoppingItem(id){ var data=getData(); var item=data.shopping.find(function(i){return i.id===id;}); if(item)item.done=!item.done; saveSho(data.shopping); }
 function deleteShoppingItem(id){ var data=getData(); saveSho(data.shopping.filter(function(i){return i.id!==id;})); }
 function addMoneyIdea(d){ var data=getData(); data.moneymaking.push({id:uid(),idea:d.idea,status:d.status||'idea',notes:d.notes||'',createdAt:new Date().toISOString()}); saveMM(data.moneymaking); }
@@ -520,22 +585,22 @@ function taskHTML(task, ds, noActions) {
   var priorityCls = isR ? '' : ('task-p-'+(task.priority||'standard'));
   var tb = task.time     ? '<span class="badge badge-time">'+fmt12(task.time)+'</span>'       : '';
   var lb = task.location ? '<span class="badge badge-loc">'+escHtml(task.location)+'</span>'  : '';
+  var hasNotes = !isR && task.notes && task.notes.trim();
+  var notesBadge = hasNotes ? '<span class="task-notes-indicator" title="Has notes">📝</span>' : '';
   var actionsHTML = '';
   if (!noActions) {
     var eb = isR
       ? '<button class="btn-icon" onclick="openRoutineOverride(\''+ds+'\',\''+task.id+'\')">✏️</button>'
       : '<button class="btn-icon" onclick="openEditTask(\''+ds+'\',\''+task.id+'\')">✏️</button>';
     var db = !isR ? '<button class="btn-icon" onclick="removeTask(\''+ds+'\',\''+task.id+'\')">🗑</button>' : '';
-    var hasNotes = !isR && task.notes && task.notes.trim();
     var nb = hasNotes ? '<button class="btn-icon task-notes-btn" onclick="toggleTaskNotes(this)" title="View notes">📋</button>' : '';
-    var notesPanel = hasNotes ? '<div class="task-notes-panel" style="display:none">'+escHtml(task.notes)+'</div>' : '';
     actionsHTML = '<div class="task-actions">'+nb+eb+db+'</div>';
   }
-  var notesPanel = (!noActions && !isR && task.notes && task.notes.trim())
+  var notesPanel = (!noActions && hasNotes)
     ? '<div class="task-notes-panel" style="display:none">'+escHtml(task.notes)+'</div>' : '';
   return '<div class="task-item '+itemCls+(task.done?' is-done':'')+'" id="ti-'+task.id+'">' +
     '<input type="checkbox" class="task-check"'+(task.done?' checked':'')+' onchange="checkTask(\''+ds+'\',\''+task.id+'\','+isR+')">' +
-    '<div class="task-body"><div class="task-title '+priorityCls+'">'+escHtml(task.title)+'</div>' +
+    '<div class="task-body"><div class="task-title '+priorityCls+'">'+escHtml(task.title)+notesBadge+'</div>' +
     '<div class="task-meta">'+tb+lb+'</div>'+notesPanel+'</div>' +
     actionsHTML+'</div>';
 }
@@ -553,9 +618,10 @@ function dayCardHTML(date, compact) {
   var head  = compact
     ? '<div class="day-card-name">'+shortDay(date)+chip+'</div><div class="day-card-label">'+shortMonthDay(date)+'</div><div class="day-card-hdate" id="hdate-'+ds+'">...</div>'
     : '<div class="day-card-name">'+dayName(date)+chip+'</div><div class="day-card-label">'+monthDay(date)+'</div><div class="day-card-hdate" id="hdate-'+ds+'">...</div>';
-  var tHTML = tasks.length
-    ? tasks.map(function(t){return taskHTML(t,ds,compact);}).join('')
-    : '<div class="empty-tasks">No tasks yet</div>';
+  var displayTasks = compact ? tasks.filter(function(t){return !t.done;}) : tasks;
+  var tHTML = displayTasks.length
+    ? displayTasks.map(function(t){return taskHTML(t,ds,compact);}).join('')
+    : '<div class="empty-tasks">'+(compact?'Nothing pending':'No tasks yet')+'</div>';
 
   // In compact (7-day) mode: clickable header opens day popup, no zmanim strip
   // In full mode: zmanim strip shown
@@ -973,25 +1039,50 @@ function renderReminders() {
 // ============================================================
 // RENDER — LEARNING SEDER
 // ============================================================
+function getLearningSection(time) {
+  if(!time)return 'unscheduled';
+  var h=parseInt(time.split(':')[0],10);
+  if(h>=5&&h<12) return 'morning';
+  if(h>=12&&h<18) return 'afternoon';
+  return 'night';
+}
+var LEARNING_SECTIONS=[
+  {key:'morning',   label:'Morning',   hours:'5am–12pm'},
+  {key:'afternoon', label:'Afternoon', hours:'12pm–6pm'},
+  {key:'night',     label:'Night',     hours:'6pm+'},
+  {key:'unscheduled',label:'Unscheduled',hours:'No time set'},
+];
+
 function renderLearning() {
   var data=getData(); var grid=document.getElementById('learningGrid'); if(!grid)return;
   grid.innerHTML=LEARNING_DAYS.map(function(day){
     var items=data.learning[day]||[];
-    var itemsHTML=items.map(function(item){
-      return '<div class="learning-item">' +
-        '<div class="learning-item-body">' +
-          '<div class="learning-item-subject">'+escHtml(item.subject)+'</div>'+
-          (item.source?'<div class="learning-item-source">'+escHtml(item.source)+'</div>':'')+
-          (item.notes ?'<div class="learning-item-notes">'+escHtml(item.notes)+'</div>' :'')+
-        '</div>' +
-        '<div class="learning-item-actions">' +
-          '<button class="btn-icon" onclick="openEditLearningItem(\''+day+'\',\''+item.id+'\')">✏️</button>'+
-          '<button class="btn-icon" onclick="deleteLrn(\''+day+'\',\''+item.id+'\')">🗑</button>'+
-        '</div></div>';
-    }).join('');
+    var sections={morning:[],afternoon:[],night:[],unscheduled:[]};
+    items.forEach(function(item){ sections[getLearningSection(item.time||'')].push(item); });
+    ['morning','afternoon','night'].forEach(function(sec){
+      sections[sec].sort(function(a,b){return (a.time||'').localeCompare(b.time||'');});
+    });
+    var bodyHTML='';
+    LEARNING_SECTIONS.forEach(function(sec){
+      var sItems=sections[sec.key]; if(!sItems.length)return;
+      bodyHTML+='<div class="learning-section-header">'+sec.label+'</div>';
+      bodyHTML+=sItems.map(function(item){
+        var timeBadge=item.time?'<span class="learning-time-badge">'+fmt12(item.time)+'</span>':'';
+        return '<div class="learning-item">' +
+          '<div class="learning-item-body">' +
+            '<div class="learning-item-subject">'+escHtml(item.subject)+timeBadge+'</div>'+
+            (item.source?'<div class="learning-item-source">'+escHtml(item.source)+'</div>':'')+
+            (item.notes ?'<div class="learning-item-notes">'+escHtml(item.notes)+'</div>' :'')+
+          '</div>' +
+          '<div class="learning-item-actions">' +
+            '<button class="btn-icon" onclick="openEditLearningItem(\''+day+'\',\''+item.id+'\')">✏️</button>'+
+            '<button class="btn-icon" onclick="deleteLrn(\''+day+'\',\''+item.id+'\')">🗑</button>'+
+          '</div></div>';
+      }).join('');
+    });
     return '<div class="learning-day-col">' +
       '<div class="learning-day-header">'+LEARNING_DAY_LABELS[day]+'</div>' +
-      '<div class="learning-day-body">'+(itemsHTML||'<div style="padding:12px 14px;font-size:13px;color:#ccc">Empty</div>')+'</div>' +
+      '<div class="learning-day-body">'+(bodyHTML||'<div style="padding:12px 14px;font-size:13px;color:#ccc">Empty</div>')+'</div>' +
       '<button class="learning-add-row" onclick="openAddLearningItem(\''+day+'\')">+ Add</button>' +
       '</div>';
   }).join('');
@@ -1008,9 +1099,10 @@ function renderFinancial() {
     else {
       var incTotal=data.income.reduce(function(s,i){return s+i.amount;},0);
       incEl.innerHTML=data.income.map(function(item){
+        var recBadge=item.recurring?'<span class="fin-recurring-badge">🔄 '+escHtml(item.recurring)+'</span>':'';
         return '<div class="fin-row"><div class="fin-row-main"><div class="fin-row-name">'+escHtml(item.name)+'</div>'+
           '<div class="fin-row-meta">'+fmtDateDisplay(item.date)+(item.category?' · '+escHtml(item.category):'')+'</div></div>'+
-          '<div class="fin-row-right"><span class="fin-row-amount income">+$'+item.amount.toLocaleString()+'</span>'+
+          '<div class="fin-row-right">'+recBadge+'<span class="fin-row-amount income">+$'+item.amount.toLocaleString()+'</span>'+
           '<button class="btn-icon" onclick="delInc(\''+item.id+'\')">🗑</button></div></div>';
       }).join('')+
       '<div class="fin-row" style="background:#f9fef9"><div class="fin-row-main"><strong>Total</strong></div>'+
@@ -1023,9 +1115,10 @@ function renderFinancial() {
     else {
       var expTotal=data.expenses.reduce(function(s,i){return s+i.amount;},0);
       expEl.innerHTML=data.expenses.map(function(item){
+        var recBadge=item.recurring?'<span class="fin-recurring-badge">🔄 '+escHtml(item.recurring)+'</span>':'';
         return '<div class="fin-row"><div class="fin-row-main"><div class="fin-row-name">'+escHtml(item.name)+'</div>'+
           '<div class="fin-row-meta">'+fmtDateDisplay(item.date)+(item.category?' · '+escHtml(item.category):'')+'</div></div>'+
-          '<div class="fin-row-right"><span class="fin-row-amount expense">-$'+item.amount.toLocaleString()+'</span>'+
+          '<div class="fin-row-right">'+recBadge+'<span class="fin-row-amount expense">-$'+item.amount.toLocaleString()+'</span>'+
           '<button class="btn-icon" onclick="delExp(\''+item.id+'\')">🗑</button></div></div>';
       }).join('')+
       '<div class="fin-row" style="background:#fff5f5"><div class="fin-row-main"><strong>Total</strong></div>'+
@@ -1037,11 +1130,13 @@ function renderFinancial() {
     if (!data.shopping.length) { shoEl.innerHTML='<div class="fin-empty">Your shopping list is empty.</div>'; }
     else {
       shoEl.innerHTML=data.shopping.map(function(item){
+        var meta=[item.price,item.notes].filter(Boolean);
+        var metaHTML=meta.length?'<div class="shopping-meta">'+meta.map(escHtml).join(' · ')+'</div>':'';
+        var linkHTML=item.link?'<a href="'+escHtml(item.link)+'" class="shopping-link" target="_blank" rel="noopener">🔗</a>':'';
         return '<div class="shopping-item'+(item.done?' is-done':'')+'">' +
           '<input type="checkbox" class="task-check"'+(item.done?' checked':'')+' onchange="toggleShop(\''+item.id+'\')">' +
-          '<span class="shopping-name">'+escHtml(item.name)+'</span>' +
-          '<span class="shopping-qty">×'+item.qty+'</span>' +
-          '<button class="btn-icon" onclick="delShop(\''+item.id+'\')">🗑</button></div>';
+          '<div class="shopping-item-body"><div class="shopping-name-row"><span class="shopping-name">'+escHtml(item.name)+'</span><span class="shopping-qty">×'+item.qty+'</span>'+linkHTML+'</div>'+metaHTML+'</div>'+
+          '<div style="display:flex;gap:2px;flex-shrink:0"><button class="btn-icon" onclick="openEditShoppingItem(\''+item.id+'\')">✏️</button><button class="btn-icon" onclick="delShop(\''+item.id+'\')">🗑</button></div></div>';
       }).join('');
     }
   }
@@ -1106,6 +1201,7 @@ function renderNotesSidebar() {
   var html='';
   html+='<div class="sidebar-item'+(active==='all'?' active':'')+'" onclick="setNoteFolder(\'all\')">📝 All Notes</div>';
   html+='<div class="sidebar-item'+(active==='pinned'?' active':'')+'" onclick="setNoteFolder(\'pinned\')">📌 Pinned</div>';
+  html+='<div class="sidebar-item'+(active==='trash'?' active':'')+' trash" onclick="setNoteFolder(\'trash\')">🗑 Recently Deleted</div>';
   html+='<hr class="sidebar-divider">';
   data.folders.filter(function(f){return !f.parentId;}).forEach(function(f){
     var dot = f.color ? '<span class="folder-color-dot" style="background:'+f.color+'"></span>' : '📁 ';
@@ -1133,10 +1229,41 @@ function renderNotesSidebar() {
   html+='<div class="sidebar-add-folder" onclick="openFolderModal()">+ New Folder</div>';
   sidebar.innerHTML=html;
 }
+function trashNoteCardHTML(note) {
+  var c=colorByValue(note.color); var colorClass=c.noteCls?' '+c.noteCls:'';
+  var contentHTML = note.type==='checklist'
+    ? '<div class="note-card-content">'+note.items.slice(0,3).map(function(item){return escHtml(item.text);}).join(', ')+'</div>'
+    : '<div class="note-card-content">'+escHtml(note.content||'')+'</div>';
+  var daysLeft='';
+  if(note.deletedAt){
+    var d=Math.ceil((new Date(note.deletedAt).getTime()+7*24*60*60*1000-Date.now())/(1000*60*60*24));
+    daysLeft='<div class="note-deleted-info">Auto-deleted in '+Math.max(0,d)+' day'+(Math.max(0,d)!==1?'s':'')+'</div>';
+  }
+  return '<div class="note-card is-deleted'+colorClass+'">'+(note.title?'<div class="note-card-title">'+escHtml(note.title)+'</div>':'')+contentHTML+daysLeft+
+    '<div class="note-restore-actions">'+
+    '<button class="btn-restore" onclick="event.stopPropagation();restoreNoteCard(\''+note.id+'\')">↩ Restore</button>'+
+    '<button class="btn-icon" onclick="event.stopPropagation();permanentlyDeleteNote(\''+note.id+'\')" title="Delete permanently" style="color:#e53e3e">🗑</button>'+
+    '</div></div>';
+}
+window.restoreNoteCard = function(id){ restoreNote(id); renderNotes(); };
+window.permanentlyDeleteNote = function(id){ if(confirm('Permanently delete this note? This cannot be undone.')){ purgeNoteById(id); renderNotes(); } };
+
 function renderNotesMain() {
-  var data=getData(); var main=document.getElementById('notesMain'); var query=state.notesSearchQuery.toLowerCase();
+  var data=getData(); var main=document.getElementById('notesMain');
+
+  if(state.activeFolderId==='trash'){
+    var deleted=data.notes.filter(function(n){return n.deleted;});
+    if(!deleted.length){
+      main.innerHTML='<div class="notes-empty"><div class="notes-empty-icon">🗑</div><p>Recently Deleted is empty.<br>Deleted notes stay here for 7 days.</p></div>';
+    } else {
+      main.innerHTML='<p style="color:#aaa;font-size:13px;margin-bottom:12px">Deleted notes are permanently removed after 7 days.</p><div class="notes-grid">'+deleted.map(trashNoteCardHTML).join('')+'</div>';
+    }
+    return;
+  }
+
+  var query=state.notesSearchQuery.toLowerCase();
   var notes=data.notes.filter(function(n){
-    if (n.archived) return false;
+    if(n.deleted||n.archived) return false;
     if (query) return (n.title+' '+n.content+' '+n.items.map(function(i){return i.text;}).join(' ')).toLowerCase().includes(query);
     if (state.activeFolderId==='pinned') return n.pinned;
     if (state.activeFolderId==='all') return true;
@@ -1327,7 +1454,6 @@ window.openAddTask = function(ds) {
   document.getElementById('taskReminder').value='';
   document.getElementById('taskAddToCalendar').checked=false;
   document.querySelectorAll('.priority-btn').forEach(function(b){b.classList.toggle('active',b.dataset.priority==='standard');});
-  buildColorPicker('taskColorPicker','',function(v){state.selectedTaskColor=v;});
   openModal('taskModal');
   setTimeout(function(){document.getElementById('taskTitle').focus();},80);
 };
@@ -1342,7 +1468,6 @@ window.openEditTask = function(ds,id) {
   document.getElementById('taskReminder').value=t.reminder||'';
   document.getElementById('taskAddToCalendar').checked=false;
   document.querySelectorAll('.priority-btn').forEach(function(b){b.classList.toggle('active',b.dataset.priority===(t.priority||'standard'));});
-  buildColorPicker('taskColorPicker',t.color||'',function(v){state.selectedTaskColor=v;});
   openModal('taskModal');
 };
 window.openZmanim = async function(ds) {
@@ -1450,6 +1575,10 @@ window.openNoteView = function(id) {
     var c=colorByValue(n.color); if(c.noteCls)box.classList.add(c.noteCls);
   }
 
+  // Pin button state
+  var pinBtn=document.getElementById('noteViewPinBtn');
+  if(pinBtn){ pinBtn.style.opacity=n.pinned?'1':'0.4'; pinBtn.title=n.pinned?'Unpin note':'Pin note'; }
+
   // Title
   document.getElementById('noteViewTitleInput').value=n.title||'';
 
@@ -1502,13 +1631,66 @@ window.openDayDetail = function(ds) {
   document.getElementById('dayDetailTitle').textContent=date.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
   var events=getEventsForDate(ds); var body=document.getElementById('dayDetailBody');
   if (!events.length){ body.innerHTML='<p style="color:#aaa;font-size:14px;padding:8px 0">No events on this day.</p>'; }
-  else { body.innerHTML=events.map(function(ev){ return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f2f2f2">'+
-    '<div><strong style="font-size:14px">'+escHtml(ev.title)+'</strong>'+(ev.time?'<div style="font-size:12px;color:#888;margin-top:2px">'+fmt12(ev.time)+'</div>':'')+
-    '</div><button class="btn-icon" onclick="removeCalEvent(\''+ev.id+'\')">🗑</button></div>'; }).join(''); }
+  else {
+    body.innerHTML=events.map(function(ev){
+      var isRec=ev.recurring&&ev.recurring!=='none';
+      var recIcon=isRec?'<span class="cal-recurring-icon" title="Recurring: '+escHtml(ev.recurring)+'">🔄</span>':'';
+      var delBtns=isRec
+        ? '<button class="btn-icon" onclick="delCalEvOcc(\''+ev.id+'\',\''+ds+'\',\'single\')" title="Skip this occurrence">✕</button>'+
+          '<button class="btn-icon" onclick="delCalEvOcc(\''+ev.id+'\',\''+ds+'\',\'future\')" title="Delete this & all future" style="font-size:10px">✕✕</button>'
+        : '<button class="btn-icon" onclick="removeCalEvent(\''+ev.id+'\')">🗑</button>';
+      return '<div class="cal-event-detail-row">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start">'+
+          '<div>'+
+            '<div class="cal-event-detail-title">'+escHtml(ev.title)+recIcon+'</div>'+
+            ((ev.time||ev.location)?'<div class="cal-event-detail-meta">'+(ev.time?fmt12(ev.time):'')+(ev.time&&ev.location?' · ':'')+escHtml(ev.location||'')+'</div>':'')+
+            (ev.notes?'<div class="cal-event-detail-notes">'+escHtml(ev.notes)+'</div>':'')+
+          '</div>'+
+          '<div style="display:flex;gap:4px;flex-shrink:0">'+
+            '<button class="btn-icon" onclick="openEditCalEvent(\''+ev.id+'\',\''+ds+'\')">✏️</button>'+
+            delBtns+
+          '</div>'+
+        '</div>'+
+        '</div>';
+    }).join('');
+  }
   state.pendingCalDate=ds;
   document.getElementById('addEventOnDay').onclick=function(){ closeModal('dayDetailModal'); openAddCalEvent(ds); };
   openModal('dayDetailModal');
 };
+window.delCalEvOcc = function(id, ds, mode) {
+  var data=getData();
+  var ev=data.calEvents.find(function(e){return e.id===id;}); if(!ev)return;
+  if(mode==='single'){
+    if(!ev.exceptions)ev.exceptions=[];
+    ev.exceptions.push(ds); saveCE(data.calEvents);
+  } else {
+    var d=fromDateStr(ds); d.setDate(d.getDate()-1);
+    if(d<fromDateStr(ev.date)){ deleteCalEvent(id); }
+    else{ ev.recurringUntil=toDateStr(d); saveCE(data.calEvents); }
+  }
+  closeModal('dayDetailModal'); renderCalendar();
+};
+function openEditCalEvent(id, ds) {
+  var data=getData(); var ev=data.calEvents.find(function(e){return e.id===id;}); if(!ev)return;
+  state.editCalEventId=id; state.selectedCalEventColor=ev.color||'';
+  document.getElementById('calEventModalTitle').textContent='Edit Event';
+  document.getElementById('calEventTitle').value=ev.title;
+  document.getElementById('calEventDate').value=ds||ev.date;
+  document.getElementById('calEventTime').value=ev.time||'';
+  document.getElementById('calEventLocation').value=ev.location||'';
+  document.getElementById('calEventNotes').value=ev.notes||'';
+  var rec=ev.recurring||'none';
+  document.getElementById('calEventRecurring').value=rec;
+  document.getElementById('calEventUntilGroup').style.display=rec!=='none'?'':'none';
+  document.getElementById('calEventUntil').value=ev.recurringUntil||'';
+  document.getElementById('calEventAddToDashboard').checked=false;
+  buildColorPicker('calEventColorPicker',ev.color||'',function(v){state.selectedCalEventColor=v;});
+  closeModal('dayDetailModal');
+  openModal('calEventModal');
+  setTimeout(function(){document.getElementById('calEventTitle').focus();},80);
+}
+window.openEditCalEvent = openEditCalEvent;
 window.removeCalEvent = function(id){ if(confirm('Delete this event?')){ deleteCalEvent(id); closeModal('dayDetailModal'); renderCalendar(); } };
 
 // Short/Long Term
@@ -1538,8 +1720,8 @@ window.openEditReminder = function(id) {
 window.deleteRem = function(id){ if(confirm('Delete this reminder?')){ deleteReminder(id); renderReminders(); } };
 
 // Learning
-window.openAddLearningItem = function(day){ state.learningDay=day; state.editLearningItemId=null; document.getElementById('learningItemModalTitle').textContent='Add to '+LEARNING_DAY_LABELS[day]; document.getElementById('learningSubject').value=''; document.getElementById('learningSource').value=''; document.getElementById('learningNotes').value=''; openModal('learningItemModal'); setTimeout(function(){document.getElementById('learningSubject').focus();},80); };
-window.openEditLearningItem = function(day,id){ var data=getData(); var items=data.learning[day]||[]; var item=items.find(function(i){return i.id===id;}); if(!item)return; state.learningDay=day; state.editLearningItemId=id; document.getElementById('learningItemModalTitle').textContent='Edit '+LEARNING_DAY_LABELS[day]; document.getElementById('learningSubject').value=item.subject; document.getElementById('learningSource').value=item.source||''; document.getElementById('learningNotes').value=item.notes||''; openModal('learningItemModal'); };
+window.openAddLearningItem = function(day){ state.learningDay=day; state.editLearningItemId=null; document.getElementById('learningItemModalTitle').textContent='Add to '+LEARNING_DAY_LABELS[day]; document.getElementById('learningSubject').value=''; document.getElementById('learningTime').value=''; document.getElementById('learningSource').value=''; document.getElementById('learningNotes').value=''; openModal('learningItemModal'); setTimeout(function(){document.getElementById('learningSubject').focus();},80); };
+window.openEditLearningItem = function(day,id){ var data=getData(); var items=data.learning[day]||[]; var item=items.find(function(i){return i.id===id;}); if(!item)return; state.learningDay=day; state.editLearningItemId=id; document.getElementById('learningItemModalTitle').textContent='Edit '+LEARNING_DAY_LABELS[day]; document.getElementById('learningSubject').value=item.subject; document.getElementById('learningTime').value=item.time||''; document.getElementById('learningSource').value=item.source||''; document.getElementById('learningNotes').value=item.notes||''; openModal('learningItemModal'); setTimeout(function(){document.getElementById('learningSubject').focus();},80); };
 window.deleteLrn = function(day,id){ if(confirm('Remove this entry?')){ deleteLearningItem(day,id); renderLearning(); } };
 
 // Financial
@@ -1572,6 +1754,13 @@ function saveTaskModal() {
   var addToCal=document.getElementById('taskAddToCalendar').checked;
   state.editTaskId ? updateTask(state.editTaskDate,state.editTaskId,d) : addTask(state.editTaskDate,d);
   if (addToCal) addCalEvent({title:d.title,date:state.editTaskDate,time:d.time,color:d.color});
+  // If this task was moved from Future tab, delete the source item
+  if(state.movingFromFutureId){
+    deleteSimpleItem(state.movingFromFutureList,state.movingFromFutureId);
+    var movedList=state.movingFromFutureList;
+    state.movingFromFutureId=null; state.movingFromFutureList=null;
+    movedList==='shortterm'?renderShortTerm():renderLongTerm();
+  }
   closeModal('taskModal'); refresh(); refreshDashDayModal();
 }
 
@@ -1604,6 +1793,11 @@ function openAddCalEvent(ds) {
   document.getElementById('calEventTitle').value='';
   document.getElementById('calEventDate').value=ds||toDateStr(new Date());
   document.getElementById('calEventTime').value='';
+  document.getElementById('calEventLocation').value='';
+  document.getElementById('calEventNotes').value='';
+  document.getElementById('calEventRecurring').value='none';
+  document.getElementById('calEventUntilGroup').style.display='none';
+  document.getElementById('calEventUntil').value='';
   document.getElementById('calEventAddToDashboard').checked=false;
   buildColorPicker('calEventColorPicker','',function(v){state.selectedCalEventColor=v;});
   openModal('calEventModal');
@@ -1613,7 +1807,17 @@ function saveCalEventModal() {
   var title=document.getElementById('calEventTitle').value.trim();
   if (!title){ document.getElementById('calEventTitle').classList.add('error'); document.getElementById('calEventTitle').focus(); return; }
   document.getElementById('calEventTitle').classList.remove('error');
-  var d={title:title,date:document.getElementById('calEventDate').value,time:document.getElementById('calEventTime').value,color:state.selectedCalEventColor};
+  var rec=document.getElementById('calEventRecurring').value;
+  var d={
+    title:title,
+    date:document.getElementById('calEventDate').value,
+    time:document.getElementById('calEventTime').value,
+    location:document.getElementById('calEventLocation').value.trim(),
+    notes:document.getElementById('calEventNotes').value.trim(),
+    color:state.selectedCalEventColor,
+    recurring:rec,
+    recurringUntil:rec!=='none'?(document.getElementById('calEventUntil').value||null):null
+  };
   state.editCalEventId?updateCalEvent(state.editCalEventId,d):addCalEvent(d);
   if (document.getElementById('calEventAddToDashboard').checked&&d.date) addTask(d.date,{title:d.title,time:d.time,color:d.color});
   closeModal('calEventModal'); renderCalendar();
@@ -1638,11 +1842,17 @@ window.removeCheckItem = function(i){ state.noteCheckItems.splice(i,1); renderCh
 function populateFolderSelect(selectedFolderId) {
   var data=getData(); var sel=document.getElementById('noteFolderSelect'); if(!sel)return;
   sel.innerHTML='<option value="">No folder</option>';
-  data.folders.forEach(function(f){
+  data.folders.filter(function(f){return !f.parentId;}).forEach(function(f){
     var opt=document.createElement('option');
     opt.value=f.id; opt.textContent=f.name;
     if(f.id===selectedFolderId)opt.selected=true;
     sel.appendChild(opt);
+    data.folders.filter(function(sf){return sf.parentId===f.id;}).forEach(function(sf){
+      var sopt=document.createElement('option');
+      sopt.value=sf.id; sopt.textContent='  ↳ '+sf.name;
+      if(sf.id===selectedFolderId)sopt.selected=true;
+      sel.appendChild(sopt);
+    });
   });
 }
 function openNoteModal() {
@@ -1758,6 +1968,15 @@ function initListeners() {
   document.getElementById('closeRoutineOverrideModal').addEventListener('click', function(){ closeModal('routineOverrideModal'); });
   document.getElementById('cancelRoutineOverride').addEventListener('click',     function(){ closeModal('routineOverrideModal'); });
   document.getElementById('saveRoutineOverride').addEventListener('click', saveRoutineOverrideModal);
+  document.getElementById('skipRoutineDay').addEventListener('click', function(){
+    if(!confirm('Skip "'+document.getElementById('routineOverrideTitle').value+'" for this day only?'))return;
+    var data=getData();
+    var key=state.routineOverrideDs+'_'+state.routineOverrideId;
+    data.routineOverrides[key]={skipped:true};
+    saveRO(data.routineOverrides);
+    closeModal('routineOverrideModal');
+    refresh(); refreshDashDayModal();
+  });
 
   // Routine modals
   document.getElementById('closeRoutineModal').addEventListener('click',     function(){ closeModal('routineModal'); });
@@ -1811,8 +2030,20 @@ function initListeners() {
   document.getElementById('confirmMoveToDay').addEventListener('click', function(){
     var ds=document.getElementById('moveToDayDate').value;
     if (!ds||!state.movingItemId){ closeModal('moveToDayModal'); return; }
-    moveItemToDay(state.movingItemList,state.movingItemId,ds); closeModal('moveToDayModal');
-    state.movingItemList==='shortterm'?renderShortTerm():renderLongTerm();
+    var data=getData();
+    var item=data[state.movingItemList].find(function(i){return i.id===state.movingItemId;});
+    closeModal('moveToDayModal');
+    if(!item)return;
+    // Store future item info so it gets deleted after task is saved
+    state.movingFromFutureId=state.movingItemId;
+    state.movingFromFutureList=state.movingItemList;
+    state.movingItemId=null; state.movingItemList=null;
+    // Open task modal pre-filled
+    window.openAddTask(ds);
+    setTimeout(function(){
+      document.getElementById('taskTitle').value=item.title;
+      document.getElementById('taskNotes').value=item.notes||'';
+    },10);
   });
 
   // Cheshbon HaNefesh
@@ -1936,7 +2167,7 @@ function initListeners() {
     var subject=document.getElementById('learningSubject').value.trim();
     if (!subject){ document.getElementById('learningSubject').classList.add('error'); return; }
     document.getElementById('learningSubject').classList.remove('error');
-    var d={subject:subject,source:document.getElementById('learningSource').value.trim(),notes:document.getElementById('learningNotes').value.trim()};
+    var d={subject:subject,source:document.getElementById('learningSource').value.trim(),notes:document.getElementById('learningNotes').value.trim(),time:document.getElementById('learningTime').value};
     state.editLearningItemId?updateLearningItem(state.learningDay,state.editLearningItemId,d):addLearningItem(state.learningDay,d);
     state.editLearningItemId=null; closeModal('learningItemModal'); renderLearning();
   });
@@ -1952,27 +2183,51 @@ function initListeners() {
   });
 
   // Income / Expense
-  document.getElementById('addIncomeBtn').addEventListener('click',  function(){ state.finEntryType='income';  state.editFinEntryId=null; document.getElementById('finEntryModalTitle').textContent='Add Income';  document.getElementById('finEntryName').value=''; document.getElementById('finEntryAmount').value=''; document.getElementById('finEntryDate').value=toDateStr(new Date()); document.getElementById('finEntryCategory').value=''; openModal('finEntryModal'); setTimeout(function(){document.getElementById('finEntryName').focus();},80); });
-  document.getElementById('addExpenseBtn').addEventListener('click', function(){ state.finEntryType='expense'; state.editFinEntryId=null; document.getElementById('finEntryModalTitle').textContent='Add Expense'; document.getElementById('finEntryName').value=''; document.getElementById('finEntryAmount').value=''; document.getElementById('finEntryDate').value=toDateStr(new Date()); document.getElementById('finEntryCategory').value=''; openModal('finEntryModal'); setTimeout(function(){document.getElementById('finEntryName').focus();},80); });
+  document.getElementById('addIncomeBtn').addEventListener('click',  function(){ state.finEntryType='income';  state.editFinEntryId=null; document.getElementById('finEntryModalTitle').textContent='Add Income';  document.getElementById('finEntryName').value=''; document.getElementById('finEntryAmount').value=''; document.getElementById('finEntryDate').value=toDateStr(new Date()); document.getElementById('finEntryCategory').value=''; document.getElementById('finEntryRecurring').value=''; openModal('finEntryModal'); setTimeout(function(){document.getElementById('finEntryName').focus();},80); });
+  document.getElementById('addExpenseBtn').addEventListener('click', function(){ state.finEntryType='expense'; state.editFinEntryId=null; document.getElementById('finEntryModalTitle').textContent='Add Expense'; document.getElementById('finEntryName').value=''; document.getElementById('finEntryAmount').value=''; document.getElementById('finEntryDate').value=toDateStr(new Date()); document.getElementById('finEntryCategory').value=''; document.getElementById('finEntryRecurring').value=''; openModal('finEntryModal'); setTimeout(function(){document.getElementById('finEntryName').focus();},80); });
   document.getElementById('closeFinEntryModal').addEventListener('click', function(){ closeModal('finEntryModal'); });
   document.getElementById('cancelFinEntry').addEventListener('click',     function(){ closeModal('finEntryModal'); });
   document.getElementById('saveFinEntry').addEventListener('click', function(){
     var name=document.getElementById('finEntryName').value.trim(), amt=document.getElementById('finEntryAmount').value;
     if (!name||!amt){ if(!name)document.getElementById('finEntryName').classList.add('error'); if(!amt)document.getElementById('finEntryAmount').classList.add('error'); return; }
     document.getElementById('finEntryName').classList.remove('error'); document.getElementById('finEntryAmount').classList.remove('error');
-    var d={name:name,amount:amt,date:document.getElementById('finEntryDate').value,category:document.getElementById('finEntryCategory').value.trim()};
+    var d={name:name,amount:amt,date:document.getElementById('finEntryDate').value,category:document.getElementById('finEntryCategory').value.trim(),recurring:document.getElementById('finEntryRecurring').value};
     state.finEntryType==='income'?addIncome(d):addExpense(d); closeModal('finEntryModal'); renderFinancial();
   });
 
   // Shopping
-  document.getElementById('addShoppingBtn').addEventListener('click',  function(){ document.getElementById('shoppingItemName').value=''; document.getElementById('shoppingItemQty').value='1'; openModal('shoppingModal'); setTimeout(function(){document.getElementById('shoppingItemName').focus();},80); });
+  function openAddShoppingModal(){
+    state.editShoppingId=null;
+    document.getElementById('shoppingItemName').value='';
+    document.getElementById('shoppingItemQty').value='1';
+    document.getElementById('shoppingItemPrice').value='';
+    document.getElementById('shoppingItemLink').value='';
+    document.getElementById('shoppingItemNotes').value='';
+    openModal('shoppingModal');
+    setTimeout(function(){document.getElementById('shoppingItemName').focus();},80);
+  }
+  window.openEditShoppingItem = function(id) {
+    var data=getData(); var item=data.shopping.find(function(i){return i.id===id;}); if(!item)return;
+    state.editShoppingId=id;
+    document.getElementById('shoppingItemName').value=item.name;
+    document.getElementById('shoppingItemQty').value=item.qty||1;
+    document.getElementById('shoppingItemPrice').value=item.price||'';
+    document.getElementById('shoppingItemLink').value=item.link||'';
+    document.getElementById('shoppingItemNotes').value=item.notes||'';
+    openModal('shoppingModal');
+    setTimeout(function(){document.getElementById('shoppingItemName').focus();},80);
+  };
+  document.getElementById('addShoppingBtn').addEventListener('click', openAddShoppingModal);
   document.getElementById('closeShoppingModal').addEventListener('click', function(){ closeModal('shoppingModal'); });
   document.getElementById('cancelShopping').addEventListener('click',     function(){ closeModal('shoppingModal'); });
   document.getElementById('saveShopping').addEventListener('click', function(){
     var name=document.getElementById('shoppingItemName').value.trim();
     if (!name){ document.getElementById('shoppingItemName').classList.add('error'); return; }
     document.getElementById('shoppingItemName').classList.remove('error');
-    addShoppingItem(name,document.getElementById('shoppingItemQty').value||1); closeModal('shoppingModal'); renderFinancial();
+    var d={name:name,qty:document.getElementById('shoppingItemQty').value||1,price:document.getElementById('shoppingItemPrice').value.trim(),link:document.getElementById('shoppingItemLink').value.trim(),notes:document.getElementById('shoppingItemNotes').value.trim()};
+    if(state.editShoppingId){ updateShoppingItem(state.editShoppingId,d); state.editShoppingId=null; }
+    else { addShoppingItem(d); }
+    closeModal('shoppingModal'); renderFinancial();
   });
   document.getElementById('shoppingItemName').addEventListener('keydown', function(e){ if(e.key==='Enter')document.getElementById('saveShopping').click(); });
 
@@ -1996,6 +2251,9 @@ function initListeners() {
   document.getElementById('closeCalEventModal').addEventListener('click', function(){ closeModal('calEventModal'); });
   document.getElementById('cancelCalEvent').addEventListener('click',     function(){ closeModal('calEventModal'); });
   document.getElementById('saveCalEvent').addEventListener('click', saveCalEventModal);
+  document.getElementById('calEventRecurring').addEventListener('change', function(){
+    document.getElementById('calEventUntilGroup').style.display=this.value!=='none'?'':'none';
+  });
   document.getElementById('closeDayDetailModal').addEventListener('click', function(){ closeModal('dayDetailModal'); });
   document.getElementById('calMonthViewBtn') && document.getElementById('calMonthViewBtn').addEventListener('click', function(){ renderCalendar(); });
 
@@ -2005,6 +2263,20 @@ function initListeners() {
   document.getElementById('noteViewModal').addEventListener('click', function(e){ if(e.target===this) closeNoteView(); });
   document.getElementById('noteViewOptionsBtn').addEventListener('click', function(){
     saveNoteViewModal(); closeModal('noteViewModal'); openEditNote(state.viewingNoteId);
+  });
+  document.getElementById('noteViewPinBtn').addEventListener('click', function(){
+    saveNoteViewModal();
+    toggleNotePin(state.viewingNoteId);
+    var n=getData().notes.find(function(n){return n.id===state.viewingNoteId;});
+    this.style.opacity=n&&n.pinned?'1':'0.4';
+    this.title=n&&n.pinned?'Unpin note':'Pin note';
+  });
+  document.getElementById('noteViewTrashBtn').addEventListener('click', function(){
+    if(!confirm('Delete this note? You can restore it from Recently Deleted within 7 days.'))return;
+    var id=state.viewingNoteId;
+    closeModal('noteViewModal');
+    deleteNote(id);
+    renderNotes();
   });
   document.getElementById('noteViewContent').addEventListener('input', function(){
     this.style.height='auto'; this.style.height=Math.max(120,this.scrollHeight)+'px';
@@ -2053,6 +2325,7 @@ async function loadHeaderHebrewDate() {
 }
 
 function init() {
+  purgeOldDeletedNotes();
   seedRoutineIfEmpty();
   seedFinancialIfEmpty();
   updateHeaderDate();
@@ -2060,7 +2333,7 @@ function init() {
   setInterval(updateHeaderDate,60000);
   initListeners();
   initSwipe();
-  setDashView('seven'); // Default: open to 7-day view
+  setDashView('seven');
 }
 
 document.addEventListener('DOMContentLoaded', init);
