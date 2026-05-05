@@ -50,11 +50,12 @@ const state = {
   selectedPlanActivityType: '',
   learningDay: null,
   editLearningItemId: null,
-  activeFinTab: 'finances',
-  finEntryType: null,
-  editFinEntryId: null,
-  editShoppingId: null,
-  editShoppingItemId: null,
+  activeFinTab: 'weekly',
+  finWeekIdx: 0,
+  editFinExpId: null,
+  editFinIncId: null,
+  editFinBonId: null,
+  editFinWishId: null,
   editMoneyIdeaId: null,
   calYear: new Date().getFullYear(),
   calMonth: new Date().getMonth(),
@@ -92,9 +93,12 @@ function getData() {
     longterm:    JSON.parse(localStorage.getItem('dm_longterm')    || '[]'),
     reminders:   JSON.parse(localStorage.getItem('dm_reminders')   || '[]'),
     learning:    JSON.parse(localStorage.getItem('dm_learning')    || '{}'),
-    income:      JSON.parse(localStorage.getItem('dm_income')      || '[]'),
-    expenses:    JSON.parse(localStorage.getItem('dm_expenses')    || '[]'),
-    shopping:    JSON.parse(localStorage.getItem('dm_shopping')    || '[]'),
+    finIncome:   JSON.parse(localStorage.getItem('dm_fin_income')   || '[]'),
+    finExpenses: JSON.parse(localStorage.getItem('dm_fin_expenses') || '[]'),
+    finBonuses:  JSON.parse(localStorage.getItem('dm_fin_bonuses')  || '[]'),
+    finWishlist: JSON.parse(localStorage.getItem('dm_fin_wishlist') || '[]'),
+    finPoints:   JSON.parse(localStorage.getItem('dm_fin_points')   || '0'),
+    finBank:     JSON.parse(localStorage.getItem('dm_fin_bank')     || '0'),
     moneymaking:      JSON.parse(localStorage.getItem('dm_moneymaking')       || '[]'),
     routineOverrides:      JSON.parse(localStorage.getItem('dm_routine_overrides'))          || {},
     gratitude:             JSON.parse(localStorage.getItem('dm_gratitude'))                  || Array(10).fill(''),
@@ -120,9 +124,12 @@ function saveST(v)  { localStorage.setItem('dm_shortterm',   JSON.stringify(v));
 function saveLT(v)  { localStorage.setItem('dm_longterm',    JSON.stringify(v)); }
 function saveRem(v) { localStorage.setItem('dm_reminders',   JSON.stringify(v)); }
 function saveLrn(v) { localStorage.setItem('dm_learning',    JSON.stringify(v)); }
-function saveInc(v) { localStorage.setItem('dm_income',      JSON.stringify(v)); }
-function saveExp(v) { localStorage.setItem('dm_expenses',    JSON.stringify(v)); }
-function saveSho(v) { localStorage.setItem('dm_shopping',    JSON.stringify(v)); }
+function saveFinInc(v)  { localStorage.setItem('dm_fin_income',   JSON.stringify(v)); }
+function saveFinExp(v)  { localStorage.setItem('dm_fin_expenses', JSON.stringify(v)); }
+function saveFinBon(v)  { localStorage.setItem('dm_fin_bonuses',  JSON.stringify(v)); }
+function saveFinWish(v) { localStorage.setItem('dm_fin_wishlist', JSON.stringify(v)); }
+function saveFinPts(v)  { localStorage.setItem('dm_fin_points',   JSON.stringify(v)); }
+function saveFinBank(v) { localStorage.setItem('dm_fin_bank',     JSON.stringify(v)); }
 function saveMM(v)  { localStorage.setItem('dm_moneymaking',       JSON.stringify(v)); }
 function saveRO(v)   { localStorage.setItem('dm_routine_overrides',      JSON.stringify(v)); }
 function saveGrat(v) { localStorage.setItem('dm_gratitude',              JSON.stringify(v)); }
@@ -432,14 +439,34 @@ function deleteLearningItem(day,id){ var data=getData(); if(!data.learning[day])
 // ============================================================
 // FINANCIAL DATA
 // ============================================================
-function addIncome(d){ var data=getData(); data.income.push({id:uid(),name:d.name,amount:+d.amount,date:d.date,category:d.category||'',recurring:d.recurring||''}); saveInc(data.income); }
-function deleteIncome(id){ var data=getData(); saveInc(data.income.filter(function(i){return i.id!==id;})); }
-function addExpense(d){ var data=getData(); data.expenses.push({id:uid(),name:d.name,amount:+d.amount,date:d.date,category:d.category||'',recurring:d.recurring||''}); saveExp(data.expenses); }
-function deleteExpense(id){ var data=getData(); saveExp(data.expenses.filter(function(e){return e.id!==id;})); }
-function addShoppingItem(d){ var data=getData(); data.shopping.push({id:uid(),name:d.name,qty:+d.qty||1,price:d.price||'',link:d.link||'',notes:d.notes||'',done:false}); saveSho(data.shopping); }
-function updateShoppingItem(id,d){ var data=getData(); var item=data.shopping.find(function(i){return i.id===id;}); if(item){item.name=d.name;item.qty=+d.qty||1;item.price=d.price||'';item.link=d.link||'';item.notes=d.notes||'';} saveSho(data.shopping); }
-function toggleShoppingItem(id){ var data=getData(); var item=data.shopping.find(function(i){return i.id===id;}); if(item)item.done=!item.done; saveSho(data.shopping); }
-function deleteShoppingItem(id){ var data=getData(); saveSho(data.shopping.filter(function(i){return i.id!==id;})); }
+function fmtDollar(n) { var x=parseFloat(n)||0; return x%1===0?x.toLocaleString():x.toFixed(2); }
+function fmtAmt(lo,hi) { lo=parseFloat(lo)||0; hi=parseFloat(hi)||lo; return lo===hi?'$'+fmtDollar(lo):'$'+fmtDollar(lo)+'–$'+fmtDollar(hi); }
+var TAG_CLS={'Need':'tag-need','Flexible':'tag-flex','Self-invest':'tag-invest','Gift':'tag-gift','Income':'tag-income','Bonus':'tag-bonus'};
+function tagBadge(tag) { var cls=TAG_CLS[tag]||'tag-need'; return '<span class="fin-tag '+cls+'">'+escHtml(tag||'')+'</span>'; }
+function getFinWeeks() {
+  var now=new Date(); var y=now.getFullYear(); var m=now.getMonth();
+  var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return [1,8,15,22].map(function(d,i){ return {label:'Week '+(i+1)+' \xb7 '+MON[m]+' '+d,idx:i}; });
+}
+function getAutoWeekIdx() { var d=new Date().getDate(); if(d<8)return 0; if(d<15)return 1; if(d<22)return 2; return 3; }
+function itemInWeek(item,wi) { if(item.frequency==='weekly')return true; return (item.weeks||[]).indexOf(wi)!==-1; }
+function addFinInc(d)       { var data=getData(); data.finIncome.push(Object.assign({id:uid()},d)); saveFinInc(data.finIncome); }
+function updateFinInc(id,d) { var data=getData(); var i=data.finIncome.findIndex(function(x){return x.id===id;}); if(i>-1)data.finIncome[i]=Object.assign({},data.finIncome[i],d,{id:id}); saveFinInc(data.finIncome); }
+function deleteFinInc(id)   { var data=getData(); saveFinInc(data.finIncome.filter(function(x){return x.id!==id;})); }
+function addFinExp(d)       { var data=getData(); data.finExpenses.push(Object.assign({id:uid()},d)); saveFinExp(data.finExpenses); }
+function updateFinExp(id,d) { var data=getData(); var i=data.finExpenses.findIndex(function(x){return x.id===id;}); if(i>-1)data.finExpenses[i]=Object.assign({},data.finExpenses[i],d,{id:id}); saveFinExp(data.finExpenses); }
+function deleteFinExp(id)   { var data=getData(); saveFinExp(data.finExpenses.filter(function(x){return x.id!==id;})); }
+function addFinBon(d)       { var data=getData(); data.finBonuses.push(Object.assign({id:uid()},d)); saveFinBon(data.finBonuses); }
+function updateFinBon(id,d) { var data=getData(); var i=data.finBonuses.findIndex(function(x){return x.id===id;}); if(i>-1)data.finBonuses[i]=Object.assign({},data.finBonuses[i],d,{id:id}); saveFinBon(data.finBonuses); }
+function deleteFinBon(id)   { var data=getData(); saveFinBon(data.finBonuses.filter(function(x){return x.id!==id;})); }
+function normalizeWishOrders(list) {
+  ['really-want','want','can-wait'].forEach(function(tier){
+    list.filter(function(w){return w.tier===tier;}).sort(function(a,b){return (a.order||0)-(b.order||0);}).forEach(function(w,i){w.order=i;});
+  });
+}
+function addFinWish(d)       { var data=getData(); normalizeWishOrders(data.finWishlist); var tier=data.finWishlist.filter(function(x){return x.tier===d.tier;}); d.order=tier.length; data.finWishlist.push(Object.assign({id:uid()},d)); saveFinWish(data.finWishlist); }
+function updateFinWish(id,d) { var data=getData(); var i=data.finWishlist.findIndex(function(x){return x.id===id;}); if(i>-1)data.finWishlist[i]=Object.assign({},data.finWishlist[i],d,{id:id}); saveFinWish(data.finWishlist); }
+function deleteFinWish(id)   { var data=getData(); saveFinWish(data.finWishlist.filter(function(x){return x.id!==id;})); }
 function addMoneyIdea(d){ var data=getData(); data.moneymaking.push({id:uid(),idea:d.idea,status:d.status||'idea',notes:d.notes||'',createdAt:new Date().toISOString()}); saveMM(data.moneymaking); }
 function updateMoneyIdea(id,d){ var data=getData(); var item=data.moneymaking.find(function(i){return i.id===id;}); if(item){item.idea=d.idea;item.status=d.status||'idea';item.notes=d.notes||'';} saveMM(data.moneymaking); }
 function deleteMoneyIdea(id){ var data=getData(); saveMM(data.moneymaking.filter(function(i){return i.id!==id;})); }
@@ -523,33 +550,56 @@ function seedRoutineIfEmpty() {
 }
 function seedFinancialIfEmpty() {
   var data=getData();
-  if (!data.income.length) {
-    [{name:'Law School Scholarship',amount:45000,date:'2026-01-15',category:'Education'},
-     {name:'Part-time Work',amount:2800,date:'2026-03-01',category:'Employment'},
-     {name:'Freelance Project',amount:1500,date:'2026-02-20',category:'Freelance'}]
-    .forEach(function(d){data.income.push({id:uid(),name:d.name,amount:d.amount,date:d.date,category:d.category});});
-    saveInc(data.income);
+  if (!data.finIncome.length) {
+    saveFinInc([
+      {id:uid(),name:'Weekly pay',      amountLow:350,  amountHigh:350,  frequency:'weekly',   weeks:[0,1,2,3], notes:'Cash, no tax'},
+      {id:uid(),name:'Side income',     amountLow:200,  amountHigh:200,  frequency:'monthly',  weeks:[0],       notes:''},
+      {id:uid(),name:'TA payment',      amountLow:45,   amountHigh:45,   frequency:'biweekly', weeks:[0,2],     notes:'Weeks 1 & 3'},
+      {id:uid(),name:'Amazon side hustle',amountLow:0,  amountHigh:0,    frequency:'monthly',  weeks:[0],       notes:'Variable — log each month'}
+    ]);
   }
-  if (!data.expenses.length) {
-    [{name:'Rent',amount:1800,date:'2026-04-01',category:'Housing'},
-     {name:'Groceries',amount:280,date:'2026-04-15',category:'Food'},
-     {name:'Phone Bill',amount:85,date:'2026-04-10',category:'Utilities'},
-     {name:'Books & Supplies',amount:320,date:'2026-03-28',category:'Education'},
-     {name:'Dining Out',amount:145,date:'2026-04-20',category:'Food'}]
-    .forEach(function(d){data.expenses.push({id:uid(),name:d.name,amount:d.amount,date:d.date,category:d.category});});
-    saveExp(data.expenses);
+  if (!data.finExpenses.length) {
+    saveFinExp([
+      {id:uid(),name:'WiFi',                  amountLow:20,   amountHigh:20,  tag:'Need',       frequency:'monthly',  weeks:[0]},
+      {id:uid(),name:'AAA',                   amountLow:6.08, amountHigh:6.08,tag:'Need',       frequency:'monthly',  weeks:[0]},
+      {id:uid(),name:'Spotify',               amountLow:21.99,amountHigh:21.99,tag:'Need',      frequency:'monthly',  weeks:[0]},
+      {id:uid(),name:'Web Chaver plan 1',     amountLow:5.99, amountHigh:5.99,tag:'Need',       frequency:'monthly',  weeks:[0]},
+      {id:uid(),name:'Web Chaver plan 2',     amountLow:7.98, amountHigh:7.98,tag:'Need',       frequency:'monthly',  weeks:[0]},
+      {id:uid(),name:'Chavruta',              amountLow:75,   amountHigh:150, tag:'Self-invest', frequency:'biweekly',weeks:[0,2], notes:'Increments of $15, usually $120–$150'},
+      {id:uid(),name:"Trader Joe's / Groceries",amountLow:50, amountHigh:50,  tag:'Need',       frequency:'weekly',   weeks:[0,1,2,3]},
+      {id:uid(),name:'Dates',                 amountLow:200,  amountHigh:350, tag:'Flexible',   frequency:'weekly',   weeks:[0,1,2,3]},
+      {id:uid(),name:'Sudden expenses buffer',amountLow:0,    amountHigh:75,  tag:'Flexible',   frequency:'weekly',   weeks:[0,1,2,3]}
+    ]);
   }
-  if (!data.shopping.length) {
-    [{name:'Printer Paper',qty:2,done:false},{name:'Laptop Charger',qty:1,done:true},
-     {name:'Highlighters',qty:3,done:false},{name:'Case Briefs Book',qty:1,done:false}]
-    .forEach(function(d){data.shopping.push({id:uid(),name:d.name,qty:d.qty,done:d.done});});
-    saveSho(data.shopping);
+  if (!data.finBonuses.length) {
+    saveFinBon([
+      {id:uid(),name:'One-time payment', amountLow:187.50,amountHigh:187.50,status:'Pending',              notes:'Arriving early May'},
+      {id:uid(),name:'Acorns bonus',     amountLow:380,   amountHigh:430,   status:'Better deal possible', notes:'Random timing'}
+    ]);
+  }
+  if (!data.finWishlist.length) {
+    saveFinWish([
+      {id:uid(),name:'Sunglasses',           cost:110,  tier:'really-want',pointsEligible:false,pointsEarmarked:0,eta:'',notes:'',order:0},
+      {id:uid(),name:'Nice watch',           cost:80,   tier:'really-want',pointsEligible:false,pointsEarmarked:0,eta:'',notes:'',order:1},
+      {id:uid(),name:'Light spring coat',    cost:100,  tier:'really-want',pointsEligible:false,pointsEarmarked:0,eta:'',notes:'',order:2},
+      {id:uid(),name:'Tennis racket set',    cost:250,  tier:'want',       pointsEligible:false,pointsEarmarked:0,eta:'',notes:'Pending confirmation from Skinny',order:0},
+      {id:uid(),name:'Beard trimmer (Ufree)',cost:35,   tier:'want',       pointsEligible:true, pointsEarmarked:0,eta:'',notes:'',order:1},
+      {id:uid(),name:'Ugg house slippers',   cost:50,   tier:'want',       pointsEligible:false,pointsEarmarked:0,eta:'',notes:'',order:2},
+      {id:uid(),name:'Gloves',               cost:40,   tier:'want',       pointsEligible:false,pointsEarmarked:0,eta:'',notes:'',order:3},
+      {id:uid(),name:'Scarves',              cost:0,    tier:'want',       pointsEligible:false,pointsEarmarked:0,eta:'',notes:'Gift from dad',order:4},
+      {id:uid(),name:'Rain/snow shoes',      cost:250,  tier:'want',       pointsEligible:false,pointsEarmarked:0,eta:'',notes:'',order:5},
+      {id:uid(),name:'3× Colognes (Amazon)', cost:450,  tier:'want',       pointsEligible:true, pointsEarmarked:0,eta:'',notes:'',order:6},
+      {id:uid(),name:'On Cloud + dress shoes',cost:500, tier:'want',       pointsEligible:false,pointsEarmarked:0,eta:'',notes:'',order:7},
+      {id:uid(),name:'AirPods 4 ANC',        cost:129,  tier:'can-wait',   pointsEligible:true, pointsEarmarked:0,eta:'',notes:'Pro 3 at $249 has significantly better ANC',order:0},
+      {id:uid(),name:'3 suits (Rahmani)',    cost:1400, tier:'can-wait',   pointsEligible:false,pointsEarmarked:0,eta:'',notes:'',order:1},
+      {id:uid(),name:'iPhone',               cost:750,  tier:'can-wait',   pointsEligible:true, pointsEarmarked:0,eta:'',notes:'',order:2},
+      {id:uid(),name:'MacBook',              cost:1500, tier:'can-wait',   pointsEligible:true, pointsEarmarked:0,eta:'',notes:'',order:3}
+    ]);
   }
   if (!data.moneymaking.length) {
-    [{idea:'Legal Research Service',status:'exploring',notes:'Help law firms with targeted research'},
-     {idea:'Case Brief Templates',status:'inprogress',notes:'Sell templates to 1L students'},
-     {idea:'LSAT Tutoring',status:'idea',notes:'Tutor undergrads for LSAT prep'},
-     {idea:'Real Estate Research',status:'idea',notes:'Research REITs for passive income'}]
+    [{idea:'Amazon FBA / Reselling',status:'idea',notes:'Leverage existing Amazon seller account'},
+     {idea:'Freelance Work',status:'idea',notes:'Utilize skills for side income'},
+     {idea:'Content Creation',status:'idea',notes:'YouTube/blog around interests'}]
     .forEach(function(d){data.moneymaking.push({id:uid(),idea:d.idea,status:d.status,notes:d.notes,createdAt:new Date().toISOString()});});
     saveMM(data.moneymaking);
   }
@@ -1091,68 +1141,219 @@ function renderLearning() {
 // ============================================================
 // RENDER — FINANCIAL
 // ============================================================
+var FREQ_LABEL={weekly:'Weekly',biweekly:'Biweekly',monthly:'Monthly'};
+
 function renderFinancial() {
-  var data=getData();
-  var incEl=document.getElementById('incomeList');
-  if (incEl) {
-    if (!data.income.length) { incEl.innerHTML='<div class="fin-empty">No income entries yet.</div>'; }
-    else {
-      var incTotal=data.income.reduce(function(s,i){return s+i.amount;},0);
-      incEl.innerHTML=data.income.map(function(item){
-        var recBadge=item.recurring?'<span class="fin-recurring-badge">🔄 '+escHtml(item.recurring)+'</span>':'';
-        return '<div class="fin-row"><div class="fin-row-main"><div class="fin-row-name">'+escHtml(item.name)+'</div>'+
-          '<div class="fin-row-meta">'+fmtDateDisplay(item.date)+(item.category?' · '+escHtml(item.category):'')+'</div></div>'+
-          '<div class="fin-row-right">'+recBadge+'<span class="fin-row-amount income">+$'+item.amount.toLocaleString()+'</span>'+
-          '<button class="btn-icon" onclick="delInc(\''+item.id+'\')">🗑</button></div></div>';
-      }).join('')+
-      '<div class="fin-row" style="background:#f9fef9"><div class="fin-row-main"><strong>Total</strong></div>'+
-      '<div class="fin-row-right"><span class="fin-row-amount income" style="font-size:16px">$'+incTotal.toLocaleString()+'</span></div></div>';
-    }
-  }
-  var expEl=document.getElementById('expenseList');
-  if (expEl) {
-    if (!data.expenses.length) { expEl.innerHTML='<div class="fin-empty">No expense entries yet.</div>'; }
-    else {
-      var expTotal=data.expenses.reduce(function(s,i){return s+i.amount;},0);
-      expEl.innerHTML=data.expenses.map(function(item){
-        var recBadge=item.recurring?'<span class="fin-recurring-badge">🔄 '+escHtml(item.recurring)+'</span>':'';
-        return '<div class="fin-row"><div class="fin-row-main"><div class="fin-row-name">'+escHtml(item.name)+'</div>'+
-          '<div class="fin-row-meta">'+fmtDateDisplay(item.date)+(item.category?' · '+escHtml(item.category):'')+'</div></div>'+
-          '<div class="fin-row-right">'+recBadge+'<span class="fin-row-amount expense">-$'+item.amount.toLocaleString()+'</span>'+
-          '<button class="btn-icon" onclick="delExp(\''+item.id+'\')">🗑</button></div></div>';
-      }).join('')+
-      '<div class="fin-row" style="background:#fff5f5"><div class="fin-row-main"><strong>Total</strong></div>'+
-      '<div class="fin-row-right"><span class="fin-row-amount expense" style="font-size:16px">$'+expTotal.toLocaleString()+'</span></div></div>';
-    }
-  }
-  var shoEl=document.getElementById('shoppingList');
-  if (shoEl) {
-    if (!data.shopping.length) { shoEl.innerHTML='<div class="fin-empty">Your shopping list is empty.</div>'; }
-    else {
-      shoEl.innerHTML=data.shopping.map(function(item){
-        var meta=[item.price,item.notes].filter(Boolean);
-        var metaHTML=meta.length?'<div class="shopping-meta">'+meta.map(escHtml).join(' · ')+'</div>':'';
-        var linkHTML=item.link?'<a href="'+escHtml(item.link)+'" class="shopping-link" target="_blank" rel="noopener">🔗</a>':'';
-        return '<div class="shopping-item'+(item.done?' is-done':'')+'">' +
-          '<input type="checkbox" class="task-check"'+(item.done?' checked':'')+' onchange="toggleShop(\''+item.id+'\')">' +
-          '<div class="shopping-item-body"><div class="shopping-name-row"><span class="shopping-name">'+escHtml(item.name)+'</span><span class="shopping-qty">×'+item.qty+'</span>'+linkHTML+'</div>'+metaHTML+'</div>'+
-          '<div style="display:flex;gap:2px;flex-shrink:0"><button class="btn-icon" onclick="openEditShoppingItem(\''+item.id+'\')">✏️</button><button class="btn-icon" onclick="delShop(\''+item.id+'\')">🗑</button></div></div>';
-      }).join('');
-    }
-  }
+  var tab=state.activeFinTab;
+  if(tab==='weekly')   renderFinWeekly();
+  if(tab==='monthly')  renderFinMonthly();
+  if(tab==='income')   renderFinIncome();
+  if(tab==='wishlist') renderFinWishlist();
+  // money making always fresh when panel visible
   var mmEl=document.getElementById('moneyMakingList');
-  if (mmEl) {
+  if(mmEl) {
+    var data=getData();
     var statusLabel={idea:'💡 Idea',exploring:'🔍 Exploring',inprogress:'⚡ In Progress',earning:'💰 Earning',paused:'⏸ Paused'};
-    if (!data.moneymaking.length) { mmEl.innerHTML='<div class="fin-empty">No ideas yet.</div>'; }
-    else {
-      mmEl.innerHTML=data.moneymaking.map(function(item){
-        return '<div class="mm-row">' +
-          '<div class="mm-row-body"><div class="mm-idea">'+escHtml(item.idea)+'</div>'+(item.notes?'<div class="mm-notes">'+escHtml(item.notes)+'</div>':'')+' </div>'+
+    mmEl.innerHTML=!data.moneymaking.length?'<div class="fin-empty">No ideas yet.</div>':
+      data.moneymaking.map(function(item){
+        return '<div class="mm-row">'+
+          '<div class="mm-row-body"><div class="mm-idea">'+escHtml(item.idea)+'</div>'+(item.notes?'<div class="mm-notes">'+escHtml(item.notes)+'</div>':'')+'</div>'+
           '<span class="mm-status '+item.status+'">'+(statusLabel[item.status]||item.status)+'</span>'+
           '<div class="mm-row-actions"><button class="btn-icon" onclick="openEditMoneyIdea(\''+item.id+'\')">✏️</button><button class="btn-icon" onclick="delMM(\''+item.id+'\')">🗑</button></div></div>';
       }).join('');
-    }
   }
+}
+
+function renderFinWeekly() {
+  var data=getData(); var wi=state.finWeekIdx; var weeks=getFinWeeks();
+  var stEl=document.getElementById('finWeekSubtabs');
+  if(stEl) stEl.innerHTML=weeks.map(function(w){
+    return '<button class="fin-week-tab'+(w.idx===wi?' active':'')+'" onclick="setFinWeek('+w.idx+')">'+escHtml(w.label)+'</button>';
+  }).join('');
+  var incItems=data.finIncome.filter(function(i){return itemInWeek(i,wi);});
+  var expItems=data.finExpenses.filter(function(i){return itemInWeek(i,wi);});
+  var incLo=incItems.reduce(function(s,i){return s+(parseFloat(i.amountLow)||0);},0);
+  var incHi=incItems.reduce(function(s,i){return s+(parseFloat(i.amountHigh)||parseFloat(i.amountLow)||0);},0);
+  var expLo=expItems.reduce(function(s,i){return s+(parseFloat(i.amountLow)||0);},0);
+  var expHi=expItems.reduce(function(s,i){return s+(parseFloat(i.amountHigh)||parseFloat(i.amountLow)||0);},0);
+  var surpLo=incLo-expHi; var surpHi=incHi-expLo;
+  function tblRow(item,type) {
+    var lo=parseFloat(item.amountLow)||0; var hi=parseFloat(item.amountHigh)||lo;
+    var editFn=type==='inc'?'openEditFinInc':'openEditFinExp';
+    var delFn=type==='inc'?'delFinInc':'delFinExp';
+    return '<div class="fin-tbl-row">'+
+      '<span class="fin-tbl-name">'+escHtml(item.name)+(item.notes?'<span class="fin-note-dot" title="'+escHtml(item.notes)+'"> ·</span>':'')+'</span>'+
+      tagBadge(item.tag||(type==='inc'?'Income':'Need'))+
+      '<span class="fin-tbl-freq">'+escHtml(FREQ_LABEL[item.frequency]||'')+'</span>'+
+      '<span class="fin-tbl-amt '+(type==='inc'?'inc':'exp')+'">$'+fmtDollar(lo)+'</span>'+
+      '<span class="fin-tbl-amt '+(type==='inc'?'inc':'exp')+'">$'+fmtDollar(hi)+'</span>'+
+      '<span class="fin-tbl-act">'+
+        '<button class="btn-icon-sm" onclick="'+editFn+'(\''+item.id+'\')">✏️</button>'+
+        '<button class="btn-icon-sm" onclick="'+delFn+'(\''+item.id+'\')">🗑</button>'+
+      '</span></div>';
+  }
+  var incHdr='<div class="fin-tbl-hdr"><span>Item</span><span>Tag</span><span>Freq</span><span>Low</span><span>High</span><span></span></div>';
+  var callout='';
+  if(surpLo<0) callout='<div class="fin-callout fin-callout-alert">⚠️ Possible deficit of $'+Math.abs(Math.round(surpLo))+' at max spend</div>';
+  else if(surpHi<50) callout='<div class="fin-callout fin-callout-warn">Tight week — max surplus under $50</div>';
+  else callout='<div class="fin-callout fin-callout-ok">✓ Surplus range: $'+Math.max(0,Math.round(surpLo))+' – $'+Math.max(0,Math.round(surpHi))+'</div>';
+  var expPct=incHi?Math.min(100,Math.round(expHi/incHi*100)):100;
+  var cEl=document.getElementById('finWeekContent');
+  if(!cEl)return;
+  cEl.innerHTML=
+    '<div class="fin-section">'+
+      '<div class="fin-section-header"><h3>Income</h3><button class="btn-primary" style="font-size:13px;padding:6px 13px" onclick="openAddFinInc()">+ Add</button></div>'+
+      '<div class="fin-tbl-wrap">'+incHdr+(incItems.length?incItems.map(function(i){return tblRow(i,'inc');}).join(''):'<div class="fin-empty">No income this week.</div>')+'</div>'+
+    '</div>'+
+    '<div class="fin-section">'+
+      '<div class="fin-section-header"><h3>Expenses</h3><button class="btn-primary" style="font-size:13px;padding:6px 13px" onclick="openAddFinExp()">+ Add</button></div>'+
+      '<div class="fin-tbl-wrap">'+incHdr+(expItems.length?expItems.map(function(i){return tblRow(i,'exp');}).join(''):'<div class="fin-empty">No expenses this week.</div>')+'</div>'+
+    '</div>'+
+    '<div class="fin-surplus-block">'+
+      '<div class="fin-surplus-bar-outer"><div class="fin-surplus-bar-fill" style="width:'+expPct+'%"></div></div>'+
+      callout+
+    '</div>';
+}
+
+function renderFinMonthly() {
+  var data=getData();
+  function mTot(items,field) {
+    return items.reduce(function(s,i){
+      var val=parseFloat(i[field])||parseFloat(i.amountLow)||0;
+      var m=i.frequency==='weekly'?4:i.frequency==='biweekly'?2:1;
+      return s+val*m;
+    },0);
+  }
+  var incLo=mTot(data.finIncome,'amountLow'); var incHi=mTot(data.finIncome,'amountHigh');
+  var expLo=mTot(data.finExpenses,'amountLow'); var expHi=mTot(data.finExpenses,'amountHigh');
+  var fixedExp=data.finExpenses.filter(function(e){return (parseFloat(e.amountLow)||0)===(parseFloat(e.amountHigh)||0);});
+  var flexExp=data.finExpenses.filter(function(e){return (parseFloat(e.amountHigh)||0)>(parseFloat(e.amountLow)||0);});
+  var fixHi=mTot(fixedExp,'amountHigh'); var flexHi=mTot(flexExp,'amountHigh');
+  var freeLo=Math.max(0,incLo-expHi); var freeHi=Math.max(0,incHi-expLo);
+  var tot=incHi||1; var fixPct=Math.round(fixHi/tot*100); var flxPct=Math.round(flexHi/tot*100); var frePct=Math.max(0,100-fixPct-flxPct);
+  function mRow(item,type) {
+    var lo=parseFloat(item.amountLow)||0; var hi=parseFloat(item.amountHigh)||lo;
+    var m=item.frequency==='weekly'?4:item.frequency==='biweekly'?2:1;
+    var editFn=type==='inc'?'openEditFinInc':'openEditFinExp'; var delFn=type==='inc'?'delFinInc':'delFinExp';
+    return '<div class="fin-mrow">'+
+      '<span class="fin-tbl-name">'+escHtml(item.name)+'</span>'+
+      (type==='exp'?tagBadge(item.tag):'<span></span>')+
+      '<span class="fin-tbl-freq">'+escHtml(FREQ_LABEL[item.frequency]||'')+'</span>'+
+      '<span class="fin-tbl-amt '+(type==='inc'?'inc':'exp')+'">'+fmtAmt(lo*m,hi*m)+'</span>'+
+      '<span class="fin-tbl-act">'+
+        '<button class="btn-icon-sm" onclick="'+editFn+'(\''+item.id+'\')">✏️</button>'+
+        '<button class="btn-icon-sm" onclick="'+delFn+'(\''+item.id+'\')">🗑</button>'+
+      '</span></div>';
+  }
+  var el=document.getElementById('finMonthlyContent'); if(!el)return;
+  el.innerHTML=
+    '<div class="fin-metric-grid">'+
+      '<div class="fin-metric-card"><div class="fin-metric-lbl">Monthly Income</div><div class="fin-metric-val inc">'+fmtAmt(incLo,incHi)+'</div></div>'+
+      '<div class="fin-metric-card"><div class="fin-metric-lbl">Fixed Expenses</div><div class="fin-metric-val exp">$'+fmtDollar(fixHi)+'</div></div>'+
+      '<div class="fin-metric-card"><div class="fin-metric-lbl">Flexible Range</div><div class="fin-metric-val amb">'+fmtAmt(mTot(flexExp,'amountLow'),flexHi)+'</div></div>'+
+      '<div class="fin-metric-card"><div class="fin-metric-lbl">Free Cash</div><div class="fin-metric-val inc">'+fmtAmt(freeLo,freeHi)+'</div></div>'+
+    '</div>'+
+    '<div class="fin-pill-wrap">'+
+      '<div class="fin-pill-lbl">Income split</div>'+
+      '<div class="fin-pill-bar">'+
+        '<div class="fin-pill-seg pill-fixed" style="width:'+fixPct+'%" title="Fixed">'+fixPct+'%</div>'+
+        '<div class="fin-pill-seg pill-flex"  style="width:'+flxPct+'%" title="Flexible">'+flxPct+'%</div>'+
+        '<div class="fin-pill-seg pill-free"  style="width:'+frePct+'%" title="Free">'+frePct+'%</div>'+
+      '</div>'+
+      '<div class="fin-pill-legend">'+
+        '<span class="fin-legend-dot" style="background:#ef4444"></span> Fixed ($'+fmtDollar(fixHi)+')  '+
+        '<span class="fin-legend-dot" style="background:#f59e0b"></span> Flexible  '+
+        '<span class="fin-legend-dot" style="background:#10b981"></span> Free cash'+
+      '</div>'+
+    '</div>'+
+    '<div class="fin-monthly-cards">'+
+      '<div class="fin-section"><div class="fin-section-header"><h3>Income Breakdown</h3></div>'+
+        '<div class="fin-tbl-wrap">'+(data.finIncome.length?data.finIncome.map(function(i){return mRow(i,'inc');}).join(''):'<div class="fin-empty">No income streams.</div>')+'</div></div>'+
+      '<div class="fin-section"><div class="fin-section-header"><h3>Fixed Commitments</h3></div>'+
+        '<div class="fin-tbl-wrap">'+(fixedExp.length?fixedExp.map(function(i){return mRow(i,'exp');}).join(''):'<div class="fin-empty">None.</div>')+'</div></div>'+
+      '<div class="fin-section"><div class="fin-section-header"><h3>Flexible Expenses</h3></div>'+
+        '<div class="fin-tbl-wrap">'+(flexExp.length?flexExp.map(function(i){return mRow(i,'exp');}).join(''):'<div class="fin-empty">None.</div>')+'</div></div>'+
+    '</div>';
+}
+
+function renderFinIncome() {
+  var data=getData(); var el=document.getElementById('finIncomeContent'); if(!el)return;
+  var pts=parseInt(data.finPoints)||0;
+  function iRow(item) {
+    var lo=parseFloat(item.amountLow)||0; var hi=parseFloat(item.amountHigh)||lo;
+    return '<div class="fin-tbl-row">'+
+      '<span class="fin-tbl-name">'+escHtml(item.name)+(item.notes?'<span class="fin-note-dot" title="'+escHtml(item.notes)+'"> ·</span>':'')+'</span>'+
+      '<span class="fin-tbl-freq">'+escHtml(FREQ_LABEL[item.frequency]||'')+'</span>'+
+      '<span class="fin-tbl-amt inc">'+fmtAmt(lo,hi)+'</span>'+
+      '<span class="fin-tbl-act"><button class="btn-icon-sm" onclick="openEditFinInc(\''+item.id+'\')">✏️</button><button class="btn-icon-sm" onclick="delFinInc(\''+item.id+'\')">🗑</button></span></div>';
+  }
+  function bRow(item) {
+    var lo=parseFloat(item.amountLow)||0; var hi=parseFloat(item.amountHigh)||lo;
+    var sc=item.status==='Received'?'bon-got':item.status==='Better deal possible'?'bon-better':'bon-pending';
+    return '<div class="fin-tbl-row">'+
+      '<span class="fin-tbl-name">'+escHtml(item.name)+(item.notes?'<span class="fin-note-dot" title="'+escHtml(item.notes)+'"> ·</span>':'')+'</span>'+
+      '<span class="fin-bon-status '+sc+'">'+escHtml(item.status)+'</span>'+
+      '<span class="fin-tbl-amt inc">'+fmtAmt(lo,hi)+'</span>'+
+      '<span class="fin-tbl-act"><button class="btn-icon-sm" onclick="openEditFinBon(\''+item.id+'\')">✏️</button><button class="btn-icon-sm" onclick="delFinBon(\''+item.id+'\')">🗑</button></span></div>';
+  }
+  var earmarked=data.finWishlist.filter(function(w){return (w.pointsEarmarked||0)>0;});
+  var ptsNote=earmarked.length?
+    'Earmarked: '+earmarked.map(function(w){return escHtml(w.name)+' ('+w.pointsEarmarked+' pts)';}).join(', ')+'  — Total used: '+(earmarked.reduce(function(s,w){return s+(w.pointsEarmarked||0);},0))+' / '+pts:
+    'No points earmarked yet.';
+  el.innerHTML=
+    '<div class="fin-section"><div class="fin-section-header"><h3>Income Streams</h3><button class="btn-primary" style="font-size:13px;padding:6px 13px" onclick="openAddFinInc()">+ Add</button></div>'+
+      '<div class="fin-tbl-wrap fin-has-hdr"><div class="fin-tbl-hdr"><span>Source</span><span>Frequency</span><span>Amount</span><span></span></div>'+
+      (data.finIncome.length?data.finIncome.map(iRow).join(''):'<div class="fin-empty">No income streams yet.</div>')+'</div></div>'+
+    '<div class="fin-section"><div class="fin-section-header"><h3>Bonuses &amp; Irregular Income</h3><button class="btn-primary" style="font-size:13px;padding:6px 13px" onclick="openAddFinBon()">+ Add</button></div>'+
+      '<div class="fin-tbl-wrap fin-has-hdr"><div class="fin-tbl-hdr"><span>Source</span><span>Status</span><span>Amount</span><span></span></div>'+
+      (data.finBonuses.length?data.finBonuses.map(bRow).join(''):'<div class="fin-empty">No bonuses logged yet.</div>')+'</div></div>'+
+    '<div class="fin-section"><div class="fin-section-header"><h3>Amazon Points</h3></div>'+
+      '<div style="padding:16px 18px">'+
+        '<div class="fin-pts-row"><span class="fin-pts-lbl">Balance</span>'+
+          '<input type="number" id="finPointsInput" class="field fin-pts-field" value="'+pts+'" min="0" step="1">'+
+          '<span style="font-size:13px;color:#aaa;margin:0 6px">pts</span>'+
+          '<button class="btn-primary" style="font-size:12px;padding:5px 10px" onclick="saveFinPointsBalance()">Save</button>'+
+        '</div>'+
+        '<div class="fin-pts-note">'+ptsNote+'</div>'+
+      '</div></div>';
+}
+
+function renderFinWishlist() {
+  var data=getData(); var el=document.getElementById('finWishlistContent'); if(!el)return;
+  var incLo=data.finIncome.reduce(function(s,i){var m=i.frequency==='weekly'?4:i.frequency==='biweekly'?2:1;return s+(parseFloat(i.amountLow)||0)*m;},0);
+  var expHi=data.finExpenses.reduce(function(s,i){var m=i.frequency==='weekly'?4:i.frequency==='biweekly'?2:1;return s+(parseFloat(i.amountHigh)||parseFloat(i.amountLow)||0)*m;},0);
+  var freeMo=Math.max(0,incLo-expHi);
+  var TIERS=[{key:'really-want',lbl:'Really Want',cls:'tier-purple'},{key:'want',lbl:'Want',cls:'tier-amber'},{key:'can-wait',lbl:'Can Wait',cls:'tier-gray'}];
+  el.innerHTML=TIERS.map(function(tier){
+    var items=data.finWishlist.filter(function(w){return w.tier===tier.key;}).sort(function(a,b){return (a.order||0)-(b.order||0);});
+    var tot=items.reduce(function(s,w){return s+(parseFloat(w.cost)||0);},0);
+    var rows=items.length?items.map(function(w,i){
+      var cost=parseFloat(w.cost)||0; var em=w.pointsEarmarked||0;
+      var etaStr=w.eta||(cost>0&&freeMo>0?'~'+Math.ceil(cost/freeMo)+' mo':'—');
+      return '<div class="fin-wish-row">'+
+        '<span class="fin-tbl-num">'+(i+1)+'</span>'+
+        '<span class="fin-tbl-name">'+escHtml(w.name)+(w.pointsEligible?'<span class="fin-pts-badge">★</span>':'')+
+          (w.notes?'<span class="fin-note-dot" title="'+escHtml(w.notes)+'"> ·</span>':'')+'</span>'+
+        '<span class="fin-tbl-amt">$'+fmtDollar(cost)+'</span>'+
+        '<span class="fin-tbl-pts">'+(em>0?em+' pts':'—')+'</span>'+
+        '<span class="fin-tbl-eta">'+escHtml(etaStr)+'</span>'+
+        '<span class="fin-tbl-act">'+
+          '<button class="btn-icon-sm" onclick="wishMoveUp(\''+w.id+'\')" title="Move up">↑</button>'+
+          '<button class="btn-icon-sm" onclick="wishMoveDown(\''+w.id+'\')" title="Move down">↓</button>'+
+          '<button class="btn-icon-sm" onclick="openEditFinWish(\''+w.id+'\')">✏️</button>'+
+          '<button class="btn-icon-sm" onclick="delFinWish(\''+w.id+'\')">🗑</button>'+
+        '</span></div>';
+    }).join(''):'<div class="fin-empty">Nothing here yet.</div>';
+    return '<div class="fin-tier-section '+tier.cls+'">'+
+      '<div class="fin-tier-header">'+
+        '<h3>'+escHtml(tier.lbl)+'</h3>'+
+        '<span class="fin-tier-total">$'+fmtDollar(tot)+'</span>'+
+        '<button class="btn-primary" style="font-size:12px;padding:5px 10px" onclick="openAddFinWish(\''+tier.key+'\')">+ Add</button>'+
+      '</div>'+
+      (items.length?'<div class="fin-wish-hdr"><span>#</span><span>Item</span><span>Cost</span><span>Points</span><span>ETA</span><span>Actions</span></div>':'')+
+      rows+'</div>';
+  }).join('')+
+  (freeMo>0?'<div class="fin-info-box">Free cash/month (conservative): <strong>$'+fmtDollar(freeMo)+'</strong> — used for ETA calculations</div>':'');
 }
 
 // ============================================================
@@ -1724,12 +1925,155 @@ window.openAddLearningItem = function(day){ state.learningDay=day; state.editLea
 window.openEditLearningItem = function(day,id){ var data=getData(); var items=data.learning[day]||[]; var item=items.find(function(i){return i.id===id;}); if(!item)return; state.learningDay=day; state.editLearningItemId=id; document.getElementById('learningItemModalTitle').textContent='Edit '+LEARNING_DAY_LABELS[day]; document.getElementById('learningSubject').value=item.subject; document.getElementById('learningTime').value=item.time||''; document.getElementById('learningSource').value=item.source||''; document.getElementById('learningNotes').value=item.notes||''; openModal('learningItemModal'); setTimeout(function(){document.getElementById('learningSubject').focus();},80); };
 window.deleteLrn = function(day,id){ if(confirm('Remove this entry?')){ deleteLearningItem(day,id); renderLearning(); } };
 
-// Financial
-window.delInc  = function(id){ if(confirm('Delete income entry?'  )){ deleteIncome(id);       renderFinancial(); } };
-window.delExp  = function(id){ if(confirm('Delete expense entry?' )){ deleteExpense(id);      renderFinancial(); } };
-window.delShop = function(id){ if(confirm('Remove this item?'     )){ deleteShoppingItem(id); renderFinancial(); } };
-window.toggleShop = function(id){ toggleShoppingItem(id); renderFinancial(); };
-window.delMM   = function(id){ if(confirm('Delete this idea?'     )){ deleteMoneyIdea(id);    renderFinancial(); } };
+// Financial — week selection
+window.setFinWeek = function(idx) { state.finWeekIdx=idx; renderFinWeekly(); };
+
+// Financial — CRUD globals
+window.delFinInc  = function(id){ if(confirm('Delete this income stream?')){ deleteFinInc(id); renderFinancial(); } };
+window.delFinExp  = function(id){ if(confirm('Delete this expense?')){ deleteFinExp(id); renderFinancial(); } };
+window.delFinBon  = function(id){ if(confirm('Delete this bonus entry?')){ deleteFinBon(id); renderFinancial(); } };
+window.delFinWish = function(id){ if(confirm('Delete this wishlist item?')){ deleteFinWish(id); renderFinancial(); } };
+
+window.wishMoveUp = function(id) {
+  var data=getData(); normalizeWishOrders(data.finWishlist);
+  var item=data.finWishlist.find(function(w){return w.id===id;}); if(!item)return;
+  var tier=data.finWishlist.filter(function(w){return w.tier===item.tier;}).sort(function(a,b){return a.order-b.order;});
+  var idx=tier.findIndex(function(w){return w.id===id;}); if(idx<=0)return;
+  tier[idx].order=idx-1; tier[idx-1].order=idx; saveFinWish(data.finWishlist); renderFinancial();
+};
+window.wishMoveDown = function(id) {
+  var data=getData(); normalizeWishOrders(data.finWishlist);
+  var item=data.finWishlist.find(function(w){return w.id===id;}); if(!item)return;
+  var tier=data.finWishlist.filter(function(w){return w.tier===item.tier;}).sort(function(a,b){return a.order-b.order;});
+  var idx=tier.findIndex(function(w){return w.id===id;}); if(idx>=tier.length-1)return;
+  tier[idx].order=idx+1; tier[idx+1].order=idx; saveFinWish(data.finWishlist); renderFinancial();
+};
+
+window.saveFinPointsBalance = function() {
+  var v=parseInt(document.getElementById('finPointsInput').value)||0;
+  saveFinPts(v); renderFinancial();
+};
+
+// Expense modal open
+window.openAddFinExp = function(prefillTier) {
+  state.editFinExpId=null;
+  document.getElementById('finExpModalTitle').textContent='Add Expense';
+  document.getElementById('finExpName').value='';
+  document.querySelectorAll('#finExpAmtToggle .fin-amt-btn').forEach(function(b,i){b.classList.toggle('active',i===0);});
+  document.getElementById('finExpAmtFixed').style.display='';
+  document.getElementById('finExpAmtRange').style.display='none';
+  document.getElementById('finExpAmtSingle').value='';
+  document.getElementById('finExpAmtLow').value=''; document.getElementById('finExpAmtHigh').value='';
+  document.getElementById('finExpTag').value='Need';
+  document.getElementById('finExpFreq').value='weekly';
+  document.getElementById('finExpWeeksRow').style.display='none';
+  document.querySelectorAll('#finExpWeeksRow .fin-wk-check').forEach(function(c){c.checked=false;});
+  document.getElementById('finExpNotes').value='';
+  openModal('finExpModal'); setTimeout(function(){document.getElementById('finExpName').focus();},80);
+};
+window.openEditFinExp = function(id) {
+  var data=getData(); var item=data.finExpenses.find(function(x){return x.id===id;}); if(!item)return;
+  state.editFinExpId=id;
+  document.getElementById('finExpModalTitle').textContent='Edit Expense';
+  document.getElementById('finExpName').value=item.name;
+  var isRange=(parseFloat(item.amountHigh)||0)>(parseFloat(item.amountLow)||0);
+  document.querySelectorAll('#finExpAmtToggle .fin-amt-btn').forEach(function(b){b.classList.toggle('active',isRange?b.dataset.type==='range':b.dataset.type==='fixed');});
+  document.getElementById('finExpAmtFixed').style.display=isRange?'none':'';
+  document.getElementById('finExpAmtRange').style.display=isRange?'':'none';
+  if(isRange){document.getElementById('finExpAmtLow').value=item.amountLow||'';document.getElementById('finExpAmtHigh').value=item.amountHigh||'';}
+  else document.getElementById('finExpAmtSingle').value=item.amountLow||'';
+  document.getElementById('finExpTag').value=item.tag||'Need';
+  document.getElementById('finExpFreq').value=item.frequency||'weekly';
+  var sw=item.frequency!=='weekly';
+  document.getElementById('finExpWeeksRow').style.display=sw?'':'none';
+  document.querySelectorAll('#finExpWeeksRow .fin-wk-check').forEach(function(c){c.checked=(item.weeks||[]).indexOf(parseInt(c.value))!==-1;});
+  document.getElementById('finExpNotes').value=item.notes||'';
+  openModal('finExpModal'); setTimeout(function(){document.getElementById('finExpName').focus();},80);
+};
+
+// Income modal open
+window.openAddFinInc = function() {
+  state.editFinIncId=null;
+  document.getElementById('finIncModalTitle').textContent='Add Income Stream';
+  document.getElementById('finIncName').value='';
+  document.querySelectorAll('#finIncAmtToggle .fin-amt-btn').forEach(function(b,i){b.classList.toggle('active',i===0);});
+  document.getElementById('finIncAmtFixed').style.display='';
+  document.getElementById('finIncAmtRange').style.display='none';
+  document.getElementById('finIncAmtSingle').value='';
+  document.getElementById('finIncAmtLow').value=''; document.getElementById('finIncAmtHigh').value='';
+  document.getElementById('finIncFreq').value='weekly';
+  document.getElementById('finIncWeeksRow').style.display='none';
+  document.querySelectorAll('#finIncWeeksRow .fin-wk-check').forEach(function(c){c.checked=false;});
+  document.getElementById('finIncNotes').value='';
+  openModal('finIncModal'); setTimeout(function(){document.getElementById('finIncName').focus();},80);
+};
+window.openEditFinInc = function(id) {
+  var data=getData(); var item=data.finIncome.find(function(x){return x.id===id;}); if(!item)return;
+  state.editFinIncId=id;
+  document.getElementById('finIncModalTitle').textContent='Edit Income Stream';
+  document.getElementById('finIncName').value=item.name;
+  var isVar=(parseFloat(item.amountHigh)||0)>(parseFloat(item.amountLow)||0);
+  document.querySelectorAll('#finIncAmtToggle .fin-amt-btn').forEach(function(b){b.classList.toggle('active',isVar?b.dataset.type==='variable':b.dataset.type==='fixed');});
+  document.getElementById('finIncAmtFixed').style.display=isVar?'none':'';
+  document.getElementById('finIncAmtRange').style.display=isVar?'':'none';
+  if(isVar){document.getElementById('finIncAmtLow').value=item.amountLow||'';document.getElementById('finIncAmtHigh').value=item.amountHigh||'';}
+  else document.getElementById('finIncAmtSingle').value=item.amountLow||'';
+  document.getElementById('finIncFreq').value=item.frequency||'weekly';
+  var sw=item.frequency!=='weekly';
+  document.getElementById('finIncWeeksRow').style.display=sw?'':'none';
+  document.querySelectorAll('#finIncWeeksRow .fin-wk-check').forEach(function(c){c.checked=(item.weeks||[]).indexOf(parseInt(c.value))!==-1;});
+  document.getElementById('finIncNotes').value=item.notes||'';
+  openModal('finIncModal'); setTimeout(function(){document.getElementById('finIncName').focus();},80);
+};
+
+// Bonus modal open
+window.openAddFinBon = function() {
+  state.editFinBonId=null;
+  document.getElementById('finBonModalTitle').textContent='Add Bonus';
+  document.getElementById('finBonName').value='';
+  document.getElementById('finBonAmtLow').value=''; document.getElementById('finBonAmtHigh').value='';
+  document.getElementById('finBonStatus').value='Pending';
+  document.getElementById('finBonNotes').value='';
+  openModal('finBonModal'); setTimeout(function(){document.getElementById('finBonName').focus();},80);
+};
+window.openEditFinBon = function(id) {
+  var data=getData(); var item=data.finBonuses.find(function(x){return x.id===id;}); if(!item)return;
+  state.editFinBonId=id;
+  document.getElementById('finBonModalTitle').textContent='Edit Bonus';
+  document.getElementById('finBonName').value=item.name;
+  document.getElementById('finBonAmtLow').value=item.amountLow||'';
+  document.getElementById('finBonAmtHigh').value=item.amountHigh||item.amountLow||'';
+  document.getElementById('finBonStatus').value=item.status||'Pending';
+  document.getElementById('finBonNotes').value=item.notes||'';
+  openModal('finBonModal'); setTimeout(function(){document.getElementById('finBonName').focus();},80);
+};
+
+// Wishlist modal open
+window.openAddFinWish = function(tier) {
+  state.editFinWishId=null;
+  document.getElementById('finWishModalTitle').textContent='Add Wishlist Item';
+  document.getElementById('finWishName').value='';
+  document.getElementById('finWishCost').value='';
+  document.getElementById('finWishTier').value=tier||'really-want';
+  document.getElementById('finWishPointsEligible').checked=false;
+  document.getElementById('finWishETA').value='';
+  document.getElementById('finWishNotes').value='';
+  openModal('finWishModal'); setTimeout(function(){document.getElementById('finWishName').focus();},80);
+};
+window.openEditFinWish = function(id) {
+  var data=getData(); var item=data.finWishlist.find(function(x){return x.id===id;}); if(!item)return;
+  state.editFinWishId=id;
+  document.getElementById('finWishModalTitle').textContent='Edit Wishlist Item';
+  document.getElementById('finWishName').value=item.name;
+  document.getElementById('finWishCost').value=item.cost||'';
+  document.getElementById('finWishTier').value=item.tier||'want';
+  document.getElementById('finWishPointsEligible').checked=!!item.pointsEligible;
+  document.getElementById('finWishETA').value=item.eta||'';
+  document.getElementById('finWishNotes').value=item.notes||'';
+  openModal('finWishModal'); setTimeout(function(){document.getElementById('finWishName').focus();},80);
+};
+
+window.delMM   = function(id){ if(confirm('Delete this idea?')){ deleteMoneyIdea(id); renderFinancial(); } };
 window.openEditMoneyIdea = function(id) {
   var data=getData(); var item=data.moneymaking.find(function(i){return i.id===id;}); if(!item)return;
   state.editMoneyIdeaId=id;
@@ -2178,61 +2522,105 @@ function initListeners() {
       document.querySelectorAll('.fin-tab').forEach(function(t){t.classList.remove('active');});
       document.querySelectorAll('.fin-panel').forEach(function(p){p.classList.remove('active');});
       tab.classList.add('active');
+      state.activeFinTab=tab.dataset.tab;
       var panel=document.getElementById('fin-'+tab.dataset.tab); if(panel)panel.classList.add('active');
+      renderFinancial();
     });
   });
 
-  // Income / Expense
-  document.getElementById('addIncomeBtn').addEventListener('click',  function(){ state.finEntryType='income';  state.editFinEntryId=null; document.getElementById('finEntryModalTitle').textContent='Add Income';  document.getElementById('finEntryName').value=''; document.getElementById('finEntryAmount').value=''; document.getElementById('finEntryDate').value=toDateStr(new Date()); document.getElementById('finEntryCategory').value=''; document.getElementById('finEntryRecurring').value=''; openModal('finEntryModal'); setTimeout(function(){document.getElementById('finEntryName').focus();},80); });
-  document.getElementById('addExpenseBtn').addEventListener('click', function(){ state.finEntryType='expense'; state.editFinEntryId=null; document.getElementById('finEntryModalTitle').textContent='Add Expense'; document.getElementById('finEntryName').value=''; document.getElementById('finEntryAmount').value=''; document.getElementById('finEntryDate').value=toDateStr(new Date()); document.getElementById('finEntryCategory').value=''; document.getElementById('finEntryRecurring').value=''; openModal('finEntryModal'); setTimeout(function(){document.getElementById('finEntryName').focus();},80); });
-  document.getElementById('closeFinEntryModal').addEventListener('click', function(){ closeModal('finEntryModal'); });
-  document.getElementById('cancelFinEntry').addEventListener('click',     function(){ closeModal('finEntryModal'); });
-  document.getElementById('saveFinEntry').addEventListener('click', function(){
-    var name=document.getElementById('finEntryName').value.trim(), amt=document.getElementById('finEntryAmount').value;
-    if (!name||!amt){ if(!name)document.getElementById('finEntryName').classList.add('error'); if(!amt)document.getElementById('finEntryAmount').classList.add('error'); return; }
-    document.getElementById('finEntryName').classList.remove('error'); document.getElementById('finEntryAmount').classList.remove('error');
-    var d={name:name,amount:amt,date:document.getElementById('finEntryDate').value,category:document.getElementById('finEntryCategory').value.trim(),recurring:document.getElementById('finEntryRecurring').value};
-    state.finEntryType==='income'?addIncome(d):addExpense(d); closeModal('finEntryModal'); renderFinancial();
+  // Expense modal frequency → show/hide weeks row
+  document.getElementById('finExpFreq').addEventListener('change', function(){
+    document.getElementById('finExpWeeksRow').style.display=this.value!=='weekly'?'':'none';
+  });
+  // Expense amount toggle
+  document.getElementById('finExpAmtToggle').addEventListener('click', function(e){
+    var btn=e.target.closest('.fin-amt-btn'); if(!btn)return;
+    document.querySelectorAll('#finExpAmtToggle .fin-amt-btn').forEach(function(b){b.classList.remove('active');});
+    btn.classList.add('active');
+    var isRange=btn.dataset.type==='range';
+    document.getElementById('finExpAmtFixed').style.display=isRange?'none':'';
+    document.getElementById('finExpAmtRange').style.display=isRange?'':'none';
+  });
+  // Expense save
+  document.getElementById('closeFinExpModal').addEventListener('click', function(){ closeModal('finExpModal'); });
+  document.getElementById('cancelFinExp').addEventListener('click',     function(){ closeModal('finExpModal'); });
+  document.getElementById('saveFinExp').addEventListener('click', function(){
+    var name=document.getElementById('finExpName').value.trim();
+    if(!name){ document.getElementById('finExpName').classList.add('error'); return; }
+    document.getElementById('finExpName').classList.remove('error');
+    var isRange=document.querySelector('#finExpAmtToggle .fin-amt-btn.active').dataset.type==='range';
+    var lo=parseFloat(isRange?document.getElementById('finExpAmtLow').value:document.getElementById('finExpAmtSingle').value)||0;
+    var hi=parseFloat(isRange?document.getElementById('finExpAmtHigh').value:document.getElementById('finExpAmtSingle').value)||lo;
+    var freq=document.getElementById('finExpFreq').value;
+    var weeks=freq==='weekly'?[0,1,2,3]:Array.from(document.querySelectorAll('#finExpWeeksRow .fin-wk-check:checked')).map(function(c){return parseInt(c.value);});
+    var d={name:name,amountLow:lo,amountHigh:hi,tag:document.getElementById('finExpTag').value,frequency:freq,weeks:weeks,notes:document.getElementById('finExpNotes').value.trim()};
+    state.editFinExpId?updateFinExp(state.editFinExpId,d):addFinExp(d);
+    state.editFinExpId=null; closeModal('finExpModal'); renderFinancial();
   });
 
-  // Shopping
-  function openAddShoppingModal(){
-    state.editShoppingId=null;
-    document.getElementById('shoppingItemName').value='';
-    document.getElementById('shoppingItemQty').value='1';
-    document.getElementById('shoppingItemPrice').value='';
-    document.getElementById('shoppingItemLink').value='';
-    document.getElementById('shoppingItemNotes').value='';
-    openModal('shoppingModal');
-    setTimeout(function(){document.getElementById('shoppingItemName').focus();},80);
-  }
-  window.openEditShoppingItem = function(id) {
-    var data=getData(); var item=data.shopping.find(function(i){return i.id===id;}); if(!item)return;
-    state.editShoppingId=id;
-    document.getElementById('shoppingItemName').value=item.name;
-    document.getElementById('shoppingItemQty').value=item.qty||1;
-    document.getElementById('shoppingItemPrice').value=item.price||'';
-    document.getElementById('shoppingItemLink').value=item.link||'';
-    document.getElementById('shoppingItemNotes').value=item.notes||'';
-    openModal('shoppingModal');
-    setTimeout(function(){document.getElementById('shoppingItemName').focus();},80);
-  };
-  document.getElementById('addShoppingBtn').addEventListener('click', openAddShoppingModal);
-  document.getElementById('closeShoppingModal').addEventListener('click', function(){ closeModal('shoppingModal'); });
-  document.getElementById('cancelShopping').addEventListener('click',     function(){ closeModal('shoppingModal'); });
-  document.getElementById('saveShopping').addEventListener('click', function(){
-    var name=document.getElementById('shoppingItemName').value.trim();
-    if (!name){ document.getElementById('shoppingItemName').classList.add('error'); return; }
-    document.getElementById('shoppingItemName').classList.remove('error');
-    var d={name:name,qty:document.getElementById('shoppingItemQty').value||1,price:document.getElementById('shoppingItemPrice').value.trim(),link:document.getElementById('shoppingItemLink').value.trim(),notes:document.getElementById('shoppingItemNotes').value.trim()};
-    if(state.editShoppingId){ updateShoppingItem(state.editShoppingId,d); state.editShoppingId=null; }
-    else { addShoppingItem(d); }
-    closeModal('shoppingModal'); renderFinancial();
+  // Income modal frequency → weeks row
+  document.getElementById('finIncFreq').addEventListener('change', function(){
+    document.getElementById('finIncWeeksRow').style.display=this.value!=='weekly'?'':'none';
   });
-  document.getElementById('shoppingItemName').addEventListener('keydown', function(e){ if(e.key==='Enter')document.getElementById('saveShopping').click(); });
+  // Income amount toggle
+  document.getElementById('finIncAmtToggle').addEventListener('click', function(e){
+    var btn=e.target.closest('.fin-amt-btn'); if(!btn)return;
+    document.querySelectorAll('#finIncAmtToggle .fin-amt-btn').forEach(function(b){b.classList.remove('active');});
+    btn.classList.add('active');
+    var isVar=btn.dataset.type==='variable';
+    document.getElementById('finIncAmtFixed').style.display=isVar?'none':'';
+    document.getElementById('finIncAmtRange').style.display=isVar?'':'none';
+  });
+  // Income save
+  document.getElementById('closeFinIncModal').addEventListener('click', function(){ closeModal('finIncModal'); });
+  document.getElementById('cancelFinInc').addEventListener('click',     function(){ closeModal('finIncModal'); });
+  document.getElementById('saveFinInc').addEventListener('click', function(){
+    var name=document.getElementById('finIncName').value.trim();
+    if(!name){ document.getElementById('finIncName').classList.add('error'); return; }
+    document.getElementById('finIncName').classList.remove('error');
+    var isVar=document.querySelector('#finIncAmtToggle .fin-amt-btn.active').dataset.type==='variable';
+    var lo=parseFloat(isVar?document.getElementById('finIncAmtLow').value:document.getElementById('finIncAmtSingle').value)||0;
+    var hi=parseFloat(isVar?document.getElementById('finIncAmtHigh').value:document.getElementById('finIncAmtSingle').value)||lo;
+    var freq=document.getElementById('finIncFreq').value;
+    var weeks=freq==='weekly'?[0,1,2,3]:Array.from(document.querySelectorAll('#finIncWeeksRow .fin-wk-check:checked')).map(function(c){return parseInt(c.value);});
+    var d={name:name,amountLow:lo,amountHigh:hi,frequency:freq,weeks:weeks,notes:document.getElementById('finIncNotes').value.trim()};
+    state.editFinIncId?updateFinInc(state.editFinIncId,d):addFinInc(d);
+    state.editFinIncId=null; closeModal('finIncModal'); renderFinancial();
+  });
+
+  // Bonus save
+  document.getElementById('closeFinBonModal').addEventListener('click', function(){ closeModal('finBonModal'); });
+  document.getElementById('cancelFinBon').addEventListener('click',     function(){ closeModal('finBonModal'); });
+  document.getElementById('saveFinBon').addEventListener('click', function(){
+    var name=document.getElementById('finBonName').value.trim();
+    if(!name){ document.getElementById('finBonName').classList.add('error'); return; }
+    document.getElementById('finBonName').classList.remove('error');
+    var lo=parseFloat(document.getElementById('finBonAmtLow').value)||0;
+    var hi=parseFloat(document.getElementById('finBonAmtHigh').value)||lo;
+    var d={name:name,amountLow:lo,amountHigh:hi,status:document.getElementById('finBonStatus').value,notes:document.getElementById('finBonNotes').value.trim()};
+    state.editFinBonId?updateFinBon(state.editFinBonId,d):addFinBon(d);
+    state.editFinBonId=null; closeModal('finBonModal'); renderFinancial();
+  });
+
+  // Wishlist save
+  document.getElementById('closeFinWishModal').addEventListener('click', function(){ closeModal('finWishModal'); });
+  document.getElementById('cancelFinWish').addEventListener('click',     function(){ closeModal('finWishModal'); });
+  document.getElementById('saveFinWish').addEventListener('click', function(){
+    var name=document.getElementById('finWishName').value.trim();
+    if(!name){ document.getElementById('finWishName').classList.add('error'); return; }
+    document.getElementById('finWishName').classList.remove('error');
+    var d={name:name,cost:parseFloat(document.getElementById('finWishCost').value)||0,
+      tier:document.getElementById('finWishTier').value,
+      pointsEligible:document.getElementById('finWishPointsEligible').checked,
+      pointsEarmarked:state.editFinWishId?(getData().finWishlist.find(function(w){return w.id===state.editFinWishId;})||{}).pointsEarmarked||0:0,
+      eta:document.getElementById('finWishETA').value.trim(),
+      notes:document.getElementById('finWishNotes').value.trim()};
+    state.editFinWishId?updateFinWish(state.editFinWishId,d):addFinWish(d);
+    state.editFinWishId=null; closeModal('finWishModal'); renderFinancial();
+  });
 
   // Money Making
-  document.getElementById('addMoneyIdeaBtn').addEventListener('click',    function(){ state.editMoneyIdeaId=null; document.getElementById('moneyIdeaModalTitle').textContent='Add Idea'; document.getElementById('moneyIdeaName').value=''; document.getElementById('moneyIdeaStatus').value='idea'; document.getElementById('moneyIdeaNotes').value=''; openModal('moneyIdeaModal'); setTimeout(function(){document.getElementById('moneyIdeaName').focus();},80); });
+  document.getElementById('addMoneyIdeaBtn').addEventListener('click', function(){ state.editMoneyIdeaId=null; document.getElementById('moneyIdeaModalTitle').textContent='Add Idea'; document.getElementById('moneyIdeaName').value=''; document.getElementById('moneyIdeaStatus').value='idea'; document.getElementById('moneyIdeaNotes').value=''; openModal('moneyIdeaModal'); setTimeout(function(){document.getElementById('moneyIdeaName').focus();},80); });
   document.getElementById('closeMoneyIdeaModal').addEventListener('click', function(){ closeModal('moneyIdeaModal'); });
   document.getElementById('cancelMoneyIdea').addEventListener('click',     function(){ closeModal('moneyIdeaModal'); });
   document.getElementById('saveMoneyIdea').addEventListener('click', function(){
@@ -2328,6 +2716,7 @@ function init() {
   purgeOldDeletedNotes();
   seedRoutineIfEmpty();
   seedFinancialIfEmpty();
+  state.finWeekIdx=getAutoWeekIdx();
   updateHeaderDate();
   loadHeaderHebrewDate();
   setInterval(updateHeaderDate,60000);

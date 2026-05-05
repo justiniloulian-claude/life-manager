@@ -1069,21 +1069,180 @@ textarea.field { resize: vertical; }
 .cal-recurring-icon { font-size: 11px; color: #8b5cf6; margin-left: 4px; opacity: 0.8; }
 .fin-empty { padding: 24px 18px; font-size: 14px; color: #ccc; text-align: center; }
 
-/* Shopping list */
-.fin-shopping-list { padding: 0; }
-.shopping-item {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 18px; border-bottom: 1px solid #f7f7f7; font-size: 14px;
+/* ===== NEW FINANCIAL DASHBOARD ===== */
+
+/* Week sub-tabs */
+.fin-week-subtabs {
+  display: flex; gap: 4px; flex-wrap: wrap;
+  margin-bottom: 18px; padding-bottom: 14px;
+  border-bottom: 1px solid #f0f0f0;
 }
-.shopping-item:last-child { border-bottom: none; }
-.shopping-item.is-done .shopping-name { text-decoration: line-through; color: #bbb; }
-.shopping-name { flex: 1; color: #1a1a1a; }
-.shopping-qty  { font-size: 12px; color: #aaa; white-space: nowrap; }
-.shopping-item-body { flex: 1; min-width: 0; }
-.shopping-name-row  { display: flex; align-items: center; gap: 6px; }
-.shopping-meta { font-size: 12px; color: #aaa; margin-top: 2px; }
-.shopping-link { font-size: 12px; color: #3b82f6; text-decoration: none; }
-.shopping-link:hover { text-decoration: underline; }
+.fin-week-tab {
+  padding: 6px 16px; border: 1px solid #e8e8e8; border-radius: 20px;
+  background: #fff; font-size: 13px; font-weight: 500; color: #777;
+  cursor: pointer; font-family: inherit; transition: all 0.15s;
+}
+.fin-week-tab:hover  { border-color: #ccc; color: #333; }
+.fin-week-tab.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+
+/* Data table */
+.fin-tbl-wrap { border-top: 1px solid #f0f0f0; }
+.fin-tbl-hdr {
+  display: grid; grid-template-columns: 1fr 90px 80px 65px 65px 80px;
+  padding: 6px 18px; font-size: 10px; font-weight: 700; letter-spacing: .6px;
+  text-transform: uppercase; color: #aaa; background: #fafaf8;
+  border-bottom: 1px solid #f0f0f0;
+}
+.wish-hdr { grid-template-columns: 30px 1fr 70px 80px 80px 110px; }
+.fin-has-hdr .fin-tbl-hdr { grid-template-columns: 1fr 90px 90px 80px; }
+.fin-tbl-row {
+  display: grid; grid-template-columns: 1fr 90px 80px 65px 65px 80px;
+  align-items: center; padding: 10px 18px;
+  border-bottom: 1px solid #f7f7f7; font-size: 13px; gap: 4px;
+  transition: background 0.1s;
+}
+.fin-tbl-row:last-child { border-bottom: none; }
+.fin-tbl-row:hover { background: #fafaf8; }
+.fin-has-hdr .fin-tbl-row { grid-template-columns: 1fr 90px 90px 80px; }
+.fin-tbl-name { font-size: 13px; color: #1a1a1a; display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fin-tbl-freq { font-size: 12px; color: #888; }
+.fin-tbl-amt  { font-size: 13px; font-weight: 600; text-align: right; }
+.fin-tbl-amt.inc { color: #10b981; }
+.fin-tbl-amt.exp { color: #ef4444; }
+.fin-tbl-act  { display: flex; gap: 2px; justify-content: flex-end; }
+.fin-tbl-num  { font-size: 12px; color: #aaa; font-weight: 500; }
+.fin-tbl-pts  { font-size: 12px; color: #8b5cf6; text-align: right; }
+.fin-tbl-eta  { font-size: 12px; color: #888; }
+.fin-note-dot { color: #3b82f6; font-weight: 700; cursor: default; flex-shrink: 0; }
+
+/* Tags */
+.fin-tag { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 12px; white-space: nowrap; letter-spacing: .3px; }
+.tag-need     { background: #fef2f2; color: #b91c1c; }
+.tag-flex     { background: #fffbeb; color: #92400e; }
+.tag-invest   { background: #eff6ff; color: #1d4ed8; }
+.tag-gift     { background: #f0fdf4; color: #166534; }
+.tag-income   { background: #ecfdf5; color: #065f46; }
+.tag-bonus    { background: #f0fdfa; color: #0f766e; }
+
+/* Btn icon small */
+.btn-icon-sm {
+  padding: 4px 6px; border: none; background: transparent; cursor: pointer;
+  font-size: 13px; border-radius: 6px; transition: background 0.1s;
+}
+.btn-icon-sm:hover { background: #f3f4f6; }
+
+/* Surplus bar */
+.fin-surplus-block { margin: 16px 0 4px; }
+.fin-surplus-bar-outer {
+  height: 8px; background: #f3f4f6; border-radius: 8px; overflow: hidden; margin-bottom: 8px;
+}
+.fin-surplus-bar-fill { height: 100%; background: #ef4444; border-radius: 8px; transition: width 0.3s; }
+
+/* Callouts */
+.fin-callout { padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 500; margin-top: 4px; }
+.fin-callout-ok    { background: #ecfdf5; color: #065f46; border: 1px solid #6ee7b7; }
+.fin-callout-warn  { background: #fffbeb; color: #92400e; border: 1px solid #fcd34d; }
+.fin-callout-alert { background: #fef2f2; color: #b91c1c; border: 1px solid #fca5a5; }
+
+/* Metric cards */
+.fin-metric-grid {
+  display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 20px;
+}
+.fin-metric-card {
+  background: #fff; border: 1px solid #e8e8e8; border-radius: 14px;
+  padding: 16px 18px; text-align: center;
+}
+.fin-metric-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: #aaa; font-weight: 600; margin-bottom: 6px; }
+.fin-metric-val { font-size: 18px; font-weight: 700; }
+.fin-metric-val.inc { color: #10b981; }
+.fin-metric-val.exp { color: #ef4444; }
+.fin-metric-val.amb { color: #f59e0b; }
+
+/* Income split pill */
+.fin-pill-wrap { margin-bottom: 20px; }
+.fin-pill-lbl  { font-size: 12px; color: #888; margin-bottom: 8px; }
+.fin-pill-bar  { display: flex; height: 24px; border-radius: 12px; overflow: hidden; background: #f3f4f6; }
+.fin-pill-seg  { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; min-width: 24px; transition: width 0.3s; }
+.pill-fixed { background: #ef4444; }
+.pill-flex  { background: #f59e0b; }
+.pill-free  { background: #10b981; }
+.fin-pill-legend { display: flex; gap: 14px; font-size: 12px; color: #666; margin-top: 8px; align-items: center; flex-wrap: wrap; }
+.fin-legend-dot  { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; }
+
+/* Monthly cards grid */
+.fin-monthly-cards { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+.fin-mrow {
+  display: flex; align-items: center; gap: 10px; padding: 10px 18px;
+  border-bottom: 1px solid #f7f7f7; font-size: 13px;
+}
+.fin-mrow:last-child { border-bottom: none; }
+.fin-mrow:hover { background: #fafaf8; }
+.fin-mrow .fin-tbl-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fin-mrow .fin-tbl-freq { flex-shrink: 0; color: #888; font-size: 12px; min-width: 60px; }
+.fin-mrow .fin-tbl-amt  { flex-shrink: 0; font-size: 13px; font-weight: 600; min-width: 80px; text-align: right; }
+.fin-mrow .fin-tbl-act  { flex-shrink: 0; display: flex; gap: 2px; }
+
+/* Bonus status */
+.fin-bon-status { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+.bon-got     { background: #d1fae5; color: #065f46; }
+.bon-pending { background: #fffbeb; color: #92400e; }
+.bon-better  { background: #ede9fe; color: #5b21b6; }
+
+/* Points tracker */
+.fin-pts-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.fin-pts-lbl { font-size: 14px; font-weight: 500; color: #333; min-width: 70px; }
+.fin-pts-field { max-width: 110px !important; }
+.fin-pts-note { font-size: 12px; color: #888; }
+.fin-pts-badge { font-size: 10px; color: #8b5cf6; background: #ede9fe; padding: 1px 5px; border-radius: 8px; margin-left: 4px; flex-shrink: 0; }
+
+/* Wishlist rows */
+.fin-wish-hdr {
+  display: grid; grid-template-columns: 28px 1fr 70px 80px 75px 110px;
+  padding: 6px 18px; font-size: 10px; font-weight: 700; letter-spacing: .6px;
+  text-transform: uppercase; color: #aaa; background: #fafaf8;
+  border-top: 1px solid #f0f0f0; border-bottom: 1px solid #f0f0f0;
+}
+.fin-wish-row {
+  display: grid; grid-template-columns: 28px 1fr 70px 80px 75px 110px;
+  align-items: center; padding: 10px 18px;
+  border-bottom: 1px solid #f7f7f7; font-size: 13px; gap: 4px;
+}
+.fin-wish-row:last-child { border-bottom: none; }
+.fin-wish-row:hover { background: #fafaf8; }
+
+/* Tier sections (Wishlist) */
+.fin-tier-section { background: #fff; border: 1px solid #e8e8e8; border-radius: 14px; overflow: hidden; margin-bottom: 16px; }
+.fin-tier-header {
+  display: flex; align-items: center; gap: 10px; padding: 14px 18px;
+  border-bottom: 1px solid #f0f0f0; background: #fafaf8;
+}
+.fin-tier-header h3 { font-size: 15px; font-weight: 600; flex: 1; }
+.fin-tier-total { font-size: 13px; font-weight: 700; color: #888; }
+.tier-purple .fin-tier-header h3 { color: #5b21b6; }
+.tier-amber  .fin-tier-header h3 { color: #92400e; }
+.tier-gray   .fin-tier-header h3 { color: #6b7280; }
+
+/* Info box */
+.fin-info-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 10px 16px; font-size: 13px; color: #1d4ed8; margin-top: 4px; }
+
+/* Amount toggle in modals */
+.fin-amt-toggle-wrap { margin-bottom: 10px; }
+.fin-amt-toggle { display: inline-flex; border: 1px solid #e8e8e8; border-radius: 8px; overflow: hidden; margin-bottom: 6px; }
+.fin-amt-btn { padding: 5px 14px; border: none; background: #fff; font-size: 12px; font-weight: 500; color: #888; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+.fin-amt-btn.active { background: #1a1a1a; color: #fff; }
+.fin-amt-btn:first-child { border-right: 1px solid #e8e8e8; }
+
+/* Week checkboxes */
+.fin-week-checks { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 6px; }
+.fin-week-checks label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #555; cursor: pointer; }
+
+/* Responsive */
+@media (max-width: 700px) {
+  .fin-metric-grid { grid-template-columns: repeat(2,1fr); }
+  .fin-monthly-cards { grid-template-columns: 1fr; }
+  .fin-tbl-hdr, .fin-tbl-row { grid-template-columns: 1fr 70px 60px 60px 60px 70px; font-size: 12px; padding: 9px 12px; }
+  .fin-has-hdr .fin-tbl-hdr, .fin-has-hdr .fin-tbl-row { grid-template-columns: 1fr 70px 70px 60px; }
+}
 
 /* Money making */
 .mm-row {

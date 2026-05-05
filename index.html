@@ -264,35 +264,32 @@
 <!-- ===== FINANCIAL PAGE ===== -->
 <div id="page-financial" class="page">
   <div class="fin-tabs">
-    <button class="fin-tab active" data-tab="finances">Finances</button>
+    <button class="fin-tab active" data-tab="weekly">Weekly</button>
+    <button class="fin-tab" data-tab="monthly">Monthly</button>
+    <button class="fin-tab" data-tab="income">Income &amp; Bonuses</button>
+    <button class="fin-tab" data-tab="wishlist">Wishlist</button>
     <button class="fin-tab" data-tab="moneymaking">Money Making</button>
   </div>
 
-  <!-- Finances Panel -->
-  <div id="fin-finances" class="fin-panel active">
-    <div class="fin-sections">
-      <div class="fin-section">
-        <div class="fin-section-header">
-          <h3>Income</h3>
-          <button id="addIncomeBtn" class="btn-primary" style="font-size:13px;padding:7px 14px">+ Add</button>
-        </div>
-        <div id="incomeList" class="fin-table-wrap"></div>
-      </div>
-      <div class="fin-section">
-        <div class="fin-section-header">
-          <h3>Expenses</h3>
-          <button id="addExpenseBtn" class="btn-primary" style="font-size:13px;padding:7px 14px">+ Add</button>
-        </div>
-        <div id="expenseList" class="fin-table-wrap"></div>
-      </div>
-      <div class="fin-section fin-section-full">
-        <div class="fin-section-header">
-          <h3>Shopping List</h3>
-          <button id="addShoppingBtn" class="btn-primary" style="font-size:13px;padding:7px 14px">+ Add Item</button>
-        </div>
-        <div id="shoppingList" class="fin-shopping-list"></div>
-      </div>
-    </div>
+  <!-- Weekly Panel -->
+  <div id="fin-weekly" class="fin-panel active">
+    <div class="fin-week-subtabs" id="finWeekSubtabs"></div>
+    <div id="finWeekContent"></div>
+  </div>
+
+  <!-- Monthly Panel -->
+  <div id="fin-monthly" class="fin-panel">
+    <div id="finMonthlyContent"></div>
+  </div>
+
+  <!-- Income & Bonuses Panel -->
+  <div id="fin-income" class="fin-panel">
+    <div id="finIncomeContent"></div>
+  </div>
+
+  <!-- Wishlist Panel -->
+  <div id="fin-wishlist" class="fin-panel">
+    <div id="finWishlistContent"></div>
   </div>
 
   <!-- Money Making Panel -->
@@ -648,59 +645,163 @@
   </div>
 </div>
 
-<!-- Financial Entry Modal (Income / Expense) -->
-<div id="finEntryModal" class="modal">
-  <div class="modal-box" style="max-width:400px">
+<!-- Expense Modal -->
+<div id="finExpModal" class="modal">
+  <div class="modal-box" style="max-width:440px">
     <div class="modal-header">
-      <h2 id="finEntryModalTitle">Add Income</h2>
-      <button class="modal-close" id="closeFinEntryModal">&times;</button>
+      <h2 id="finExpModalTitle">Add Expense</h2>
+      <button class="modal-close" id="closeFinExpModal">&times;</button>
     </div>
     <div class="modal-body">
-      <label class="field-label">Description</label>
-      <input type="text" id="finEntryName" class="field" placeholder="e.g. Freelance Project, Rent">
-      <label class="field-label">Amount ($)</label>
-      <input type="number" id="finEntryAmount" class="field" placeholder="0.00" step="0.01" min="0">
-      <label class="field-label">Date</label>
-      <input type="date" id="finEntryDate" class="field">
-      <label class="field-label">Category <span class="optional">optional</span></label>
-      <input type="text" id="finEntryCategory" class="field" placeholder="e.g. Housing, Food, Education">
-      <label class="field-label">Recurring <span class="optional">optional</span></label>
-      <select id="finEntryRecurring" class="field">
-        <option value="">One-time</option>
-        <option value="weekly">Weekly</option>
-        <option value="biweekly">Every 2 weeks</option>
-        <option value="monthly">Monthly</option>
+      <label class="field-label">Name</label>
+      <input type="text" id="finExpName" class="field" placeholder="e.g. Groceries, WiFi, Dates">
+      <label class="field-label">Amount</label>
+      <div class="fin-amt-toggle-wrap">
+        <div class="fin-amt-toggle" id="finExpAmtToggle">
+          <button type="button" class="fin-amt-btn active" data-type="fixed">Fixed</button>
+          <button type="button" class="fin-amt-btn" data-type="range">Range</button>
+        </div>
+      </div>
+      <div id="finExpAmtFixed"><input type="number" id="finExpAmtSingle" class="field" placeholder="0.00" min="0" step="0.01"></div>
+      <div id="finExpAmtRange" style="display:none"><div style="display:flex;gap:8px;align-items:center"><input type="number" id="finExpAmtLow" class="field" placeholder="Low" min="0" step="0.01"><span style="color:#aaa;flex-shrink:0">–</span><input type="number" id="finExpAmtHigh" class="field" placeholder="High" min="0" step="0.01"></div></div>
+      <label class="field-label">Tag</label>
+      <select id="finExpTag" class="field">
+        <option value="Need">Need</option>
+        <option value="Flexible">Flexible</option>
+        <option value="Self-invest">Self-invest</option>
+        <option value="Gift">Gift</option>
       </select>
+      <label class="field-label">Frequency</label>
+      <select id="finExpFreq" class="field">
+        <option value="weekly">Weekly (every week)</option>
+        <option value="biweekly">Biweekly (Wks 1 &amp; 3 or 2 &amp; 4)</option>
+        <option value="monthly">Monthly (one week only)</option>
+      </select>
+      <div id="finExpWeeksRow" style="display:none">
+        <label class="field-label">Which week(s)?</label>
+        <div class="fin-week-checks">
+          <label><input type="checkbox" class="fin-wk-check" value="0"> Week 1</label>
+          <label><input type="checkbox" class="fin-wk-check" value="1"> Week 2</label>
+          <label><input type="checkbox" class="fin-wk-check" value="2"> Week 3</label>
+          <label><input type="checkbox" class="fin-wk-check" value="3"> Week 4</label>
+        </div>
+      </div>
+      <label class="field-label">Notes <span class="optional">optional</span></label>
+      <textarea id="finExpNotes" class="field" rows="2" placeholder="Any details..."></textarea>
     </div>
     <div class="modal-footer">
-      <button id="cancelFinEntry" class="btn-cancel">Cancel</button>
-      <button id="saveFinEntry" class="btn-primary">Save</button>
+      <button id="cancelFinExp" class="btn-cancel">Cancel</button>
+      <button id="saveFinExp" class="btn-primary">Save</button>
     </div>
   </div>
 </div>
 
-<!-- Shopping Item Modal -->
-<div id="shoppingModal" class="modal">
-  <div class="modal-box" style="max-width:360px">
+<!-- Income Stream Modal -->
+<div id="finIncModal" class="modal">
+  <div class="modal-box" style="max-width:440px">
     <div class="modal-header">
-      <h2>Add Shopping Item</h2>
-      <button class="modal-close" id="closeShoppingModal">&times;</button>
+      <h2 id="finIncModalTitle">Add Income Stream</h2>
+      <button class="modal-close" id="closeFinIncModal">&times;</button>
     </div>
     <div class="modal-body">
-      <label class="field-label">Item name</label>
-      <input type="text" id="shoppingItemName" class="field" placeholder="e.g. Milk, Laptop charger">
-      <label class="field-label">Quantity <span class="optional">optional</span></label>
-      <input type="number" id="shoppingItemQty" class="field" placeholder="1" min="1" value="1">
-      <label class="field-label">Price <span class="optional">optional</span></label>
-      <input type="text" id="shoppingItemPrice" class="field" placeholder="e.g. $12.99 or $10–$15">
-      <label class="field-label">Link <span class="optional">optional</span></label>
-      <input type="url" id="shoppingItemLink" class="field" placeholder="https://...">
+      <label class="field-label">Source Name</label>
+      <input type="text" id="finIncName" class="field" placeholder="e.g. Weekly pay, Side income, TA payment">
+      <label class="field-label">Amount</label>
+      <div class="fin-amt-toggle-wrap">
+        <div class="fin-amt-toggle" id="finIncAmtToggle">
+          <button type="button" class="fin-amt-btn active" data-type="fixed">Fixed</button>
+          <button type="button" class="fin-amt-btn" data-type="variable">Variable</button>
+        </div>
+      </div>
+      <div id="finIncAmtFixed"><input type="number" id="finIncAmtSingle" class="field" placeholder="0.00" min="0" step="0.01"></div>
+      <div id="finIncAmtRange" style="display:none"><div style="display:flex;gap:8px;align-items:center"><input type="number" id="finIncAmtLow" class="field" placeholder="Low" min="0" step="0.01"><span style="color:#aaa;flex-shrink:0">–</span><input type="number" id="finIncAmtHigh" class="field" placeholder="High" min="0" step="0.01"></div></div>
+      <label class="field-label">Frequency</label>
+      <select id="finIncFreq" class="field">
+        <option value="weekly">Weekly</option>
+        <option value="biweekly">Biweekly</option>
+        <option value="monthly">Monthly</option>
+      </select>
+      <div id="finIncWeeksRow" style="display:none">
+        <label class="field-label">Which week(s)?</label>
+        <div class="fin-week-checks">
+          <label><input type="checkbox" class="fin-wk-check" value="0"> Week 1</label>
+          <label><input type="checkbox" class="fin-wk-check" value="1"> Week 2</label>
+          <label><input type="checkbox" class="fin-wk-check" value="2"> Week 3</label>
+          <label><input type="checkbox" class="fin-wk-check" value="3"> Week 4</label>
+        </div>
+      </div>
       <label class="field-label">Notes <span class="optional">optional</span></label>
-      <textarea id="shoppingItemNotes" class="field" rows="2" placeholder="Any extra details..."></textarea>
+      <textarea id="finIncNotes" class="field" rows="2" placeholder="Any details..."></textarea>
     </div>
     <div class="modal-footer">
-      <button id="cancelShopping" class="btn-cancel">Cancel</button>
-      <button id="saveShopping" class="btn-primary">Save Item</button>
+      <button id="cancelFinInc" class="btn-cancel">Cancel</button>
+      <button id="saveFinInc" class="btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bonus Modal -->
+<div id="finBonModal" class="modal">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-header">
+      <h2 id="finBonModalTitle">Add Bonus</h2>
+      <button class="modal-close" id="closeFinBonModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Name / Source</label>
+      <input type="text" id="finBonName" class="field" placeholder="e.g. Acorns bonus, One-time payment">
+      <label class="field-label">Amount (or range)</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="number" id="finBonAmtLow" class="field" placeholder="Low / Fixed" min="0" step="0.01">
+        <span style="color:#aaa;flex-shrink:0">–</span>
+        <input type="number" id="finBonAmtHigh" class="field" placeholder="High (or same)" min="0" step="0.01">
+      </div>
+      <label class="field-label" style="margin-top:12px">Status</label>
+      <select id="finBonStatus" class="field">
+        <option value="Pending">Pending</option>
+        <option value="Received">Received</option>
+        <option value="Better deal possible">Better deal possible</option>
+      </select>
+      <label class="field-label">Notes <span class="optional">optional</span></label>
+      <textarea id="finBonNotes" class="field" rows="2" placeholder="Any details..."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button id="cancelFinBon" class="btn-cancel">Cancel</button>
+      <button id="saveFinBon" class="btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Wishlist Item Modal -->
+<div id="finWishModal" class="modal">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-header">
+      <h2 id="finWishModalTitle">Add Wishlist Item</h2>
+      <button class="modal-close" id="closeFinWishModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Item Name</label>
+      <input type="text" id="finWishName" class="field" placeholder="e.g. Sunglasses, Tennis racket set">
+      <label class="field-label">Cost ($)</label>
+      <input type="number" id="finWishCost" class="field" placeholder="0.00" min="0" step="0.01">
+      <label class="field-label">Tier</label>
+      <select id="finWishTier" class="field">
+        <option value="really-want">Really Want</option>
+        <option value="want">Want</option>
+        <option value="can-wait">Can Wait</option>
+      </select>
+      <div class="field-check-row" style="margin-top:10px">
+        <input type="checkbox" id="finWishPointsEligible">
+        <label for="finWishPointsEligible">Amazon points eligible</label>
+      </div>
+      <label class="field-label" style="margin-top:10px">ETA <span class="optional">optional — leave blank for auto-calc</span></label>
+      <input type="text" id="finWishETA" class="field" placeholder="e.g. June 2026, ~3 months">
+      <label class="field-label">Notes <span class="optional">optional</span></label>
+      <textarea id="finWishNotes" class="field" rows="2" placeholder="Any details..."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button id="cancelFinWish" class="btn-cancel">Cancel</button>
+      <button id="saveFinWish" class="btn-primary">Save</button>
     </div>
   </div>
 </div>
