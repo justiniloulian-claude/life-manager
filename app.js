@@ -2947,9 +2947,11 @@ function initListeners() {
   document.getElementById('closeFolderModal').addEventListener('click', function(){ closeModal('folderModal'); });
   document.getElementById('cancelFolder').addEventListener('click',     function(){ closeModal('folderModal'); });
   document.getElementById('saveFolder').addEventListener('click', saveFolderModal);
-  // Folder password modal
-  document.getElementById('cancelFolderPassword').addEventListener('click', function(){ closeModal('folderPasswordModal'); });
-  document.getElementById('confirmFolderPassword').addEventListener('click', function(){
+  // Folder password modal (null-guarded in case HTML cache lags)
+  if(document.getElementById('cancelFolderPassword'))
+    document.getElementById('cancelFolderPassword').addEventListener('click', function(){ closeModal('folderPasswordModal'); });
+  if(document.getElementById('confirmFolderPassword'))
+    document.getElementById('confirmFolderPassword').addEventListener('click', function(){
     var data=getData();
     var folder=data.folders.find(function(f){return f.id===state.pendingFolderId;}); if(!folder)return;
     var entered=document.getElementById('folderPasswordInput').value;
@@ -2962,7 +2964,8 @@ function initListeners() {
       document.getElementById('folderPasswordInput').select();
     }
   });
-  document.getElementById('folderPasswordInput').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('confirmFolderPassword').click();});
+  if(document.getElementById('folderPasswordInput'))
+    document.getElementById('folderPasswordInput').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('confirmFolderPassword').click();});
   document.getElementById('folderName').addEventListener('keydown', function(e){ if(e.key==='Enter')saveFolderModal(); });
 
   // Close modals on backdrop (noteViewModal handled separately above so it saves first)
