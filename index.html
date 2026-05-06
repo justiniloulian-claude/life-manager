@@ -162,19 +162,18 @@
   <!-- Physical Health View -->
   <div id="healthView" class="view">
 
-    <!-- Diet Section (day-navigated log) -->
+    <!-- Water Section (day-navigated) -->
     <div class="health-section-block">
       <div class="health-section-topbar">
-        <h2 class="health-section-heading">🥗 Diet</h2>
+        <h2 class="health-section-heading">💧 Water</h2>
         <div class="health-date-nav">
           <button id="healthPrevDayBtn" class="btn-nav">&#8592; Prev</button>
           <button id="healthBackTodayBtn" class="btn-today" style="display:none">Today</button>
           <span id="healthDateLabel" class="health-date-label"></span>
           <button id="healthNextDayBtn" class="btn-nav">Next &#8594;</button>
         </div>
-        <button id="addHealthFoodBtn" class="btn-primary" style="font-size:13px;padding:7px 14px">+ Log Meal</button>
       </div>
-      <div class="health-panel health-diet-panel">
+      <div class="health-panel">
         <div class="health-water-section">
           <div class="health-section-label">Water Intake</div>
           <div class="water-picker" id="waterPicker">
@@ -184,9 +183,16 @@
             <button class="water-btn" data-level="great">Great amount</button>
           </div>
         </div>
-        <div id="healthDietList" class="health-meals-list"></div>
-        <div class="health-coming-soon"><span>🎯</span><span>Targets — coming soon</span></div>
       </div>
+    </div>
+
+    <!-- Weekly Diet Plan -->
+    <div class="health-section-block" style="margin-top:28px">
+      <div class="health-section-topbar">
+        <h2 class="health-section-heading">🥗 Weekly Diet Plan</h2>
+        <span style="font-size:13px;color:#aaa">Fixed weekly template — edit any day below</span>
+      </div>
+      <div id="dietPlanGrid" class="diet-plan-grid"></div>
     </div>
 
     <!-- Activity Planner Section (weekly grid) -->
@@ -916,29 +922,6 @@
 </div>
 
 <!-- Health Food Modal -->
-<div id="healthFoodModal" class="modal">
-  <div class="modal-box" style="max-width:400px">
-    <div class="modal-header">
-      <h2 id="healthFoodModalTitle">Log Meal</h2>
-      <button class="modal-close" id="closeHealthFoodModal">&times;</button>
-    </div>
-    <div class="modal-body">
-      <label class="field-label">Meal</label>
-      <select id="healthFoodMealType" class="field">
-        <option value="breakfast">🌅 Breakfast</option>
-        <option value="lunch">☀️ Lunch</option>
-        <option value="dinner">🌙 Dinner</option>
-        <option value="snacks">🍎 Snacks</option>
-      </select>
-      <label class="field-label">What did you eat?</label>
-      <textarea id="healthFoodDescription" class="field" rows="4" placeholder="Describe what you had..."></textarea>
-    </div>
-    <div class="modal-footer">
-      <button id="cancelHealthFood" class="btn-cancel">Cancel</button>
-      <button id="saveHealthFood" class="btn-primary">Save</button>
-    </div>
-  </div>
-</div>
 
 <!-- Health Activity Modal -->
 <!-- Activity Plan Modal -->

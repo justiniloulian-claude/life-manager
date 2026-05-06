@@ -109,7 +109,7 @@ function getData() {
     cheshbonItems:         JSON.parse(localStorage.getItem('dm_cheshbon_items'))             || [],
     cheshbonChecks:        JSON.parse(localStorage.getItem('dm_cheshbon_checks'))            || {},
     cheshbonWeekHistory:   JSON.parse(localStorage.getItem('dm_cheshbon_week_history'))      || [],
-    healthDiet:            JSON.parse(localStorage.getItem('dm_health_diet'))                || {},
+    dietPlan:              JSON.parse(localStorage.getItem('dm_diet_plan'))                  || {},
     healthWater:           JSON.parse(localStorage.getItem('dm_health_water'))               || {},
     activityPlan:          JSON.parse(localStorage.getItem('dm_activity_plan'))              || {},
     activityDone:          JSON.parse(localStorage.getItem('dm_activity_done'))              || {},
@@ -140,7 +140,7 @@ function saveRHist(v){ localStorage.setItem('dm_refl_history',           JSON.st
 function saveChi(v)  { localStorage.setItem('dm_cheshbon_items',         JSON.stringify(v)); }
 function saveChk(v)  { localStorage.setItem('dm_cheshbon_checks',        JSON.stringify(v)); }
 function saveChWH(v) { localStorage.setItem('dm_cheshbon_week_history',  JSON.stringify(v)); }
-function saveHD(v)   { localStorage.setItem('dm_health_diet',     JSON.stringify(v)); }
+function saveDietPlan(v) { localStorage.setItem('dm_diet_plan', JSON.stringify(v)); }
 function saveHW(v)   { localStorage.setItem('dm_health_water',    JSON.stringify(v)); }
 function saveAP(v)   { localStorage.setItem('dm_activity_plan',   JSON.stringify(v)); }
 function saveAD(v)   { localStorage.setItem('dm_activity_done',   JSON.stringify(v)); }
@@ -505,19 +505,8 @@ function toggleActivityPlanDone(weekKey,itemId){
   data.activityDone[key]=!data.activityDone[key]; saveAD(data.activityDone);
 }
 
-function addHealthFood(ds, d) {
-  var data=getData(); if(!data.healthDiet[ds])data.healthDiet[ds]=[];
-  data.healthDiet[ds].push({id:uid(),mealType:d.mealType,description:d.description,createdAt:new Date().toISOString()});
-  saveHD(data.healthDiet);
-}
-function updateHealthFood(ds, id, d) {
-  var data=getData(); var arr=data.healthDiet[ds]||[];
-  var item=arr.find(function(i){return i.id===id;});
-  if(item){item.mealType=d.mealType;item.description=d.description;} saveHD(data.healthDiet);
-}
-function deleteHealthFood(ds, id) {
-  var data=getData(); if(!data.healthDiet[ds])return;
-  data.healthDiet[ds]=data.healthDiet[ds].filter(function(i){return i.id!==id;}); saveHD(data.healthDiet);
+function updateDietPlanDay(day, text) {
+  var data=getData(); data.dietPlan[day]=text; saveDietPlan(data.dietPlan);
 }
 function addHealthActivity(ds, d) {
   var data=getData(); if(!data.healthActivity[ds])data.healthActivity[ds]=[];
@@ -896,9 +885,6 @@ window.openCheshbonWeekHistory = function(){
 // ============================================================
 // RENDER — PHYSICAL HEALTH
 // ============================================================
-var MEAL_LABELS = {breakfast:'🌅 Breakfast',lunch:'☀️ Lunch',dinner:'🌙 Dinner',snacks:'🍎 Snacks'};
-var MEAL_TYPES  = ['breakfast','lunch','dinner','snacks'];
-
 function renderHealth() {
   var ds = state.healthDate;
   var date = fromDateStr(ds);
@@ -906,8 +892,8 @@ function renderHealth() {
   if (label) label.textContent = dayName(date) + ', ' + monthDay(date);
   var todayBtn = document.getElementById('healthBackTodayBtn');
   if (todayBtn) todayBtn.style.display = (ds === toDateStr(new Date())) ? 'none' : '';
-  renderHealthDiet(ds);
   renderHealthWater(ds);
+  renderDietPlan();
   renderActivityPlanner();
 }
 
@@ -959,27 +945,18 @@ function renderHealthWater(ds) {
   });
 }
 
-function renderHealthDiet(ds) {
-  var data = getData(); var items = (data.healthDiet[ds] || []);
-  var el = document.getElementById('healthDietList'); if(!el)return;
-  if (!items.length) { el.innerHTML='<div class="health-meals-empty">No meals logged yet.</div>'; return; }
-  var html = '';
-  MEAL_TYPES.forEach(function(mtype) {
-    var group = items.filter(function(i){return i.mealType===mtype;});
-    if (!group.length) return;
-    html += '<div class="health-meal-group">';
-    html += '<div class="health-meal-group-header"><span class="health-meal-type-label">'+(MEAL_LABELS[mtype]||mtype)+'</span></div>';
-    group.forEach(function(item){
-      html += '<div class="health-meal-item">'+
-        '<div class="health-meal-text">'+escHtml(item.description)+'</div>'+
-        '<div class="health-meal-actions">'+
-          '<button class="btn-icon" onclick="openEditHealthFood(\''+ds+'\',\''+item.id+'\')">✏️</button>'+
-          '<button class="btn-icon" onclick="removeHealthFood(\''+ds+'\',\''+item.id+'\')">🗑</button>'+
-        '</div></div>';
-    });
-    html += '</div>';
-  });
-  el.innerHTML = html;
+var DIET_DAYS = ['mon','tue','wed','thu','fri','sat','sun'];
+var DIET_DAY_LABELS = {mon:'Monday',tue:'Tuesday',wed:'Wednesday',thu:'Thursday',fri:'Friday',sat:'Saturday',sun:'Sunday'};
+
+function renderDietPlan() {
+  var data = getData(); var el = document.getElementById('dietPlanGrid'); if(!el)return;
+  el.innerHTML = DIET_DAYS.map(function(day) {
+    var plan = data.dietPlan[day] || '';
+    return '<div class="diet-day-card">'+
+      '<div class="diet-day-label">'+DIET_DAY_LABELS[day]+'</div>'+
+      '<textarea class="diet-day-text" rows="4" placeholder="Plan your meals for '+DIET_DAY_LABELS[day]+'..." onblur="saveDietDay(\''+day+'\',this.value)">'+escHtml(plan)+'</textarea>'+
+    '</div>';
+  }).join('');
 }
 
 function renderHealthActivity(ds) {
@@ -1034,19 +1011,7 @@ window.removePlanItem = function(day, id) {
 };
 
 // Health window callbacks
-window.openEditHealthFood = function(ds, id) {
-  var data=getData(); var item=(data.healthDiet[ds]||[]).find(function(i){return i.id===id;}); if(!item)return;
-  state.editHealthFoodId=id;
-  document.getElementById('healthFoodModalTitle').textContent='Edit Meal';
-  document.getElementById('healthFoodMealType').value=item.mealType||'breakfast';
-  document.getElementById('healthFoodDescription').value=item.description||'';
-  openModal('healthFoodModal');
-  setTimeout(function(){document.getElementById('healthFoodDescription').focus();},80);
-};
-window.removeHealthFood = function(ds, id){
-  if(!confirm('Delete this meal entry?'))return;
-  deleteHealthFood(ds,id); renderHealthDiet(ds);
-};
+window.saveDietDay = function(day, val) { updateDietPlanDay(day, val.trim()); };
 window.openEditHealthActivity = function(ds, id) {
   var data=getData(); var item=(data.healthActivity[ds]||[]).find(function(i){return i.id===id;}); if(!item)return;
   state.editHealthActivityId=id;
@@ -2459,26 +2424,6 @@ function initListeners() {
     setHealthWater(ds, current===level?'':level); renderHealthWater(ds);
   });
 
-  // Health Food modal
-  document.getElementById('addHealthFoodBtn').addEventListener('click', function(){
-    state.editHealthFoodId=null;
-    document.getElementById('healthFoodModalTitle').textContent='Log Meal';
-    document.getElementById('healthFoodMealType').value='breakfast';
-    document.getElementById('healthFoodDescription').value='';
-    openModal('healthFoodModal');
-    setTimeout(function(){document.getElementById('healthFoodDescription').focus();},80);
-  });
-  document.getElementById('closeHealthFoodModal').addEventListener('click', function(){ closeModal('healthFoodModal'); });
-  document.getElementById('cancelHealthFood').addEventListener('click',     function(){ closeModal('healthFoodModal'); });
-  document.getElementById('saveHealthFood').addEventListener('click', function(){
-    var desc=document.getElementById('healthFoodDescription').value.trim();
-    if(!desc){document.getElementById('healthFoodDescription').classList.add('error');return;}
-    document.getElementById('healthFoodDescription').classList.remove('error');
-    var d={mealType:document.getElementById('healthFoodMealType').value,description:desc};
-    var ds=state.healthDate;
-    state.editHealthFoodId?updateHealthFood(ds,state.editHealthFoodId,d):addHealthFood(ds,d);
-    state.editHealthFoodId=null; closeModal('healthFoodModal'); renderHealthDiet(ds);
-  });
 
   // Activity Plan modal
   document.getElementById('planActivityTypePicker').addEventListener('click', function(e){
@@ -2732,6 +2677,7 @@ async function loadHeaderHebrewDate() {
 }
 
 function init() {
+  localStorage.removeItem('dm_health_diet');
   purgeOldDeletedNotes();
   seedRoutineIfEmpty();
   seedFinancialIfEmpty();
