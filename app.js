@@ -50,6 +50,8 @@ const state = {
   selectedPlanActivityType: '',
   learningDay: null,
   editLearningItemId: null,
+  selectedLearningSeder: '',
+  dragLearn: null,
   activeFinTab: 'weekly',
   finWeekIdx: 0,
   editFinExpId: null,
@@ -432,8 +434,9 @@ function deleteReminder(id){ var data=getData(); saveRem(data.reminders.filter(f
 // ============================================================
 var LEARNING_DAYS = ['mon','tue','wed','thu','fri','sat','sun'];
 var LEARNING_DAY_LABELS = {mon:'Monday',tue:'Tuesday',wed:'Wednesday',thu:'Thursday',fri:'Friday',sat:'Saturday',sun:'Sunday'};
-function addLearningItem(day,d){ var data=getData(); if(!data.learning[day])data.learning[day]=[]; data.learning[day].push({id:uid(),subject:d.subject,source:d.source||'',notes:d.notes||'',time:d.time||''}); saveLrn(data.learning); }
-function updateLearningItem(day,id,d){ var data=getData(); if(!data.learning[day])return; var item=data.learning[day].find(function(i){return i.id===id;}); if(item){item.subject=d.subject;item.source=d.source||'';item.notes=d.notes||'';item.time=d.time||'';} saveLrn(data.learning); }
+function addLearningItem(day,d){ var data=getData(); if(!data.learning[day])data.learning[day]=[]; data.learning[day].push({id:uid(),subject:d.subject,source:d.source||'',notes:d.notes||'',time:d.time||'',seder:d.seder||''}); saveLrn(data.learning); }
+function updateLearningItem(day,id,d){ var data=getData(); if(!data.learning[day])return; var item=data.learning[day].find(function(i){return i.id===id;}); if(item){item.subject=d.subject;item.source=d.source||'';item.notes=d.notes||'';item.time=d.time||'';item.seder=d.seder||'';} saveLrn(data.learning); }
+function reorderLearningItem(day,dragId,targetId){ var data=getData(); var items=data.learning[day]||[]; var di=items.findIndex(function(i){return i.id===dragId;}); var ti=items.findIndex(function(i){return i.id===targetId;}); if(di===-1||ti===-1||di===ti)return; var dragged=items.splice(di,1)[0]; var newTi=items.findIndex(function(i){return i.id===targetId;}); items.splice(newTi,0,dragged); data.learning[day]=items; saveLrn(data.learning); renderLearning(); }
 function deleteLearningItem(day,id){ var data=getData(); if(!data.learning[day])return; data.learning[day]=data.learning[day].filter(function(i){return i.id!==id;}); saveLrn(data.learning); }
 
 // ============================================================
@@ -1054,12 +1057,15 @@ function renderReminders() {
 // ============================================================
 // RENDER — LEARNING SEDER
 // ============================================================
-function getLearningSection(time) {
-  if(!time)return 'unscheduled';
-  var h=parseInt(time.split(':')[0],10);
-  if(h>=5&&h<12) return 'morning';
-  if(h>=12&&h<18) return 'afternoon';
-  return 'night';
+function getLearningSection(item) {
+  if(item.time) {
+    var h=parseInt(item.time.split(':')[0],10);
+    if(h>=5&&h<12) return 'morning';
+    if(h>=12&&h<18) return 'afternoon';
+    return 'night';
+  }
+  if(item.seder) return item.seder;
+  return 'unscheduled';
 }
 var LEARNING_SECTIONS=[
   {key:'morning',   label:'Morning',   hours:'5am–12pm'},
@@ -1073,17 +1079,33 @@ function renderLearning() {
   grid.innerHTML=LEARNING_DAYS.map(function(day){
     var items=data.learning[day]||[];
     var sections={morning:[],afternoon:[],night:[],unscheduled:[]};
-    items.forEach(function(item){ sections[getLearningSection(item.time||'')].push(item); });
+    items.forEach(function(item){ sections[getLearningSection(item)].push(item); });
+    // time-based items sorted by time; seder-only items keep array order for drag
     ['morning','afternoon','night'].forEach(function(sec){
-      sections[sec].sort(function(a,b){return (a.time||'').localeCompare(b.time||'');});
+      sections[sec].sort(function(a,b){
+        var at=a.time||'', bt=b.time||'';
+        if(at&&bt) return at.localeCompare(bt);
+        if(at) return -1; if(bt) return 1;
+        return 0;
+      });
     });
     var bodyHTML='';
-    LEARNING_SECTIONS.forEach(function(sec){
-      var sItems=sections[sec.key]; if(!sItems.length)return;
+    var mainSecs=[{key:'morning',label:'Morning Seder'},{key:'afternoon',label:'Afternoon Seder'},{key:'night',label:'Night Seder'}];
+    mainSecs.forEach(function(sec){
+      var sItems=sections[sec.key];
       bodyHTML+='<div class="learning-section-header">'+sec.label+'</div>';
+      if(!sItems.length){
+        bodyHTML+='<div class="learning-section-empty">—</div>';
+        return;
+      }
       bodyHTML+=sItems.map(function(item){
-        var timeBadge=item.time?'<span class="learning-time-badge">'+fmt12(item.time)+'</span>':'';
-        return '<div class="learning-item">' +
+        var canDrag=!item.time;
+        var dragAttrs=canDrag?' draggable="true" data-day="'+day+'" data-id="'+item.id+'" data-sec="'+sec.key+'"':'';
+        var dragHandle=canDrag?'<span class="drag-handle">⠿</span>':'';
+        var timeBadge=item.time?'<span class="learning-time-badge">'+fmt12(item.time)+'</span>':
+                      item.seder?'<span class="learning-seder-badge">'+sec.label+'</span>':'';
+        return '<div class="learning-item'+(canDrag?' lrn-draggable':'')+'"'+dragAttrs+'>' +
+          dragHandle+
           '<div class="learning-item-body">' +
             '<div class="learning-item-subject">'+escHtml(item.subject)+timeBadge+'</div>'+
             (item.source?'<div class="learning-item-source">'+escHtml(item.source)+'</div>':'')+
@@ -1095,12 +1117,54 @@ function renderLearning() {
           '</div></div>';
       }).join('');
     });
+    if(sections.unscheduled.length){
+      bodyHTML+='<div class="learning-section-header">Unscheduled</div>';
+      bodyHTML+=sections.unscheduled.map(function(item){
+        return '<div class="learning-item">' +
+          '<div class="learning-item-body">' +
+            '<div class="learning-item-subject">'+escHtml(item.subject)+'</div>'+
+            (item.source?'<div class="learning-item-source">'+escHtml(item.source)+'</div>':'')+
+            (item.notes ?'<div class="learning-item-notes">'+escHtml(item.notes)+'</div>' :'')+
+          '</div>' +
+          '<div class="learning-item-actions">' +
+            '<button class="btn-icon" onclick="openEditLearningItem(\''+day+'\',\''+item.id+'\')">✏️</button>'+
+            '<button class="btn-icon" onclick="deleteLrn(\''+day+'\',\''+item.id+'\')">🗑</button>'+
+          '</div></div>';
+      }).join('');
+    }
     return '<div class="learning-day-col">' +
       '<div class="learning-day-header">'+LEARNING_DAY_LABELS[day]+'</div>' +
-      '<div class="learning-day-body">'+(bodyHTML||'<div style="padding:12px 14px;font-size:13px;color:#ccc">Empty</div>')+'</div>' +
+      '<div class="learning-day-body">'+bodyHTML+'</div>' +
       '<button class="learning-add-row" onclick="openAddLearningItem(\''+day+'\')">+ Add</button>' +
       '</div>';
   }).join('');
+
+  // Attach drag-and-drop listeners to draggable items
+  grid.querySelectorAll('.lrn-draggable').forEach(function(el){
+    el.addEventListener('dragstart',function(e){
+      state.dragLearn={day:el.dataset.day,id:el.dataset.id,sec:el.dataset.sec};
+      el.classList.add('lrn-dragging');
+      e.dataTransfer.effectAllowed='move';
+    });
+    el.addEventListener('dragend',function(){
+      el.classList.remove('lrn-dragging');
+      grid.querySelectorAll('.lrn-drag-over').forEach(function(x){x.classList.remove('lrn-drag-over');});
+    });
+    el.addEventListener('dragover',function(e){
+      if(!state.dragLearn||state.dragLearn.id===el.dataset.id)return;
+      if(state.dragLearn.sec!==el.dataset.sec||state.dragLearn.day!==el.dataset.day)return;
+      e.preventDefault();
+      grid.querySelectorAll('.lrn-drag-over').forEach(function(x){x.classList.remove('lrn-drag-over');});
+      el.classList.add('lrn-drag-over');
+    });
+    el.addEventListener('drop',function(e){
+      e.preventDefault();
+      if(!state.dragLearn||state.dragLearn.id===el.dataset.id)return;
+      if(state.dragLearn.sec!==el.dataset.sec||state.dragLearn.day!==el.dataset.day)return;
+      reorderLearningItem(state.dragLearn.day,state.dragLearn.id,el.dataset.id);
+      state.dragLearn=null;
+    });
+  });
 }
 
 // ============================================================
@@ -1905,8 +1969,37 @@ window.openEditReminder = function(id) {
 window.deleteRem = function(id){ if(confirm('Delete this reminder?')){ deleteReminder(id); renderReminders(); } };
 
 // Learning
-window.openAddLearningItem = function(day){ state.learningDay=day; state.editLearningItemId=null; document.getElementById('learningItemModalTitle').textContent='Add to '+LEARNING_DAY_LABELS[day]; document.getElementById('learningSubject').value=''; document.getElementById('learningTime').value=''; document.getElementById('learningSource').value=''; document.getElementById('learningNotes').value=''; openModal('learningItemModal'); setTimeout(function(){document.getElementById('learningSubject').focus();},80); };
-window.openEditLearningItem = function(day,id){ var data=getData(); var items=data.learning[day]||[]; var item=items.find(function(i){return i.id===id;}); if(!item)return; state.learningDay=day; state.editLearningItemId=id; document.getElementById('learningItemModalTitle').textContent='Edit '+LEARNING_DAY_LABELS[day]; document.getElementById('learningSubject').value=item.subject; document.getElementById('learningTime').value=item.time||''; document.getElementById('learningSource').value=item.source||''; document.getElementById('learningNotes').value=item.notes||''; openModal('learningItemModal'); setTimeout(function(){document.getElementById('learningSubject').focus();},80); };
+function setLearningSedarUI(seder){
+  state.selectedLearningSeder=seder||'';
+  document.querySelectorAll('#learningSedarGroup .seder-btn').forEach(function(b){
+    b.classList.toggle('active',b.dataset.seder===seder);
+  });
+}
+window.openAddLearningItem = function(day){
+  state.learningDay=day; state.editLearningItemId=null;
+  document.getElementById('learningItemModalTitle').textContent='Add to '+LEARNING_DAY_LABELS[day];
+  document.getElementById('learningSubject').value='';
+  document.getElementById('learningTime').value='';
+  document.getElementById('learningSource').value='';
+  document.getElementById('learningNotes').value='';
+  document.getElementById('learningTimeError').style.display='none';
+  setLearningSedarUI('');
+  openModal('learningItemModal');
+  setTimeout(function(){document.getElementById('learningSubject').focus();},80);
+};
+window.openEditLearningItem = function(day,id){
+  var data=getData(); var items=data.learning[day]||[]; var item=items.find(function(i){return i.id===id;}); if(!item)return;
+  state.learningDay=day; state.editLearningItemId=id;
+  document.getElementById('learningItemModalTitle').textContent='Edit '+LEARNING_DAY_LABELS[day];
+  document.getElementById('learningSubject').value=item.subject;
+  document.getElementById('learningTime').value=item.time||'';
+  document.getElementById('learningSource').value=item.source||'';
+  document.getElementById('learningNotes').value=item.notes||'';
+  document.getElementById('learningTimeError').style.display='none';
+  setLearningSedarUI(item.seder||'');
+  openModal('learningItemModal');
+  setTimeout(function(){document.getElementById('learningSubject').focus();},80);
+};
 window.deleteLrn = function(day,id){ if(confirm('Remove this entry?')){ deleteLearningItem(day,id); renderLearning(); } };
 
 // Financial — week selection
@@ -2471,11 +2564,33 @@ function initListeners() {
   // Learning Seder
   document.getElementById('closeLearningItemModal').addEventListener('click', function(){ closeModal('learningItemModal'); });
   document.getElementById('cancelLearningItem').addEventListener('click',     function(){ closeModal('learningItemModal'); });
+  document.getElementById('learningSedarGroup').addEventListener('click', function(e){
+    var btn=e.target.closest('.seder-btn'); if(!btn)return;
+    var s=btn.dataset.seder;
+    setLearningSedarUI(state.selectedLearningSeder===s?'':s);
+  });
+  document.getElementById('learningTime').addEventListener('input', function(){
+    if(this.value) setLearningSedarUI('');
+  });
   document.getElementById('saveLearningItem').addEventListener('click', function(){
     var subject=document.getElementById('learningSubject').value.trim();
     if (!subject){ document.getElementById('learningSubject').classList.add('error'); return; }
     document.getElementById('learningSubject').classList.remove('error');
-    var d={subject:subject,source:document.getElementById('learningSource').value.trim(),notes:document.getElementById('learningNotes').value.trim(),time:document.getElementById('learningTime').value};
+    var time=document.getElementById('learningTime').value;
+    var seder=state.selectedLearningSeder;
+    var errEl=document.getElementById('learningTimeError');
+    // Validate seder+time combo
+    if(seder&&time){
+      var h=parseInt(time.split(':')[0],10);
+      var valid=(seder==='morning'&&h>=5&&h<12)||(seder==='afternoon'&&h>=12&&h<18)||(seder==='night'&&h>=18);
+      if(!valid){
+        var rangeMap={morning:'5am–12pm',afternoon:'12pm–6pm',night:'6pm+'};
+        errEl.textContent=seder.charAt(0).toUpperCase()+seder.slice(1)+' Seder must be within '+rangeMap[seder];
+        errEl.style.display='block'; return;
+      }
+    }
+    errEl.style.display='none';
+    var d={subject:subject,source:document.getElementById('learningSource').value.trim(),notes:document.getElementById('learningNotes').value.trim(),time:time,seder:seder};
     state.editLearningItemId?updateLearningItem(state.learningDay,state.editLearningItemId,d):addLearningItem(state.learningDay,d);
     state.editLearningItemId=null; closeModal('learningItemModal'); renderLearning();
   });

@@ -637,8 +637,15 @@
     <div class="modal-body">
       <label class="field-label">Subject</label>
       <input type="text" id="learningSubject" class="field" placeholder="e.g. Gemara, Halacha, Chumash">
-      <label class="field-label">Time <span class="optional">optional</span></label>
+      <label class="field-label">Seder Period <span class="optional">optional</span></label>
+      <div class="seder-btn-group" id="learningSedarGroup">
+        <button type="button" class="seder-btn" data-seder="morning">Morning</button>
+        <button type="button" class="seder-btn" data-seder="afternoon">Afternoon</button>
+        <button type="button" class="seder-btn" data-seder="night">Night</button>
+      </div>
+      <label class="field-label" style="margin-top:10px">Specific Time <span class="optional">optional</span></label>
       <input type="time" id="learningTime" class="field">
+      <div id="learningTimeError" class="field-error" style="display:none"></div>
       <label class="field-label">Source <span class="optional">optional</span></label>
       <input type="text" id="learningSource" class="field" placeholder="e.g. Bava Metzia 12a, Shulchan Aruch OC 1">
       <label class="field-label">Notes <span class="optional">optional</span></label>

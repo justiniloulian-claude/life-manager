@@ -995,6 +995,67 @@ textarea.field { resize: vertical; }
   margin-left: 5px;
   font-weight: 400;
   vertical-align: middle;
+  white-space: nowrap;
+  display: inline-block;
+}
+.learning-seder-badge {
+  font-size: 10px;
+  color: #9b8fcc;
+  background: #f0eefa;
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 5px;
+  font-weight: 500;
+  vertical-align: middle;
+  white-space: nowrap;
+  display: inline-block;
+}
+.learning-section-empty {
+  padding: 4px 14px 6px;
+  font-size: 12px;
+  color: #ddd;
+}
+/* Seder button group */
+.seder-btn-group {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+.seder-btn {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fafaf8;
+  color: #555;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-weight: 500;
+}
+.seder-btn:hover { border-color: #bbb; background: #f4f4f0; }
+.seder-btn.active { background: #6c5ce7; border-color: #6c5ce7; color: #fff; }
+/* Drag and drop */
+.lrn-draggable { cursor: grab; }
+.lrn-draggable:active { cursor: grabbing; }
+.lrn-dragging { opacity: 0.4; }
+.lrn-drag-over { outline: 2px dashed #6c5ce7; outline-offset: -2px; background: #f5f2ff; }
+.drag-handle {
+  color: #ccc;
+  font-size: 14px;
+  cursor: grab;
+  flex-shrink: 0;
+  line-height: 1;
+  padding-top: 1px;
+  user-select: none;
+}
+.lrn-draggable:hover .drag-handle { color: #aaa; }
+/* Field error */
+.field-error {
+  font-size: 12px;
+  color: #e74c3c;
+  margin-top: 4px;
 }
 
 /* ===== FINANCIAL PAGE ===== */
