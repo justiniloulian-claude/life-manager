@@ -738,7 +738,7 @@ function renderSimpleList(list,containerId) {
       '<div class="stl-item-body"><div class="stl-item-title">'+escHtml(item.title)+'</div>'+notesHTML+'</div>' +
       '<div class="stl-actions">'+
         '<button class="btn-icon" onclick="openEditSTItem(\''+list+'\',\''+item.id+'\')">✏️</button>'+
-        (!item.done?'<button class="btn-move" onclick="openMoveToDay(\''+list+'\',\''+item.id+'\')">📅</button>':'')+
+        (!item.done?'<button class="btn-move" onclick="openMoveToDay(\''+list+'\',\''+item.id+'\')" title="Move to dashboard">→</button>':'')+
         '<button class="btn-icon" onclick="deleteSTItem(\''+list+'\',\''+item.id+'\')">🗑</button>'+
       '</div></div>';
   }).join('');
@@ -1203,11 +1203,13 @@ function renderFinWeekly() {
   cEl.innerHTML=
     '<div class="fin-section">'+
       '<div class="fin-section-header"><h3>Income</h3><button class="btn-primary" style="font-size:13px;padding:6px 13px" onclick="openAddFinInc()">+ Add</button></div>'+
-      '<div class="fin-tbl-wrap">'+incHdr+(incItems.length?incItems.map(function(i){return tblRow(i,'inc');}).join(''):'<div class="fin-empty">No income this week.</div>')+'</div>'+
+      '<div class="fin-tbl-wrap">'+incHdr+(incItems.length?incItems.map(function(i){return tblRow(i,'inc');}).join(''):'<div class="fin-empty">No income this week.</div>')+
+      (incItems.length?'<div class="fin-total-row"><span class="fin-total-lbl">Total Income</span><span></span><span></span><span class="fin-tbl-amt inc">$'+fmtDollar(incLo)+'</span><span class="fin-tbl-amt inc">$'+fmtDollar(incHi)+'</span><span></span></div>':'')+'</div>'+
     '</div>'+
     '<div class="fin-section">'+
       '<div class="fin-section-header"><h3>Expenses</h3><button class="btn-primary" style="font-size:13px;padding:6px 13px" onclick="openAddFinExp()">+ Add</button></div>'+
-      '<div class="fin-tbl-wrap">'+incHdr+(expItems.length?expItems.map(function(i){return tblRow(i,'exp');}).join(''):'<div class="fin-empty">No expenses this week.</div>')+'</div>'+
+      '<div class="fin-tbl-wrap">'+incHdr+(expItems.length?expItems.map(function(i){return tblRow(i,'exp');}).join(''):'<div class="fin-empty">No expenses this week.</div>')+
+      (expItems.length?'<div class="fin-total-row"><span class="fin-total-lbl">Total Expenses</span><span></span><span></span><span class="fin-tbl-amt exp">$'+fmtDollar(expLo)+'</span><span class="fin-tbl-amt exp">$'+fmtDollar(expHi)+'</span><span></span></div>':'')+'</div>'+
     '</div>'+
     '<div class="fin-surplus-block">'+
       '<div class="fin-surplus-bar-outer"><div class="fin-surplus-bar-fill" style="width:'+expPct+'%"></div></div>'+
@@ -1268,11 +1270,11 @@ function renderFinMonthly() {
     '</div>'+
     '<div class="fin-monthly-cards">'+
       '<div class="fin-section"><div class="fin-section-header"><h3>Income Breakdown</h3></div>'+
-        '<div class="fin-tbl-wrap">'+(data.finIncome.length?data.finIncome.map(function(i){return mRow(i,'inc');}).join(''):'<div class="fin-empty">No income streams.</div>')+'</div></div>'+
+        '<div class="fin-tbl-wrap">'+(data.finIncome.length?data.finIncome.map(function(i){return mRow(i,'inc');}).join('')+'<div class="fin-mrow fin-total-mrow"><span class="fin-total-lbl">Total Income</span><span></span><span></span><span class="fin-tbl-amt inc">'+fmtAmt(incLo,incHi)+'</span><span></span></div>':'<div class="fin-empty">No income streams.</div>')+'</div></div>'+
       '<div class="fin-section"><div class="fin-section-header"><h3>Fixed Commitments</h3></div>'+
-        '<div class="fin-tbl-wrap">'+(fixedExp.length?fixedExp.map(function(i){return mRow(i,'exp');}).join(''):'<div class="fin-empty">None.</div>')+'</div></div>'+
+        '<div class="fin-tbl-wrap">'+(fixedExp.length?fixedExp.map(function(i){return mRow(i,'exp');}).join('')+'<div class="fin-mrow fin-total-mrow"><span class="fin-total-lbl">Total Fixed</span><span></span><span></span><span class="fin-tbl-amt exp">$'+fmtDollar(fixHi)+'</span><span></span></div>':'<div class="fin-empty">None.</div>')+'</div></div>'+
       '<div class="fin-section"><div class="fin-section-header"><h3>Flexible Expenses</h3></div>'+
-        '<div class="fin-tbl-wrap">'+(flexExp.length?flexExp.map(function(i){return mRow(i,'exp');}).join(''):'<div class="fin-empty">None.</div>')+'</div></div>'+
+        '<div class="fin-tbl-wrap">'+(flexExp.length?flexExp.map(function(i){return mRow(i,'exp');}).join('')+'<div class="fin-mrow fin-total-mrow"><span class="fin-total-lbl">Total Flexible</span><span></span><span></span><span class="fin-tbl-amt exp">'+fmtAmt(mTot(flexExp,'amountLow'),flexHi)+'</span><span></span></div>':'<div class="fin-empty">None.</div>')+'</div></div>'+
     '</div>';
 }
 
@@ -1303,10 +1305,14 @@ function renderFinIncome() {
   el.innerHTML=
     '<div class="fin-section"><div class="fin-section-header"><h3>Income Streams</h3><button class="btn-primary" style="font-size:13px;padding:6px 13px" onclick="openAddFinInc()">+ Add</button></div>'+
       '<div class="fin-tbl-wrap fin-has-hdr"><div class="fin-tbl-hdr"><span>Source</span><span>Frequency</span><span>Amount</span><span></span></div>'+
-      (data.finIncome.length?data.finIncome.map(iRow).join(''):'<div class="fin-empty">No income streams yet.</div>')+'</div></div>'+
+      (data.finIncome.length?data.finIncome.map(iRow).join('')+
+        '<div class="fin-total-row fin-has-hdr-total"><span class="fin-total-lbl">Total</span><span></span><span class="fin-tbl-amt inc">'+fmtAmt(data.finIncome.reduce(function(s,i){return s+(parseFloat(i.amountLow)||0);},0),data.finIncome.reduce(function(s,i){return s+(parseFloat(i.amountHigh)||parseFloat(i.amountLow)||0);},0))+'</span><span></span></div>'
+      :'<div class="fin-empty">No income streams yet.</div>')+'</div></div>'+
     '<div class="fin-section"><div class="fin-section-header"><h3>Bonuses &amp; Irregular Income</h3><button class="btn-primary" style="font-size:13px;padding:6px 13px" onclick="openAddFinBon()">+ Add</button></div>'+
       '<div class="fin-tbl-wrap fin-has-hdr"><div class="fin-tbl-hdr"><span>Source</span><span>Status</span><span>Amount</span><span></span></div>'+
-      (data.finBonuses.length?data.finBonuses.map(bRow).join(''):'<div class="fin-empty">No bonuses logged yet.</div>')+'</div></div>'+
+      (data.finBonuses.length?data.finBonuses.map(bRow).join('')+
+        '<div class="fin-total-row fin-has-hdr-total"><span class="fin-total-lbl">Total</span><span></span><span class="fin-tbl-amt inc">'+fmtAmt(data.finBonuses.reduce(function(s,i){return s+(parseFloat(i.amountLow)||0);},0),data.finBonuses.reduce(function(s,i){return s+(parseFloat(i.amountHigh)||parseFloat(i.amountLow)||0);},0))+'</span><span></span></div>'
+      :'<div class="fin-empty">No bonuses logged yet.</div>')+'</div></div>'+
     '<div class="fin-section"><div class="fin-section-header"><h3>Amazon Points</h3></div>'+
       '<div style="padding:16px 18px">'+
         '<div class="fin-pts-row"><span class="fin-pts-lbl">Balance</span>'+
@@ -1353,7 +1359,20 @@ function renderFinWishlist() {
       (items.length?'<div class="fin-wish-hdr"><span>#</span><span>Item</span><span>Cost</span><span>Points</span><span>ETA</span><span>Actions</span></div>':'')+
       rows+'</div>';
   }).join('')+
-  (freeMo>0?'<div class="fin-info-box">Free cash/month (conservative): <strong>$'+fmtDollar(freeMo)+'</strong> — used for ETA calculations</div>':'');
+  (freeMo>0?'<div class="fin-info-box">Free cash/month (conservative): <strong>$'+fmtDollar(freeMo)+'</strong> — used for ETA calculations</div>':'')+
+  (function(){
+    var grandTotal=data.finWishlist.reduce(function(s,w){return s+(parseFloat(w.cost)||0);},0);
+    var incTotal=data.finWishlist.filter(function(w){return w.tier==='really-want';}).reduce(function(s,w){return s+(parseFloat(w.cost)||0);},0);
+    var wantTotal=data.finWishlist.filter(function(w){return w.tier==='want';}).reduce(function(s,w){return s+(parseFloat(w.cost)||0);},0);
+    var cwTotal=data.finWishlist.filter(function(w){return w.tier==='can-wait';}).reduce(function(s,w){return s+(parseFloat(w.cost)||0);},0);
+    return grandTotal>0?
+      '<div class="fin-wish-grand-total">'+
+        '<span>Really Want: <strong>$'+fmtDollar(incTotal)+'</strong></span>'+
+        '<span>Want: <strong>$'+fmtDollar(wantTotal)+'</strong></span>'+
+        '<span>Can Wait: <strong>$'+fmtDollar(cwTotal)+'</strong></span>'+
+        '<span class="fin-wish-gt-lbl">Grand Total: <strong>$'+fmtDollar(grandTotal)+'</strong></span>'+
+      '</div>':'';
+  })();
 }
 
 // ============================================================
