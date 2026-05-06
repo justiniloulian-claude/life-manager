@@ -627,6 +627,47 @@
   </div>
 </div>
 
+<!-- Move Task to Day Modal -->
+<div id="moveDayModal" class="modal">
+  <div class="modal-box" style="max-width:400px">
+    <div class="modal-header">
+      <h2>Move Task To…</h2>
+      <button class="modal-close" id="closeMoveDayModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="moveDayGrid" class="move-day-grid"></div>
+      <div style="margin-top:14px;border-top:1px solid #f0f0f0;padding-top:12px">
+        <label class="field-label">Or pick any date</label>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <input type="date" id="moveDayCustomPicker" class="field" style="flex:1">
+          <button id="moveDayPickerBtn" class="btn-primary">Move</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Task Notes Link Modal -->
+<div id="taskNotesLinkModal" class="modal">
+  <div class="modal-box" style="max-width:500px">
+    <div class="modal-header">
+      <h2>Linked Notes</h2>
+      <button class="modal-close" id="closeTaskNotesLinkModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="linkedNotesViewer"></div>
+      <div style="margin-top:14px;border-top:1px solid #f0f0f0;padding-top:12px">
+        <div class="field-label" style="margin-bottom:8px">Link / Unlink Notes</div>
+        <div id="notePickerList" style="max-height:280px;overflow-y:auto"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="cancelTaskNotesLink" class="btn-cancel">Cancel</button>
+      <button id="saveTaskNotesLink" class="btn-primary">Save Links</button>
+    </div>
+  </div>
+</div>
+
 <!-- Learning Item Modal -->
 <div id="learningItemModal" class="modal">
   <div class="modal-box" style="max-width:420px">

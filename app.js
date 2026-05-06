@@ -52,6 +52,8 @@ const state = {
   editLearningItemId: null,
   selectedLearningSeder: '',
   dragLearn: null,
+  moveTaskDs: null, moveTaskId: null, moveTaskIsR: false,
+  linkNotesTaskDs: null, linkNotesTaskId: null,
   activeFinTab: 'weekly',
   finWeekIdx: 0,
   editFinExpId: null,
@@ -302,13 +304,13 @@ function toggleDone(ds,id,isRoutine) {
 function addTask(ds,d) {
   var data=getData();
   if (!data.tasks[ds]) data.tasks[ds]=[];
-  data.tasks[ds].push({id:uid(),type:'once',title:d.title,time:d.time||'',location:d.location||'',notes:d.notes||'',reminder:d.reminder||'',color:d.color||'',priority:d.priority||'standard',done:false,createdAt:new Date().toISOString()});
+  data.tasks[ds].push({id:uid(),type:'once',title:d.title,time:d.time||'',location:d.location||'',notes:d.notes||'',reminder:d.reminder||'',color:d.color||'',priority:d.priority||'standard',linkedNoteIds:d.linkedNoteIds||[],done:false,createdAt:new Date().toISOString()});
   saveT(data.tasks);
 }
 function updateTask(ds,id,d) {
   var data=getData();
   var t=(data.tasks[ds]||[]).find(function(t){return t.id===id;});
-  if (t){t.title=d.title;t.time=d.time||'';t.location=d.location||'';t.notes=d.notes||'';t.reminder=d.reminder||'';t.color=d.color||'';t.priority=d.priority||'standard';}
+  if (t){t.title=d.title;t.time=d.time||'';t.location=d.location||'';t.notes=d.notes||'';t.reminder=d.reminder||'';t.color=d.color||'';t.priority=d.priority||'standard';if(d.linkedNoteIds!==undefined)t.linkedNoteIds=d.linkedNoteIds;}
   saveT(data.tasks);
 }
 function deleteTask(ds,id) {
@@ -627,22 +629,28 @@ function taskHTML(task, ds, noActions) {
   var priorityCls = isR ? '' : ('task-p-'+(task.priority||'standard'));
   var tb = task.time     ? '<span class="badge badge-time">'+fmt12(task.time)+'</span>'       : '';
   var lb = task.location ? '<span class="badge badge-loc">'+escHtml(task.location)+'</span>'  : '';
-  var hasNotes = !isR && task.notes && task.notes.trim();
-  var notesBadge = hasNotes ? '<span class="task-notes-indicator" title="Has notes">📝</span>' : '';
+  var hasTaskNotes = !isR && task.notes && task.notes.trim();
+  var linkedCount = (!isR && task.linkedNoteIds && task.linkedNoteIds.length) ? task.linkedNoteIds.length : 0;
+  var notesDot = hasTaskNotes ? '<span class="task-has-notes" title="Has notes"></span>' : '';
   var actionsHTML = '';
   if (!noActions) {
     var eb = isR
       ? '<button class="btn-icon" onclick="openRoutineOverride(\''+ds+'\',\''+task.id+'\')">✏️</button>'
       : '<button class="btn-icon" onclick="openEditTask(\''+ds+'\',\''+task.id+'\')">✏️</button>';
-    var db = !isR ? '<button class="btn-icon" onclick="removeTask(\''+ds+'\',\''+task.id+'\')">🗑</button>' : '';
-    var nb = hasNotes ? '<button class="btn-icon task-notes-btn" onclick="toggleTaskNotes(this)" title="View notes">📋</button>' : '';
-    actionsHTML = '<div class="task-actions">'+nb+eb+db+'</div>';
+    // Trash: routine = skip today, regular = delete
+    var db = isR
+      ? '<button class="btn-icon" onclick="skipRoutineDay(\''+ds+'\',\''+task.id+'\')" title="Skip today">🗑</button>'
+      : '<button class="btn-icon" onclick="removeTask(\''+ds+'\',\''+task.id+'\')">🗑</button>';
+    var moveBtn = '<button class="btn-icon task-move-btn" onclick="openMoveTaskModal(\''+ds+'\',\''+task.id+'\','+isR+')" title="Move to another day">→</button>';
+    var nb = hasTaskNotes ? '<button class="btn-icon task-notes-btn" onclick="toggleTaskNotes(this)" title="View notes">📋</button>' : '';
+    var linkBtn = !isR ? '<button class="btn-icon task-link-btn'+(linkedCount?' has-links':'')+'" onclick="openTaskNotesLink(\''+ds+'\',\''+task.id+'\')" title="'+(linkedCount?linkedCount+' linked note'+(linkedCount>1?'s':''):'Link notes')+'">📎'+(linkedCount?'<span class="link-count">'+linkedCount+'</span>':'')+'</button>' : '';
+    actionsHTML = '<div class="task-actions">'+linkBtn+nb+eb+db+moveBtn+'</div>';
   }
-  var notesPanel = (!noActions && hasNotes)
+  var notesPanel = (!noActions && hasTaskNotes)
     ? '<div class="task-notes-panel" style="display:none">'+escHtml(task.notes)+'</div>' : '';
   return '<div class="task-item '+itemCls+(task.done?' is-done':'')+'" id="ti-'+task.id+'">' +
     '<input type="checkbox" class="task-check"'+(task.done?' checked':'')+' onchange="checkTask(\''+ds+'\',\''+task.id+'\','+isR+')">' +
-    '<div class="task-body"><div class="task-title '+priorityCls+'">'+escHtml(task.title)+notesBadge+'</div>' +
+    '<div class="task-body"><div class="task-title '+priorityCls+'">'+escHtml(task.title)+notesDot+'</div>' +
     '<div class="task-meta">'+tb+lb+'</div>'+notesPanel+'</div>' +
     actionsHTML+'</div>';
 }
@@ -689,7 +697,8 @@ function dayCardHTML(date, compact) {
 function renderSingle() {
   var date=dateFromOffset(state.dayOffset);
   var ds=toDateStr(date);
-  document.getElementById('singleDayContainer').innerHTML=dayCardHTML(date,false);
+  var banner=state.dayOffset===0?renderCarryOverBanner():'';
+  document.getElementById('singleDayContainer').innerHTML=banner+dayCardHTML(date,false);
   loadZstrip(ds);
   loadHebrewDate(ds);
   document.getElementById('backToTodayBtn').style.display=state.dayOffset===0?'none':'';
@@ -1682,11 +1691,104 @@ window.folderDrop = function(e) {
 };
 
 // ============================================================
+// CARRY OVER BANNER — yesterday's unfinished tasks
+// ============================================================
+function renderCarryOverBanner() {
+  var todayDs = toDateStr(dateFromOffset(0));
+  var yesterDs = toDateStr(dateFromOffset(-1));
+  var tasks = getTasksForDate(yesterDs).filter(function(t){ return !t.done && t.type !== 'routine'; });
+  if (!tasks.length) return '';
+  var rows = tasks.map(function(t){
+    return '<div class="co-item">' +
+      '<span class="co-item-title">'+escHtml(t.title)+'</span>' +
+      '<div class="co-item-btns">' +
+        '<button class="co-btn co-today" onclick="executeMoveTask(\''+yesterDs+'\',\''+t.id+'\',false,\''+todayDs+'\')">→ Today</button>' +
+        '<button class="co-btn co-other" onclick="openMoveTaskModal(\''+yesterDs+'\',\''+t.id+'\',false)">→ Other day</button>' +
+        '<button class="co-btn co-done" onclick="markCarryOverDone(\''+yesterDs+'\',\''+t.id+'\')">✓ Done</button>' +
+      '</div></div>';
+  }).join('');
+  return '<div class="co-banner">' +
+    '<div class="co-banner-hdr">📋 '+tasks.length+' unfinished from yesterday</div>' +
+    rows + '</div>';
+}
+
+// ============================================================
 // GLOBAL CALLBACKS
 // ============================================================
 window.checkTask = function(ds,id,isR){ toggleDone(ds,id,isR); refresh(); refreshDashDayModal(); };
 window.removeTask = function(ds,id){ if(confirm('Delete this task?')){ deleteTask(ds,id); refresh(); refreshDashDayModal(); } };
+window.markCarryOverDone = function(ds,id){ toggleDone(ds,id,false); refresh(); };
+window.skipRoutineDay = function(ds, routineId) {
+  var data=getData(); var key=ds+'_'+routineId;
+  data.routineOverrides[key]=data.routineOverrides[key]||{};
+  data.routineOverrides[key].skipped=true;
+  saveRO(data.routineOverrides); refresh(); refreshDashDayModal();
+};
+window.executeMoveTask = function(fromDs, id, isR, toDs) {
+  if (fromDs===toDs) { closeModal('moveDayModal'); return; }
+  var data=getData();
+  if (isR) {
+    var r=data.routine.find(function(r){return r.id===id;}); if(!r)return;
+    var key=fromDs+'_'+id;
+    data.routineOverrides[key]=data.routineOverrides[key]||{};
+    data.routineOverrides[key].skipped=true; saveRO(data.routineOverrides);
+    addTask(toDs,{title:r.title,time:r.time||'',location:r.location||''});
+  } else {
+    var t=(data.tasks[fromDs]||[]).find(function(t){return t.id===id;}); if(!t)return;
+    addTask(toDs,{title:t.title,time:t.time,location:t.location,notes:t.notes,color:t.color,priority:t.priority,linkedNoteIds:t.linkedNoteIds||[]});
+    deleteTask(fromDs,id);
+  }
+  closeModal('moveDayModal'); refresh(); refreshDashDayModal();
+};
+window.openMoveTaskModal = function(ds, id, isR) {
+  state.moveTaskDs=ds; state.moveTaskId=id; state.moveTaskIsR=isR;
+  var today=dateFromOffset(0); var grid=document.getElementById('moveDayGrid');
+  if (!grid) return;
+  var days=[]; for(var i=0;i<14;i++) days.push(dateFromOffset(i));
+  grid.innerHTML=days.map(function(d){
+    var dds=toDateStr(d);
+    var isT=dds===toDateStr(today);
+    return '<button class="move-day-btn'+(isT?' move-day-today':'')+'" onclick="executeMoveTask(\''+ds+'\',\''+id+'\','+isR+',\''+dds+'\')">'+
+      '<span class="mdb-day">'+d.toLocaleDateString('en-US',{weekday:'short'})+'</span>'+
+      '<span class="mdb-date">'+d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</span>'+
+    '</button>';
+  }).join('');
+  openModal('moveDayModal');
+};
 
+window.openTaskNotesLink = function(ds, taskId) {
+  state.linkNotesTaskDs=ds; state.linkNotesTaskId=taskId;
+  var data=getData();
+  var task=(data.tasks[ds]||[]).find(function(t){return t.id===taskId;}); if(!task)return;
+  var linked=task.linkedNoteIds||[];
+  var allNotes=data.notes.filter(function(n){return !n.deleted&&!n.archived;});
+  var viewer=document.getElementById('linkedNotesViewer');
+  var picker=document.getElementById('notePickerList');
+  if (linked.length) {
+    var lnotes=linked.map(function(nid){return allNotes.find(function(n){return n.id===nid;});}).filter(Boolean);
+    viewer.innerHTML='<div class="lnv-hdr">Linked Notes</div>'+lnotes.map(function(n){
+      return '<div class="lnv-item"><div class="lnv-title">'+(n.title||'Untitled')+'</div>'+
+        (n.content?'<div class="lnv-body">'+escHtml(n.content.slice(0,200))+(n.content.length>200?'…':'')+'</div>':'')+
+      '</div>';
+    }).join('');
+  } else {
+    viewer.innerHTML='<div style="color:#aaa;font-size:13px;margin-bottom:12px">No notes linked yet.</div>';
+  }
+  picker.innerHTML=allNotes.length?allNotes.map(function(n){
+    var checked=linked.includes(n.id);
+    return '<label class="note-pick-row"><input type="checkbox" class="note-pick-chk" data-nid="'+n.id+'"'+(checked?' checked':'')+'><span class="note-pick-title">'+(n.title||'Untitled')+'</span>'+
+      (n.content?'<span class="note-pick-preview">'+escHtml(n.content.slice(0,60))+'</span>':'')+
+    '</label>';
+  }).join(''):'<div style="color:#aaa;font-size:13px">No notes found.</div>';
+  openModal('taskNotesLinkModal');
+};
+window.saveTaskNotesLink = function() {
+  var data=getData();
+  var task=(data.tasks[state.linkNotesTaskDs]||[]).find(function(t){return t.id===state.linkNotesTaskId;}); if(!task)return;
+  var checked=[]; document.querySelectorAll('#notePickerList .note-pick-chk:checked').forEach(function(el){checked.push(el.dataset.nid);});
+  task.linkedNoteIds=checked; saveT(data.tasks);
+  closeModal('taskNotesLinkModal'); refresh(); refreshDashDayModal();
+};
 window.toggleTaskNotes = function(btn) {
   var item=btn.closest('.task-item');
   var panel=item.querySelector('.task-notes-panel');
@@ -2371,6 +2473,18 @@ function initListeners() {
 
   // Dash day modal
   document.getElementById('closeDashDayModal').addEventListener('click', function(){ state.dashDayModalDs=null; closeModal('dashDayModal'); });
+
+  // Move day modal
+  document.getElementById('closeMoveDayModal').addEventListener('click', function(){ closeModal('moveDayModal'); });
+  document.getElementById('moveDayPickerBtn').addEventListener('click', function(){
+    var v=document.getElementById('moveDayCustomPicker').value; if(!v)return;
+    executeMoveTask(state.moveTaskDs, state.moveTaskId, state.moveTaskIsR, v);
+  });
+
+  // Task notes link modal
+  document.getElementById('closeTaskNotesLinkModal').addEventListener('click', function(){ closeModal('taskNotesLinkModal'); });
+  document.getElementById('cancelTaskNotesLink').addEventListener('click',     function(){ closeModal('taskNotesLinkModal'); });
+  document.getElementById('saveTaskNotesLink').addEventListener('click', saveTaskNotesLink);
 
   // Task modal
   document.getElementById('closeTaskModal').addEventListener('click', function(){ closeModal('taskModal'); });
