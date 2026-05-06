@@ -288,6 +288,12 @@ body {
 .task-item.tc-teal     { background: #ccfbf1; border-left-color: #14b8a6; }
 .task-item.tc-green    { background: #d1fae5; border-left-color: #10b981; }
 .task-item.tc-stone    { background: #f3f4f6; border-left-color: #9ca3af; }
+.task-item.tc-sage    { background: #d4e6d4; border-left-color: #6aab6a; }
+.task-item.tc-mint    { background: #c8f5e0; border-left-color: #34d399; }
+.task-item.tc-mauve   { background: #e8d5e8; border-left-color: #b07ab0; }
+.task-item.tc-rose    { background: #ffd6dd; border-left-color: #f87171; }
+.task-item.tc-cream   { background: #fef6e4; border-left-color: #d4a257; }
+.task-item.tc-indigo  { background: #dce3f8; border-left-color: #6c82d4; }
 
 .task-check {
   width: 17px; height: 17px; flex-shrink: 0; margin-top: 2px;
@@ -653,6 +659,12 @@ textarea.field { resize: vertical; }
 .cc-teal     { background: #ccfbf1; color: #134e4a; }
 .cc-green    { background: #d1fae5; color: #065f46; }
 .cc-stone    { background: #f3f4f6; color: #374151; }
+.cc-sage     { background: #d4e6d4; color: #2d5a2d; }
+.cc-mint     { background: #c8f5e0; color: #065f46; }
+.cc-mauve    { background: #e8d5e8; color: #6b2d6b; }
+.cc-rose     { background: #ffd6dd; color: #9b1d3a; }
+.cc-cream    { background: #fef6e4; color: #7c5a1e; }
+.cc-indigo   { background: #dce3f8; color: #2d3f8f; }
 
 /* ===== NOTES ===== */
 .notes-toolbar {
@@ -741,7 +753,8 @@ textarea.field { resize: vertical; }
 .note-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.1); transform: translateY(-1px); }
 .note-card.is-pinned { border-top: 2px solid #f59e0b; }
 .note-card-title   { font-size: 14px; font-weight: 600; margin-bottom: 6px; word-break: break-word; }
-.note-card-content { font-size: 13px; color: #555; line-height: 1.5; word-break: break-word; max-height: 200px; overflow: hidden; white-space: pre-wrap; }
+.note-card-content { font-size: 13px; color: #555; line-height: 1.5; word-break: break-word; max-height: 340px; overflow: hidden; white-space: pre-wrap; }
+.note-card-date { font-size: 11px; color: #bbb; margin-bottom: 5px; }
 .note-card-actions { display: flex; gap: 4px; margin-top: 10px; opacity: 0; transition: opacity 0.15s; }
 .note-card:hover .note-card-actions { opacity: 1; }
 .note-pin-flag { position: absolute; top: 8px; right: 10px; font-size: 12px; opacity: 0.5; }
@@ -761,6 +774,12 @@ textarea.field { resize: vertical; }
 .nc-teal     { background: #ccfbf1; border-color: #99f6e4; }
 .nc-green    { background: #d1fae5; border-color: #a7f3d0; }
 .nc-stone    { background: #f3f4f6; border-color: #e5e7eb; }
+.nc-sage     { background: #d4e6d4; border-color: #b5d4b5; }
+.nc-mint     { background: #c8f5e0; border-color: #99f6e4; }
+.nc-mauve    { background: #e8d5e8; border-color: #d4b0d4; }
+.nc-rose     { background: #ffd6dd; border-color: #ffaabb; }
+.nc-cream    { background: #fef6e4; border-color: #f8e0b0; }
+.nc-indigo   { background: #dce3f8; border-color: #b8c8f0; }
 
 .notes-empty { text-align: center; padding: 60px 20px; color: #ccc; }
 .notes-empty-icon { font-size: 40px; margin-bottom: 12px; }
@@ -1698,6 +1717,12 @@ textarea.field { resize: vertical; }
 .note-view-box.nc-teal     { background: #ccfbf1; }
 .note-view-box.nc-green    { background: #d1fae5; }
 .note-view-box.nc-stone    { background: #f3f4f6; }
+.note-view-box.nc-sage     { background: #d4e6d4; }
+.note-view-box.nc-mint     { background: #c8f5e0; }
+.note-view-box.nc-mauve    { background: #e8d5e8; }
+.note-view-box.nc-rose     { background: #ffd6dd; }
+.note-view-box.nc-cream    { background: #fef6e4; }
+.note-view-box.nc-indigo   { background: #dce3f8; }
 
 .note-view-header {
   display: flex;
@@ -2035,7 +2060,34 @@ textarea.field { resize: vertical; }
   .fin-section-full { grid-column: 1; }
 }
 /* ===== RECENTLY DELETED ===== */
-.sidebar-item.trash { color: #ef4444 !important; }
+.sidebar-item.trash { color: #aaa; }
+.sidebar-item.trash:hover { color: #888; }
+
+/* Folder tree — toggle, lock, indented children */
+.folder-toggle-btn {
+  font-size: 10px; color: #bbb; cursor: pointer; margin-right: 4px;
+  flex-shrink: 0; user-select: none; line-height: 1;
+}
+.folder-toggle-btn:hover { color: #555; }
+.folder-toggle-placeholder { display: inline-block; width: 14px; flex-shrink: 0; }
+.folder-lock-icon { font-size: 11px; margin-left: 3px; opacity: 0.6; }
+
+/* Folder checkbox list in note modal */
+.folder-checkbox-list {
+  max-height: 160px;
+  overflow-y: auto;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 4px 0;
+  background: #fafaf8;
+}
+.folder-pick-row {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 10px; cursor: pointer; font-size: 13px;
+  transition: background 0.1s;
+}
+.folder-pick-row:hover { background: #f0f0ec; }
+.folder-pick-row input[type="checkbox"] { flex-shrink: 0; cursor: pointer; }
 .note-card.is-deleted { opacity: 0.8; }
 .note-deleted-info { font-size: 11px; color: #bbb; margin-top: 6px; }
 .note-restore-actions { display: flex; gap: 6px; margin-top: 8px; }

@@ -524,8 +524,8 @@
           </div>
         </div>
         <div style="flex:1;min-width:140px">
-          <label class="field-label">Folder <span class="optional">optional</span></label>
-          <select id="noteFolderSelect" class="field" style="margin-bottom:0;margin-top:4px"></select>
+          <label class="field-label">Folders <span class="optional">optional — pick one or more</span></label>
+          <div id="noteFolderSelect" class="folder-checkbox-list" style="margin-top:4px"></div>
         </div>
       </div>
       <label class="field-label" style="margin-top:14px">Color</label>
@@ -558,12 +558,32 @@
           <option value="">None (top-level)</option>
         </select>
       </div>
+      <label class="field-label">Password <span class="optional">optional — locks this folder</span></label>
+      <input type="password" id="folderPasswordField" class="field" placeholder="Leave blank for no lock">
       <label class="field-label">Label color <span class="optional">optional</span></label>
       <div class="color-picker" id="folderColorPicker"></div>
     </div>
     <div class="modal-footer">
       <button id="cancelFolder" class="btn-cancel">Cancel</button>
       <button id="saveFolder"   class="btn-primary">Create Folder</button>
+    </div>
+  </div>
+</div>
+
+<!-- Folder Password Modal -->
+<div id="folderPasswordModal" class="modal">
+  <div class="modal-box" style="max-width:320px">
+    <div class="modal-header">
+      <h2>🔒 Folder Locked</h2>
+    </div>
+    <div class="modal-body">
+      <p id="folderPasswordLabel" style="font-size:14px;color:#555;margin-bottom:12px">Enter password to open this folder.</p>
+      <input type="password" id="folderPasswordInput" class="field" placeholder="Password">
+      <div id="folderPasswordError" class="field-error" style="display:none">Wrong password. Try again.</div>
+    </div>
+    <div class="modal-footer">
+      <button id="cancelFolderPassword" class="btn-cancel">Cancel</button>
+      <button id="confirmFolderPassword" class="btn-primary">Unlock</button>
     </div>
   </div>
 </div>
