@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=17">
+  <link rel="stylesheet" href="style.css?v=18">
 </head>
 <body>
 
@@ -99,64 +99,142 @@
 
   <!-- Cheshbon View -->
   <div id="cheshbonView" class="view">
-    <div class="cheshbon-layout">
 
-      <!-- LEFT: Daily Reflection -->
-      <div class="cheshbon-panel">
-        <div class="cheshbon-panel-header">
-          <h2 class="cheshbon-panel-title">Daily Reflection</h2>
-          <div style="display:flex;gap:8px;flex-shrink:0">
-            <button id="reflHistoryBtn" class="btn-secondary" style="font-size:12px;padding:6px 12px">📖 History</button>
-            <button id="reflRefreshBtn" class="btn-primary"   style="font-size:12px;padding:6px 12px">↺ New Entry</button>
-          </div>
-        </div>
-
-        <div class="cheshbon-section">
-          <div class="cheshbon-section-title">Gratitude</div>
-          <div id="gratitudeList"></div>
-        </div>
-
-        <div class="cheshbon-section">
-          <div class="cheshbon-section-title">Ayin Tov</div>
-          <div id="ayinTovList"></div>
-        </div>
-
-        <div class="cheshbon-section">
-          <div class="cheshbon-section-title">What did I learn today?</div>
-          <textarea id="learnedToday" class="field" rows="3" placeholder="Write 1–3 lines..." oninput="autoSaveLearned()" style="margin-bottom:0"></textarea>
-        </div>
-
-        <div class="cheshbon-section" style="border-bottom:none">
-          <div class="cheshbon-section-title">How do I feel?</div>
-          <textarea id="feelingToday" class="field" rows="3" placeholder="Write freely..." oninput="autoSaveFeeling()" style="margin-bottom:0"></textarea>
-        </div>
-      </div>
-
-      <!-- RIGHT: Cheshbon HaNefesh -->
-      <div class="cheshbon-panel">
-        <div class="cheshbon-panel-header">
-          <h2 class="cheshbon-panel-title">Cheshbon HaNefesh</h2>
-          <div style="display:flex;gap:8px;flex-shrink:0">
-            <button id="cheshbonWeekHistBtn" class="btn-secondary" style="font-size:12px;padding:6px 12px">📖 Past Weeks</button>
-            <button id="newWeekBtn"          class="btn-primary"   style="font-size:12px;padding:6px 12px">↺ New Week</button>
-          </div>
-        </div>
-
-        <!-- Day column headers -->
-        <div class="cheshbon-days-header">
-          <div class="cheshbon-col-item"></div>
-          <div class="cheshbon-col-days">
-            <span>Mon</span><span>Tue</span><span>Wed</span>
-            <span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
-          </div>
-          <div class="cheshbon-col-actions"></div>
-        </div>
-
-        <div id="cheshbonItemsList"></div>
-        <button id="addCheshbonItemBtn" class="add-task-row">+ Add Item</button>
-      </div>
-
+    <!-- Sub-tab nav -->
+    <div class="chesh-subnav">
+      <button class="chesh-tab active" onclick="setCheshTab('daily')">Daily</button>
+      <button class="chesh-tab" onclick="setCheshTab('weekly')">Weekly</button>
+      <button class="chesh-tab" onclick="setCheshTab('monthly')">Monthly</button>
     </div>
+
+    <!-- ===== DAILY PANEL ===== -->
+    <div id="chesh-panel-daily">
+      <div class="cheshbon-layout">
+
+        <!-- LEFT: Daily Reflection -->
+        <div class="cheshbon-panel">
+          <div class="cheshbon-panel-header">
+            <h2 class="cheshbon-panel-title">Daily Reflection</h2>
+            <div style="display:flex;gap:8px;flex-shrink:0">
+              <button id="reflHistoryBtn" class="btn-secondary" style="font-size:12px;padding:6px 12px">📖 History</button>
+              <button id="reflRefreshBtn" class="btn-primary"   style="font-size:12px;padding:6px 12px">↺ New Entry</button>
+            </div>
+          </div>
+
+          <div class="cheshbon-section">
+            <div class="cheshbon-section-title">Gratitude</div>
+            <div id="gratitudeList"></div>
+          </div>
+
+          <div class="cheshbon-section">
+            <div class="cheshbon-section-title">Ayin Tov</div>
+            <div id="ayinTovList"></div>
+          </div>
+
+          <div class="cheshbon-section">
+            <div class="cheshbon-section-title">What did I learn today?</div>
+            <textarea id="learnedToday" class="field" rows="3" placeholder="Write 1–3 lines..." oninput="autoSaveLearned()" style="margin-bottom:0"></textarea>
+          </div>
+
+          <div class="cheshbon-section" style="border-bottom:none">
+            <div class="cheshbon-section-title">How do I feel?</div>
+            <textarea id="feelingToday" class="field" rows="3" placeholder="Write freely..." oninput="autoSaveFeeling()" style="margin-bottom:0"></textarea>
+          </div>
+        </div>
+
+        <!-- RIGHT: Cheshbon HaNefesh -->
+        <div class="cheshbon-panel">
+          <div class="cheshbon-panel-header">
+            <h2 class="cheshbon-panel-title">Cheshbon HaNefesh</h2>
+            <div style="display:flex;gap:8px;flex-shrink:0">
+              <button id="cheshbonWeekHistBtn" class="btn-secondary" style="font-size:12px;padding:6px 12px">📖 Past Weeks</button>
+              <button id="newWeekBtn"          class="btn-primary"   style="font-size:12px;padding:6px 12px">↺ New Week</button>
+            </div>
+          </div>
+
+          <!-- Day column headers -->
+          <div class="cheshbon-days-header">
+            <div class="cheshbon-col-item"></div>
+            <div class="cheshbon-col-days">
+              <span>Mon</span><span>Tue</span><span>Wed</span>
+              <span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+            </div>
+            <div class="cheshbon-col-actions"></div>
+          </div>
+
+          <div id="cheshbonItemsList"></div>
+          <button id="addCheshbonItemBtn" class="add-task-row">+ Add Item</button>
+        </div>
+
+      </div>
+
+      <!-- Free Reflection Section -->
+      <div class="free-refl-block">
+        <div class="free-refl-hdr">Free Reflection</div>
+        <input type="text" id="freeReflTitle" class="field" placeholder="Title (optional — defaults to today's date)" style="margin-bottom:10px">
+        <textarea id="freeReflText" class="field" rows="5" placeholder="Write freely..."></textarea>
+        <div style="margin-top:10px;text-align:right">
+          <button class="btn-primary" style="font-size:13px;padding:7px 16px" onclick="storeFreeRefl()">Store Reflection</button>
+        </div>
+        <div class="hist-section">
+          <div class="hist-section-hdr">
+            <span>History</span>
+            <input type="text" id="freeReflSearch" class="hist-search" placeholder="Search..." oninput="renderFreeReflHist()">
+          </div>
+          <div id="freeReflHistList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== WEEKLY PANEL ===== -->
+    <div id="chesh-panel-weekly" style="display:none">
+      <div id="weeklyTabContent"></div>
+    </div>
+
+    <!-- ===== MONTHLY PANEL ===== -->
+    <div id="chesh-panel-monthly" style="display:none">
+      <div class="monthly-cols">
+
+        <!-- LEFT: Jewish Month -->
+        <div class="monthly-col">
+          <div class="monthly-col-title">Jewish Month</div>
+          <input type="text" id="jewishMonthInput" class="field" placeholder="e.g. Nissan 5786" oninput="saveJewishDraft()">
+          <div class="record-controls">
+            <button id="btnStartRecord" class="btn-record" onclick="startRecording()">⏺ Record</button>
+            <button id="btnStopRecord" class="btn-record-stop" onclick="stopRecording()" style="display:none">⏹ Stop</button>
+            <span id="recordTimer" class="record-timer" style="display:none">0:00</span>
+          </div>
+          <div id="audioPlayback" style="margin-bottom:10px"></div>
+          <button class="btn-primary" style="font-size:13px;padding:7px 16px" onclick="storeJewishMonth()">Store Entry</button>
+          <div class="hist-section">
+            <div class="hist-section-hdr">
+              <span>History</span>
+              <input type="text" id="jewishHistSearch" class="hist-search" placeholder="Search..." oninput="renderJewishHist()">
+            </div>
+            <div id="jewishHistList"></div>
+          </div>
+        </div>
+
+        <!-- RIGHT: Secular Month -->
+        <div class="monthly-col">
+          <div class="monthly-col-title">Secular Month</div>
+          <input type="text" id="secularMonthInput" class="field" placeholder="e.g. May 2026" oninput="saveSecularDraft()">
+          <textarea id="secularMonthText" class="field" rows="5" placeholder="Monthly recap..." oninput="saveSecularDraft()" style="margin-top:10px"></textarea>
+          <div style="margin-top:10px;text-align:right">
+            <button class="btn-primary" style="font-size:13px;padding:7px 16px" onclick="storeSecularMonth()">Store Reflection</button>
+          </div>
+          <div class="hist-section">
+            <div class="hist-section-hdr">
+              <span>History</span>
+              <input type="text" id="secularHistSearch" class="hist-search" placeholder="Search..." oninput="renderSecularHist()">
+            </div>
+            <div id="secularHistList"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
   </div>
 
   <!-- Physical Health View -->
@@ -925,6 +1003,24 @@
   </div>
 </div>
 
+<!-- Weekly Item Modal -->
+<div id="weeklyItemModal" class="modal">
+  <div class="modal-box" style="max-width:400px">
+    <div class="modal-header">
+      <h2 id="weeklyItemModalTitle">Add Weekly Item</h2>
+      <button class="modal-close" id="closeWeeklyItemModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Item text</label>
+      <input type="text" id="weeklyItemText" class="field" placeholder="e.g. Did I exercise?">
+    </div>
+    <div class="modal-footer">
+      <button id="cancelWeeklyItem" class="btn-cancel">Cancel</button>
+      <button id="saveWeeklyItem" class="btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Cheshbon Item Modal -->
 <div id="cheshbonItemModal" class="modal">
   <div class="modal-box" style="max-width:400px">
@@ -1023,6 +1119,6 @@
   </div>
 </div>
 
-<script src="app.js?v=17"></script>
+<script src="app.js?v=18"></script>
 </body>
 </html>

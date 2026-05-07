@@ -2163,3 +2163,57 @@ textarea.field { resize: vertical; }
   .learning-grid  { grid-template-columns: repeat(7, minmax(130px, 1fr)); }
   .dash-subnav    { padding: 8px 10px; }
 }
+
+/* ===== CHESHBON SUB-TABS ===== */
+.chesh-subnav { display:flex; gap:6px; margin-bottom:20px; border-bottom:2px solid #f0f0f0; padding-bottom:12px; }
+.chesh-tab { padding:8px 20px; border:none; border-radius:8px; background:#f4f4f0; color:#666; font-size:14px; font-weight:500; cursor:pointer; font-family:inherit; transition:all 0.15s; }
+.chesh-tab.active { background:#1a1a1a; color:#fff; }
+.chesh-tab:hover:not(.active) { background:#e8e8e4; }
+
+/* ===== FREE REFLECTION SECTION ===== */
+.free-refl-block { margin-top:28px; padding:20px; background:#fff; border:1px solid #e8e8e8; border-radius:12px; }
+.free-refl-hdr { font-size:16px; font-weight:600; margin-bottom:14px; }
+.hist-section { margin-top:20px; }
+.hist-section-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; font-size:13px; font-weight:600; color:#666; }
+.hist-search { padding:6px 12px; border:1px solid #e0e0e0; border-radius:20px; font-size:12px; font-family:inherit; outline:none; width:200px; }
+.hist-entry { padding:12px 14px; border:1px solid #f0f0f0; border-radius:8px; margin-bottom:6px; cursor:pointer; }
+.hist-entry:hover { background:#fafaf8; }
+.hist-entry-hdr { display:flex; justify-content:space-between; align-items:center; }
+.hist-entry-date { font-size:12px; color:#aaa; }
+.hist-entry-title { font-weight:500; font-size:14px; }
+.hist-entry-body { font-size:13px; color:#666; margin-top:8px; line-height:1.5; white-space:pre-wrap; display:none; }
+.hist-entry-body.open { display:block; }
+
+/* ===== WEEKLY TAB ===== */
+.weekly-week-banner { font-size:15px; font-weight:600; color:#1a1a1a; margin-bottom:16px; padding:10px 14px; background:#fafaf8; border-radius:8px; border:1px solid #f0f0f0; }
+.weekly-tbl-hdr { display:grid; grid-template-columns:1fr 110px 140px 70px; gap:8px; padding:8px 14px; font-size:11px; font-weight:700; color:#aaa; text-transform:uppercase; letter-spacing:0.05em; border-bottom:2px solid #f0f0f0; }
+.weekly-item-row { display:grid; grid-template-columns:1fr 110px 140px 70px; gap:8px; align-items:center; padding:8px 14px; border-bottom:1px solid #f7f7f7; }
+.weekly-item-row:hover { background:#fafaf8; }
+.weekly-item-text { font-size:14px; color:#1a1a1a; }
+.weekly-score-input { width:60px; padding:4px 8px; border:1px solid #e0e0e0; border-radius:6px; font-size:13px; text-align:center; font-family:inherit; }
+.weekly-score-input:focus { outline:none; border-color:#6c5ce7; }
+
+/* ===== MONTHLY TAB ===== */
+.monthly-cols { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.monthly-col { background:#fff; border:1px solid #e8e8e8; border-radius:12px; padding:20px; }
+.monthly-col-title { font-size:16px; font-weight:600; margin-bottom:16px; }
+.record-controls { display:flex; align-items:center; gap:10px; margin:12px 0; flex-wrap:wrap; }
+.btn-record { padding:8px 16px; background:#ef4444; color:#fff; border:none; border-radius:8px; cursor:pointer; font-family:inherit; font-size:13px; font-weight:500; }
+.btn-record:hover { background:#dc2626; }
+.btn-record-stop { padding:8px 16px; background:#666; color:#fff; border:none; border-radius:8px; cursor:pointer; font-family:inherit; font-size:13px; }
+.record-timer { font-size:14px; font-weight:600; color:#666; font-variant-numeric:tabular-nums; }
+.jewish-hist-entry { padding:10px 14px; border:1px solid #f0f0f0; border-radius:8px; margin-bottom:6px; }
+.jewish-hist-month { font-weight:500; font-size:13px; }
+.jewish-hist-date { font-size:11px; color:#aaa; }
+
+/* ===== CHESHBON DRAG HANDLE ===== */
+.chi-drag-handle { cursor:grab; color:#ccc; font-size:16px; padding:0 6px 0 0; flex-shrink:0; user-select:none; }
+.chi-drag-handle:hover { color:#999; }
+.cheshbon-item-row { transition:background 0.12s; }
+.cheshbon-item-row.chi-dragging { opacity:0.4; }
+.cheshbon-item-row.chi-drag-over { background:#f0eeff; border-top:2px solid #6c5ce7; }
+
+@media (max-width:700px) {
+  .monthly-cols { grid-template-columns:1fr; }
+  .weekly-tbl-hdr, .weekly-item-row { grid-template-columns:1fr 80px 100px 60px; }
+}

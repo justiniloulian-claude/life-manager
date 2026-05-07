@@ -60,6 +60,8 @@ const state = {
   dragLearn: null,
   moveTaskDs: null, moveTaskId: null, moveTaskIsR: false,
   linkNotesTaskDs: null, linkNotesTaskId: null,
+  activeCheshTab: 'daily',
+  editWeeklyItemId: null,
   activeFinTab: 'weekly',
   finWeekIdx: 0,
   editFinExpId: null,
@@ -126,6 +128,15 @@ function getData() {
     healthWater:           JSON.parse(localStorage.getItem('dm_health_water'))               || {},
     activityPlan:          JSON.parse(localStorage.getItem('dm_activity_plan'))              || {},
     activityDone:          JSON.parse(localStorage.getItem('dm_activity_done'))              || {},
+    weeklyItems:           JSON.parse(localStorage.getItem('dm_weekly_items'))               || [],
+    weeklyScores:          JSON.parse(localStorage.getItem('dm_weekly_scores'))              || {},
+    weeklyHistory:         JSON.parse(localStorage.getItem('dm_weekly_history'))             || [],
+    weeklyLastSunday:      localStorage.getItem('dm_weekly_last_sunday')                     || '',
+    freeReflHistory:       JSON.parse(localStorage.getItem('dm_free_refl_history'))          || [],
+    monthlyJewishHistory:  JSON.parse(localStorage.getItem('dm_monthly_jewish_history'))     || [],
+    monthlySecularHistory: JSON.parse(localStorage.getItem('dm_monthly_secular_history'))    || [],
+    monthlyJewishDraft:    JSON.parse(localStorage.getItem('dm_monthly_jewish_draft'))       || {month:''},
+    monthlySecularDraft:   JSON.parse(localStorage.getItem('dm_monthly_secular_draft'))      || {month:'',text:''},
   };
 }
 function saveT(v)   { localStorage.setItem('dm_tasks',       JSON.stringify(v)); }
@@ -157,7 +168,50 @@ function saveDietPlan(v) { localStorage.setItem('dm_diet_plan', JSON.stringify(v
 function saveHW(v)   { localStorage.setItem('dm_health_water',    JSON.stringify(v)); }
 function saveAP(v)   { localStorage.setItem('dm_activity_plan',   JSON.stringify(v)); }
 function saveAD(v)   { localStorage.setItem('dm_activity_done',   JSON.stringify(v)); }
+function saveWI(v)   { localStorage.setItem('dm_weekly_items',              JSON.stringify(v)); }
+function saveWS(v)   { localStorage.setItem('dm_weekly_scores',             JSON.stringify(v)); }
+function saveWH(v)   { localStorage.setItem('dm_weekly_history',            JSON.stringify(v)); }
+function saveWLS(v)  { localStorage.setItem('dm_weekly_last_sunday',        v); }
+function saveFRH(v)  { localStorage.setItem('dm_free_refl_history',         JSON.stringify(v)); }
+function saveMJH(v)  { localStorage.setItem('dm_monthly_jewish_history',    JSON.stringify(v)); }
+function saveMSH(v)  { localStorage.setItem('dm_monthly_secular_history',   JSON.stringify(v)); }
+function saveMJD(v)  { localStorage.setItem('dm_monthly_jewish_draft',      JSON.stringify(v)); }
+function saveMSD(v)  { localStorage.setItem('dm_monthly_secular_draft',     JSON.stringify(v)); }
 function uid()      { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+// Module-level media recorder state
+var _mediaRecorder=null, _audioChunks=[], _recordTimerInt=null, _recordSecs=0, _currentAudioBlob=null;
+
+// ============================================================
+// INDEXEDDB FOR AUDIO
+// ============================================================
+function openAudioDB() {
+  return new Promise(function(resolve, reject) {
+    var req = indexedDB.open('dm_audio_db', 1);
+    req.onupgradeneeded = function(e) { e.target.result.createObjectStore('recordings'); };
+    req.onsuccess = function(e) { resolve(e.target.result); };
+    req.onerror   = function(e) { reject(e); };
+  });
+}
+function saveAudioBlob(key, blob) {
+  return openAudioDB().then(function(db) {
+    return new Promise(function(resolve, reject) {
+      var tx = db.transaction('recordings', 'readwrite');
+      tx.objectStore('recordings').put(blob, key);
+      tx.oncomplete = resolve; tx.onerror = reject;
+    });
+  });
+}
+function loadAudioBlob(key) {
+  return openAudioDB().then(function(db) {
+    return new Promise(function(resolve, reject) {
+      var tx = db.transaction('recordings', 'readonly');
+      var req = tx.objectStore('recordings').get(key);
+      req.onsuccess = function(e) { resolve(e.target.result || null); };
+      req.onerror   = reject;
+    });
+  });
+}
 
 // ============================================================
 // DATE HELPERS
@@ -806,7 +860,9 @@ function renderCheshbonRight() {
       return '<div class="cheshbon-day-cell"><input type="checkbox"'+(checks[d]?' checked':'')+
         ' onchange="toggleCheshbonCheck(\''+item.id+'\',\''+d+'\')" title="'+CHESHBON_DAY_LABELS[d]+'"></div>';
     }).join('');
-    return '<div class="cheshbon-item-row">'+
+    return '<div class="cheshbon-item-row" draggable="true" data-cid="'+item.id+'"'+
+      ' ondragstart="chiDragStart(event)" ondragover="chiDragOver(event)" ondrop="chiDrop(event)" ondragleave="chiDragLeave(event)" ondragend="chiDragEnd(event)">'+
+      '<span class="chi-drag-handle" title="Drag to reorder">⠿</span>'+
       '<div class="cheshbon-item-text">'+escHtml(item.text)+'</div>'+
       '<div class="cheshbon-item-days">'+dayBoxes+'</div>'+
       '<div class="cheshbon-item-actions">'+
@@ -815,7 +871,403 @@ function renderCheshbonRight() {
       '</div></div>';
   }).join('');
 }
-function renderCheshbon() { renderCheshbonLeft(); renderCheshbonRight(); }
+
+// Drag-and-drop for cheshbon items
+var _chiDrag = { srcId: null };
+window.chiDragStart = function(e) {
+  _chiDrag.srcId = e.currentTarget.dataset.cid;
+  e.currentTarget.classList.add('chi-dragging');
+  e.dataTransfer.effectAllowed = 'move';
+};
+window.chiDragOver = function(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.classList.add('chi-drag-over');
+};
+window.chiDragLeave = function(e) {
+  if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('chi-drag-over');
+};
+window.chiDragEnd = function(e) {
+  e.currentTarget.classList.remove('chi-dragging');
+  document.querySelectorAll('.cheshbon-item-row').forEach(function(r){ r.classList.remove('chi-drag-over'); });
+};
+window.chiDrop = function(e) {
+  e.preventDefault();
+  var tgtId = e.currentTarget.dataset.cid;
+  e.currentTarget.classList.remove('chi-drag-over');
+  if (!_chiDrag.srcId || _chiDrag.srcId === tgtId) return;
+  var data = getData();
+  var arr = data.cheshbonItems;
+  var si = arr.findIndex(function(i){return i.id===_chiDrag.srcId;});
+  var ti = arr.findIndex(function(i){return i.id===tgtId;});
+  if (si === -1 || ti === -1) return;
+  var item = arr.splice(si, 1)[0]; arr.splice(ti, 0, item);
+  saveChi(arr);
+  _chiDrag.srcId = null;
+  renderCheshbonRight();
+};
+function renderCheshbon() {
+  renderCheshbonLeft();
+  renderCheshbonRight();
+  if (state.activeCheshTab === 'weekly')  renderWeeklyTab();
+  if (state.activeCheshTab === 'monthly') renderMonthlyTab();
+}
+
+// ============================================================
+// CHESHBON SUB-TABS
+// ============================================================
+function getSundayStr(date) {
+  var d = date ? new Date(date) : new Date();
+  d.setHours(0,0,0,0);
+  var dow = d.getDay(); // 0=Sun
+  d.setDate(d.getDate() - dow);
+  return toDateStr(d);
+}
+
+function checkWeeklyAutoArchive() {
+  var data = getData();
+  var currentSunday = getSundayStr(new Date());
+  var stored = data.weeklyLastSunday;
+  if (!stored) { saveWLS(currentSunday); return; }
+  if (currentSunday <= stored) return;
+  // New week — archive old data if there are any items with scores
+  if (data.weeklyItems.length) {
+    var oldScores = data.weeklyScores[stored] || {};
+    var archivedItems = data.weeklyItems.map(function(item) {
+      var sc = oldScores[item.id] || {};
+      return { text: item.text, score: sc.score || '', focus: sc.focus || '' };
+    });
+    var oldSunday = fromDateStr(stored);
+    var oldSat = new Date(oldSunday); oldSat.setDate(oldSunday.getDate() + 6);
+    var MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var weekEnd = MON[oldSat.getMonth()]+' '+oldSat.getDate()+', '+oldSat.getFullYear();
+    var weekStart = MON[oldSunday.getMonth()]+' '+oldSunday.getDate();
+    data.weeklyHistory.unshift({
+      id: uid(), weekStart: weekStart, weekEnd: weekEnd,
+      archivedAt: new Date().toISOString(), items: archivedItems
+    });
+    saveWH(data.weeklyHistory);
+  }
+  saveWLS(currentSunday);
+}
+
+function getWeekBannerText() {
+  var sunStr = getSundayStr(new Date());
+  var sun = fromDateStr(sunStr);
+  var sat = new Date(sun); sat.setDate(sun.getDate() + 6);
+  var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  if (sun.getMonth() === sat.getMonth()) {
+    return 'Week of '+MONTHS[sun.getMonth()]+' '+sun.getDate()+' – '+sat.getDate()+', '+sat.getFullYear();
+  }
+  return 'Week of '+MONTHS_SHORT[sun.getMonth()]+' '+sun.getDate()+' – '+MONTHS_SHORT[sat.getMonth()]+' '+sat.getDate()+', '+sat.getFullYear();
+}
+
+function renderWeeklyTab() {
+  checkWeeklyAutoArchive();
+  var data = getData();
+  var sunStr = getSundayStr(new Date());
+  var scores = data.weeklyScores[sunStr] || {};
+  var html = '<div class="weekly-week-banner">' + escHtml(getWeekBannerText()) + '</div>';
+  html += '<div style="margin-bottom:12px"><button class="btn-primary" style="font-size:13px;padding:7px 14px" onclick="openAddWeeklyItem()">+ Add Item</button></div>';
+  if (data.weeklyItems.length) {
+    html += '<div class="weekly-tbl-hdr"><span>Item</span><span>Score (1-10)</span><span>Focus next week (1-10)</span><span>Actions</span></div>';
+    html += data.weeklyItems.map(function(item) {
+      var sc = scores[item.id] || {};
+      return '<div class="weekly-item-row">'+
+        '<div class="weekly-item-text">'+escHtml(item.text)+'</div>'+
+        '<div><input type="number" class="weekly-score-input" min="1" max="10" value="'+escHtml(String(sc.score||''))+'" placeholder="—" onchange="updateWeeklyScore(\''+item.id+'\',\'score\',this.value)"></div>'+
+        '<div><input type="number" class="weekly-score-input" min="1" max="10" value="'+escHtml(String(sc.focus||''))+'" placeholder="—" onchange="updateWeeklyScore(\''+item.id+'\',\'focus\',this.value)"></div>'+
+        '<div style="display:flex;gap:4px">'+
+          '<button class="btn-icon" onclick="openEditWeeklyItem(\''+item.id+'\')">✏️</button>'+
+          '<button class="btn-icon" onclick="removeWeeklyItem(\''+item.id+'\')">🗑</button>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+  } else {
+    html += '<div style="color:#aaa;font-size:14px;padding:12px 0">No weekly items yet. Click "+ Add Item" to get started.</div>';
+  }
+  // History section
+  html += '<div class="hist-section" style="margin-top:28px">'+
+    '<div class="hist-section-hdr"><span>Past Weeks</span>'+
+    '<input type="text" id="weeklyHistSearch" class="hist-search" placeholder="Search..." oninput="renderWeeklyHist()">'+
+    '</div><div id="weeklyHistList"></div></div>';
+  document.getElementById('weeklyTabContent').innerHTML = html;
+  renderWeeklyHist();
+}
+
+function renderWeeklyHist() {
+  var data = getData();
+  var searchEl = document.getElementById('weeklyHistSearch');
+  var q = (searchEl ? searchEl.value : '').toLowerCase();
+  var list = document.getElementById('weeklyHistList'); if (!list) return;
+  var entries = data.weeklyHistory.filter(function(e) {
+    if (!q) return true;
+    var hay = (e.weekStart+' '+e.weekEnd+' '+e.items.map(function(i){return i.text;}).join(' ')).toLowerCase();
+    return hay.includes(q);
+  });
+  if (!entries.length) { list.innerHTML='<div style="color:#aaa;font-size:13px">No past weeks yet.</div>'; return; }
+  list.innerHTML = entries.map(function(e, idx) {
+    return '<div class="hist-entry" onclick="toggleWeeklyHistEntry(this,\''+e.id+'\')">'+
+      '<div class="hist-entry-hdr">'+
+        '<span class="hist-entry-title">Week of '+escHtml(e.weekStart)+' – '+escHtml(e.weekEnd)+'</span>'+
+        '<span class="hist-entry-date">'+new Date(e.archivedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+'</span>'+
+      '</div>'+
+      '<div class="hist-entry-body" id="wh-body-'+escHtml(e.id)+'"></div>'+
+    '</div>';
+  }).join('');
+}
+
+window.toggleWeeklyHistEntry = function(el, entryId) {
+  var body = el.querySelector('.hist-entry-body'); if (!body) return;
+  if (body.classList.contains('open')) { body.classList.remove('open'); return; }
+  var data = getData();
+  var e = data.weeklyHistory.find(function(x){return x.id===entryId;}); if (!e) return;
+  body.innerHTML = '<div style="margin-top:8px">'+
+    '<div style="display:grid;grid-template-columns:1fr 80px 100px;gap:6px;font-size:11px;font-weight:700;color:#aaa;text-transform:uppercase;margin-bottom:4px;padding:0 2px">'+
+    '<span>Item</span><span>Score</span><span>Focus</span></div>'+
+    e.items.map(function(item){
+      return '<div style="display:grid;grid-template-columns:1fr 80px 100px;gap:6px;font-size:13px;padding:4px 2px;border-bottom:1px solid #f5f5f5">'+
+        '<span>'+escHtml(item.text)+'</span>'+
+        '<span style="color:#555">'+(item.score||'—')+'</span>'+
+        '<span style="color:#555">'+(item.focus||'—')+'</span>'+
+      '</div>';
+    }).join('')+
+  '</div>';
+  body.classList.add('open');
+};
+
+window.updateWeeklyScore = function(itemId, field, val) {
+  var data = getData();
+  var sunStr = getSundayStr(new Date());
+  if (!data.weeklyScores[sunStr]) data.weeklyScores[sunStr] = {};
+  if (!data.weeklyScores[sunStr][itemId]) data.weeklyScores[sunStr][itemId] = {};
+  var n = parseInt(val); if (isNaN(n)||n<1) n=''; else if (n>10) n=10;
+  data.weeklyScores[sunStr][itemId][field] = n;
+  saveWS(data.weeklyScores);
+};
+
+window.removeWeeklyItem = function(id) {
+  if (!confirm('Remove this weekly item?')) return;
+  var data = getData();
+  saveWI(data.weeklyItems.filter(function(i){return i.id!==id;}));
+  renderWeeklyTab();
+};
+
+window.openAddWeeklyItem = function() {
+  state.editWeeklyItemId = null;
+  document.getElementById('weeklyItemModalTitle').textContent = 'Add Weekly Item';
+  document.getElementById('weeklyItemText').value = '';
+  openModal('weeklyItemModal');
+  setTimeout(function(){document.getElementById('weeklyItemText').focus();}, 80);
+};
+
+window.openEditWeeklyItem = function(id) {
+  var data = getData();
+  var item = data.weeklyItems.find(function(i){return i.id===id;}); if (!item) return;
+  state.editWeeklyItemId = id;
+  document.getElementById('weeklyItemModalTitle').textContent = 'Edit Weekly Item';
+  document.getElementById('weeklyItemText').value = item.text;
+  openModal('weeklyItemModal');
+  setTimeout(function(){document.getElementById('weeklyItemText').focus();}, 80);
+};
+
+// ============================================================
+// MONTHLY TAB
+// ============================================================
+function renderMonthlyTab() {
+  var data = getData();
+  var jd = data.monthlyJewishDraft;
+  var sd = data.monthlySecularDraft;
+  var ji = document.getElementById('jewishMonthInput');
+  var si = document.getElementById('secularMonthInput');
+  var st = document.getElementById('secularMonthText');
+  if (ji) ji.value = jd.month || '';
+  if (si) si.value = sd.month || '';
+  if (st) st.value = sd.text || '';
+  renderJewishHist();
+  renderSecularHist();
+}
+
+window.saveJewishDraft = function() {
+  var v = (document.getElementById('jewishMonthInput')||{}).value || '';
+  saveMJD({month: v});
+};
+
+window.saveSecularDraft = function() {
+  var m = (document.getElementById('secularMonthInput')||{}).value || '';
+  var t = (document.getElementById('secularMonthText')||{}).value || '';
+  saveMSD({month: m, text: t});
+};
+
+window.startRecording = function() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    alert('Microphone access is not available in this browser.'); return;
+  }
+  navigator.mediaDevices.getUserMedia({audio: true}).then(function(stream) {
+    _audioChunks = []; _recordSecs = 0; _currentAudioBlob = null;
+    _mediaRecorder = new MediaRecorder(stream);
+    _mediaRecorder.addEventListener('dataavailable', function(e) { _audioChunks.push(e.data); });
+    _mediaRecorder.addEventListener('stop', function() {
+      _currentAudioBlob = new Blob(_audioChunks, {type: 'audio/webm'});
+      var url = URL.createObjectURL(_currentAudioBlob);
+      var ap = document.getElementById('audioPlayback');
+      if (ap) ap.innerHTML = '<audio controls src="'+url+'" style="width:100%;margin-top:4px"></audio>';
+      stream.getTracks().forEach(function(t){t.stop();});
+    });
+    _mediaRecorder.start();
+    document.getElementById('btnStartRecord').style.display = 'none';
+    document.getElementById('btnStopRecord').style.display  = '';
+    document.getElementById('recordTimer').style.display    = '';
+    _recordTimerInt = setInterval(function() {
+      _recordSecs++;
+      var m = Math.floor(_recordSecs/60), s = _recordSecs%60;
+      var el = document.getElementById('recordTimer');
+      if (el) el.textContent = m+':'+(s<10?'0':'')+s;
+    }, 1000);
+  }).catch(function(err) { alert('Could not access microphone: '+err.message); });
+};
+
+window.stopRecording = function() {
+  if (_mediaRecorder && _mediaRecorder.state !== 'inactive') _mediaRecorder.stop();
+  clearInterval(_recordTimerInt);
+  document.getElementById('btnStartRecord').style.display = '';
+  document.getElementById('btnStopRecord').style.display  = 'none';
+  document.getElementById('recordTimer').style.display    = 'none';
+};
+
+window.storeJewishMonth = function() {
+  var month = (document.getElementById('jewishMonthInput')||{}).value.trim();
+  if (!month) { alert('Please enter a Jewish month name.'); return; }
+  var doSave = function(audioKey) {
+    var data = getData();
+    data.monthlyJewishHistory.unshift({
+      id: uid(), month: month, audioKey: audioKey || '',
+      storedAt: new Date().toISOString()
+    });
+    saveMJH(data.monthlyJewishHistory);
+    saveMJD({month: ''});
+    var ji = document.getElementById('jewishMonthInput'); if (ji) ji.value = '';
+    var ap = document.getElementById('audioPlayback'); if (ap) ap.innerHTML = '';
+    _currentAudioBlob = null;
+    renderJewishHist();
+  };
+  if (_currentAudioBlob) {
+    var key = uid();
+    saveAudioBlob(key, _currentAudioBlob).then(function(){ doSave(key); });
+  } else {
+    doSave('');
+  }
+};
+
+window.storeSecularMonth = function() {
+  var month = (document.getElementById('secularMonthInput')||{}).value.trim();
+  var text  = (document.getElementById('secularMonthText')||{}).value.trim();
+  if (!month) { alert('Please enter a secular month name.'); return; }
+  var data = getData();
+  data.monthlySecularHistory.unshift({
+    id: uid(), month: month, text: text, storedAt: new Date().toISOString()
+  });
+  saveMSH(data.monthlySecularHistory);
+  saveMSD({month:'',text:''});
+  var si = document.getElementById('secularMonthInput'); if (si) si.value = '';
+  var st = document.getElementById('secularMonthText'); if (st) st.value = '';
+  renderSecularHist();
+};
+
+function renderJewishHist() {
+  var data = getData();
+  var searchEl = document.getElementById('jewishHistSearch');
+  var q = (searchEl ? searchEl.value : '').toLowerCase();
+  var list = document.getElementById('jewishHistList'); if (!list) return;
+  var entries = data.monthlyJewishHistory.filter(function(e) {
+    return !q || e.month.toLowerCase().includes(q) ||
+      new Date(e.storedAt).toLocaleDateString().toLowerCase().includes(q);
+  });
+  if (!entries.length) { list.innerHTML='<div style="color:#aaa;font-size:13px;margin-top:8px">No entries yet.</div>'; return; }
+  list.innerHTML = entries.map(function(e) {
+    var dt = new Date(e.storedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    return '<div class="jewish-hist-entry">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center">'+
+        '<span class="jewish-hist-month">'+escHtml(e.month)+'</span>'+
+        '<span class="jewish-hist-date">'+escHtml(dt)+'</span>'+
+      '</div>'+
+      (e.audioKey ? '<button class="btn-secondary" style="font-size:12px;padding:4px 10px;margin-top:6px" onclick="playJewishAudio(\''+e.audioKey+'\')">▶ Play</button>' : '')+
+    '</div>';
+  }).join('');
+}
+
+function renderSecularHist() {
+  var data = getData();
+  var searchEl = document.getElementById('secularHistSearch');
+  var q = (searchEl ? searchEl.value : '').toLowerCase();
+  var list = document.getElementById('secularHistList'); if (!list) return;
+  var entries = data.monthlySecularHistory.filter(function(e) {
+    return !q || e.month.toLowerCase().includes(q) ||
+      (e.text||'').toLowerCase().includes(q) ||
+      new Date(e.storedAt).toLocaleDateString().toLowerCase().includes(q);
+  });
+  if (!entries.length) { list.innerHTML='<div style="color:#aaa;font-size:13px;margin-top:8px">No entries yet.</div>'; return; }
+  list.innerHTML = entries.map(function(e) {
+    var dt = new Date(e.storedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    return '<div class="hist-entry" onclick="this.querySelector(\'.hist-entry-body\').classList.toggle(\'open\')">'+
+      '<div class="hist-entry-hdr">'+
+        '<span class="hist-entry-title">'+escHtml(e.month)+'</span>'+
+        '<span class="hist-entry-date">'+escHtml(dt)+'</span>'+
+      '</div>'+
+      '<div class="hist-entry-body">'+escHtml(e.text||'')+'</div>'+
+    '</div>';
+  }).join('');
+}
+
+window.playJewishAudio = function(key) {
+  loadAudioBlob(key).then(function(blob) {
+    if (!blob) { alert('Audio not found.'); return; }
+    var url = URL.createObjectURL(blob);
+    var audio = new Audio(url);
+    audio.play();
+  });
+};
+
+// ============================================================
+// FREE REFLECTION
+// ============================================================
+window.storeFreeRefl = function() {
+  var title = (document.getElementById('freeReflTitle')||{}).value.trim();
+  var text  = (document.getElementById('freeReflText')||{}).value.trim();
+  if (!text) { alert('Please write something before storing.'); return; }
+  if (!title) title = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+  var data = getData();
+  data.freeReflHistory.unshift({
+    id: uid(), date: new Date().toISOString(), title: title, text: text
+  });
+  saveFRH(data.freeReflHistory);
+  var ti = document.getElementById('freeReflTitle'); if (ti) ti.value = '';
+  var tx = document.getElementById('freeReflText');  if (tx) tx.value = '';
+  renderFreeReflHist();
+};
+
+window.renderFreeReflHist = function() {
+  var data = getData();
+  var searchEl = document.getElementById('freeReflSearch');
+  var q = (searchEl ? searchEl.value : '').toLowerCase();
+  var list = document.getElementById('freeReflHistList'); if (!list) return;
+  var entries = data.freeReflHistory.filter(function(e) {
+    return !q || e.title.toLowerCase().includes(q) || e.text.toLowerCase().includes(q) ||
+      new Date(e.date).toLocaleDateString().toLowerCase().includes(q);
+  });
+  if (!entries.length) { list.innerHTML='<div style="color:#aaa;font-size:13px">No reflections stored yet.</div>'; return; }
+  list.innerHTML = entries.map(function(e) {
+    var dt = new Date(e.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    return '<div class="hist-entry" onclick="this.querySelector(\'.hist-entry-body\').classList.toggle(\'open\')">'+
+      '<div class="hist-entry-hdr">'+
+        '<span class="hist-entry-title">'+escHtml(e.title)+'</span>'+
+        '<span class="hist-entry-date">'+escHtml(dt)+'</span>'+
+      '</div>'+
+      '<div class="hist-entry-body">'+escHtml(e.text)+'</div>'+
+    '</div>';
+  }).join('');
+};
 
 // Auto-save (called inline from input oninput)
 window.autoSaveGratitude = function(){ saveGrat(Array.from(document.querySelectorAll('#gratitudeList .refl-input')).map(function(i){return i.value;})); };
@@ -1615,6 +2067,22 @@ function renderDashDayModalBody(ds) {
 }
 
 // ============================================================
+// CHESHBON TAB SWITCHING
+// ============================================================
+window.setCheshTab = function(tab) {
+  state.activeCheshTab = tab;
+  document.querySelectorAll('.chesh-tab').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('onclick') === "setCheshTab('"+tab+"')");
+  });
+  document.getElementById('chesh-panel-daily').style.display   = tab==='daily'   ? '' : 'none';
+  document.getElementById('chesh-panel-weekly').style.display  = tab==='weekly'  ? '' : 'none';
+  document.getElementById('chesh-panel-monthly').style.display = tab==='monthly' ? '' : 'none';
+  if (tab === 'daily')   { renderCheshbonLeft(); renderCheshbonRight(); renderFreeReflHist(); }
+  if (tab === 'weekly')  renderWeeklyTab();
+  if (tab === 'monthly') renderMonthlyTab();
+};
+
+// ============================================================
 // DASHBOARD VIEW SWITCHING
 // ============================================================
 function setDashView(viewName) {
@@ -1628,7 +2096,7 @@ function setDashView(viewName) {
   if (viewName==='single')    renderSingle();
   if (viewName==='seven')     renderSeven();
   if (viewName==='future')    renderFuture();
-  if (viewName==='cheshbon')  renderCheshbon();
+  if (viewName==='cheshbon')  { setCheshTab('daily'); }
   if (viewName==='health')    renderHealth();
   if (viewName==='reminders') renderReminders();
 }
@@ -2674,6 +3142,27 @@ function initListeners() {
   document.getElementById('cheshbonItemText').addEventListener('keydown', function(e){ if(e.key==='Enter')document.getElementById('saveCheshbonItem').click(); });
   document.getElementById('closeReflHistoryModal').addEventListener('click',      function(){ closeModal('reflHistoryModal'); });
   document.getElementById('closeCheshbonWeekHistModal').addEventListener('click', function(){ closeModal('cheshbonWeekHistModal'); });
+
+  // Weekly item modal
+  document.getElementById('closeWeeklyItemModal').addEventListener('click', function(){ closeModal('weeklyItemModal'); });
+  document.getElementById('cancelWeeklyItem').addEventListener('click',     function(){ closeModal('weeklyItemModal'); });
+  document.getElementById('saveWeeklyItem').addEventListener('click', function(){
+    var text = document.getElementById('weeklyItemText').value.trim();
+    if (!text) { document.getElementById('weeklyItemText').classList.add('error'); return; }
+    document.getElementById('weeklyItemText').classList.remove('error');
+    var data = getData();
+    if (state.editWeeklyItemId) {
+      var item = data.weeklyItems.find(function(i){return i.id===state.editWeeklyItemId;});
+      if (item) item.text = text;
+      saveWI(data.weeklyItems); state.editWeeklyItemId = null;
+    } else {
+      data.weeklyItems.push({id: uid(), text: text});
+      saveWI(data.weeklyItems);
+    }
+    closeModal('weeklyItemModal');
+    renderWeeklyTab();
+  });
+  document.getElementById('weeklyItemText').addEventListener('keydown', function(e){ if(e.key==='Enter') document.getElementById('saveWeeklyItem').click(); });
 
   // Physical Health nav
   document.getElementById('healthPrevDayBtn').addEventListener('click', function(){
