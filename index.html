@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=18">
+  <link rel="stylesheet" href="style.css?v=19">
 </head>
 <body>
 
@@ -514,15 +514,32 @@
       <label class="field-label">Notes <span class="optional">optional</span></label>
       <textarea id="calEventNotes" class="field" rows="2" placeholder="Any extra details..."></textarea>
       <label class="field-label">Recurring <span class="optional">optional</span></label>
-      <select id="calEventRecurring" class="field">
-        <option value="none">Does not repeat</option>
-        <option value="weekly">Weekly</option>
-        <option value="biweekly">Every 2 weeks</option>
-        <option value="monthly">Monthly (same date)</option>
-      </select>
-      <div id="calEventUntilGroup" style="display:none">
-        <label class="field-label">End date <span class="optional">optional</span></label>
+      <div class="recur-toggle-row">
+        <label class="recur-toggle-label">
+          <input type="checkbox" id="calEventDoRecur"> Repeats
+        </label>
+      </div>
+      <div id="calEventRecurGroup" style="display:none">
+        <div class="recur-interval-row">
+          <span>Every</span>
+          <input type="number" id="calEventRecurN" class="field recur-n-input" value="1" min="1">
+          <select id="calEventRecurUnit" class="field recur-unit-select">
+            <option value="days">days</option>
+            <option value="weeks" selected>weeks</option>
+            <option value="months">months</option>
+            <option value="years">years</option>
+          </select>
+        </div>
+        <label class="field-label" style="margin-top:8px">End date <span class="optional">optional</span></label>
         <input type="date" id="calEventUntil" class="field">
+      </div>
+      <label class="field-label" style="margin-top:10px">Reminders <span class="optional">optional</span></label>
+      <div class="reminder-checks">
+        <label class="rem-check-label"><input type="checkbox" class="cal-reminder-check" value="1d"> 1 day before</label>
+        <label class="rem-check-label"><input type="checkbox" class="cal-reminder-check" value="2d"> 2 days before</label>
+        <label class="rem-check-label"><input type="checkbox" class="cal-reminder-check" value="1w"> 1 week before</label>
+        <label class="rem-check-label"><input type="checkbox" class="cal-reminder-check" value="2w"> 2 weeks before</label>
+        <label class="rem-check-label"><input type="checkbox" class="cal-reminder-check" value="1m"> 1 month before</label>
       </div>
       <label class="field-label">Color <span class="optional">optional</span></label>
       <div class="color-picker" id="calEventColorPicker"></div>
@@ -548,6 +565,23 @@
     <div class="modal-body" id="dayDetailBody"></div>
     <div class="modal-footer">
       <button id="addEventOnDay" class="btn-primary">+ Add Event</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Cal Scope Modal -->
+<div id="editCalScopeModal" class="modal">
+  <div class="modal-box" style="max-width:360px">
+    <div class="modal-header">
+      <h2>Edit Recurring Event</h2>
+      <button class="modal-close" id="closeEditCalScopeModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-note">Which occurrences would you like to edit?</p>
+      <div class="edit-scope-opts">
+        <button class="btn-scope-opt" onclick="executeEditCalEvent('single')">This event only</button>
+        <button class="btn-scope-opt" onclick="executeEditCalEvent('future')">This and all following events</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1119,6 +1153,6 @@
   </div>
 </div>
 
-<script src="app.js?v=18"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>

@@ -75,6 +75,8 @@ const state = {
   editCalEventId: null,
   selectedCalEventColor: '',
   pendingCalDate: null,
+  pendingEditCalData: null,
+  pendingEditCalDs: null,
   activeFolderId: 'all',
   expandedFolders: {},
   unlockedFolders: {},
@@ -406,9 +408,32 @@ function isRecurringOccurrence(ev, ds) {
   if(ev.recurringUntil&&check>fromDateStr(ev.recurringUntil))return false;
   if((ev.exceptions||[]).indexOf(ds)!==-1)return false;
   var diffDays=Math.round((check-start)/(1000*60*60*24));
+  if(ev.recurring==='custom'&&ev.recurringN&&ev.recurringUnit){
+    var n=parseInt(ev.recurringN,10);
+    var unit=ev.recurringUnit;
+    if(unit==='days')  return diffDays%n===0;
+    if(unit==='weeks') return diffDays%(n*7)===0;
+    if(unit==='months'){
+      var sy=start.getFullYear(),sm=start.getMonth(),sd=start.getDate();
+      var cy=check.getFullYear(),cm=check.getMonth();
+      var totalMonths=(cy-sy)*12+(cm-sm);
+      if(totalMonths<0||totalMonths%n!==0)return false;
+      var daysInCM=new Date(cy,cm+1,0).getDate();
+      return check.getDate()===Math.min(sd,daysInCM);
+    }
+    if(unit==='years'){
+      var diffYears=check.getFullYear()-start.getFullYear();
+      if(diffYears<0||diffYears%n!==0)return false;
+      return check.getMonth()===start.getMonth()&&check.getDate()===start.getDate();
+    }
+    return false;
+  }
   if(ev.recurring==='weekly')   return diffDays%7===0;
   if(ev.recurring==='biweekly') return diffDays%14===0;
-  if(ev.recurring==='monthly')  return check.getDate()===start.getDate();
+  if(ev.recurring==='monthly'){
+    var dIM=new Date(check.getFullYear(),check.getMonth()+1,0).getDate();
+    return check.getDate()===Math.min(start.getDate(),dIM);
+  }
   return false;
 }
 function getEventsForDate(ds){
@@ -428,15 +453,85 @@ function getEventsForDate(ds){
 }
 function addCalEvent(d){
   var data=getData();
-  data.calEvents.push({id:uid(),title:d.title,date:d.date,time:d.time||'',location:d.location||'',notes:d.notes||'',color:d.color||'',recurring:d.recurring||'none',recurringUntil:d.recurringUntil||null,exceptions:[],fromTask:false});
+  data.calEvents.push({id:uid(),title:d.title,date:d.date,time:d.time||'',location:d.location||'',notes:d.notes||'',color:d.color||'',recurring:d.recurring||'none',recurringN:d.recurringN||null,recurringUnit:d.recurringUnit||null,recurringUntil:d.recurringUntil||null,exceptions:[],reminders:d.reminders||[],fromTask:false});
   saveCE(data.calEvents);
 }
 function updateCalEvent(id,d){
   var data=getData(); var e=data.calEvents.find(function(e){return e.id===id;});
-  if(e){e.title=d.title;e.date=d.date;e.time=d.time||'';e.location=d.location||'';e.notes=d.notes||'';e.color=d.color||'';e.recurring=d.recurring||'none';e.recurringUntil=d.recurringUntil||null;}
+  if(e){e.title=d.title;e.date=d.date;e.time=d.time||'';e.location=d.location||'';e.notes=d.notes||'';e.color=d.color||'';e.recurring=d.recurring||'none';e.recurringN=d.recurringN||null;e.recurringUnit=d.recurringUnit||null;e.recurringUntil=d.recurringUntil||null;e.reminders=d.reminders||[];}
   saveCE(data.calEvents);
 }
 function deleteCalEvent(id){ var data=getData(); saveCE(data.calEvents.filter(function(e){return e.id!==id;})); }
+
+// ============================================================
+// CALENDAR UI HELPERS
+// ============================================================
+function getRecurFromUI(){
+  var doRecur=document.getElementById('calEventDoRecur').checked;
+  if(!doRecur)return{recurring:'none',recurringN:null,recurringUnit:null,recurringUntil:null};
+  var n=parseInt(document.getElementById('calEventRecurN').value,10)||1;
+  var unit=document.getElementById('calEventRecurUnit').value||'weeks';
+  var until=document.getElementById('calEventUntil').value||null;
+  return{recurring:'custom',recurringN:n,recurringUnit:unit,recurringUntil:until};
+}
+function getRemindersFromUI(){
+  var checks=document.querySelectorAll('.cal-reminder-check:checked');
+  return Array.prototype.map.call(checks,function(c){return c.value;});
+}
+function populateCalEventUI(ev){
+  document.getElementById('calEventTitle').value=ev.title||'';
+  document.getElementById('calEventDate').value=ev.date||'';
+  document.getElementById('calEventTime').value=ev.time||'';
+  document.getElementById('calEventLocation').value=ev.location||'';
+  document.getElementById('calEventNotes').value=ev.notes||'';
+  var isRecur=ev.recurring&&ev.recurring!=='none';
+  document.getElementById('calEventDoRecur').checked=isRecur;
+  document.getElementById('calEventRecurGroup').style.display=isRecur?'':'none';
+  if(isRecur){
+    var n=ev.recurringN||(ev.recurring==='biweekly'?2:1);
+    var unit=ev.recurringUnit||(ev.recurring==='biweekly'?'weeks':ev.recurring==='monthly'?'months':'weeks');
+    document.getElementById('calEventRecurN').value=n;
+    document.getElementById('calEventRecurUnit').value=unit;
+    document.getElementById('calEventUntil').value=ev.recurringUntil||'';
+  }
+  document.querySelectorAll('.cal-reminder-check').forEach(function(c){
+    c.checked=(ev.reminders||[]).indexOf(c.value)!==-1;
+  });
+  buildColorPicker('calEventColorPicker',ev.color||'',function(v){state.selectedCalEventColor=v;});
+}
+
+// Calendar reminder dot/banner helpers
+var REMINDER_OFFSETS={'1d':1,'2d':2,'1w':7,'2w':14,'1m':30};
+function getRemindersForDate(ds){
+  var data=getData(); var result=[];
+  data.calEvents.forEach(function(ev){
+    if(ev._overrideFor)return;
+    var rems=ev.reminders||[]; if(!rems.length)return;
+    rems.forEach(function(r){
+      var offset=REMINDER_OFFSETS[r]; if(!offset)return;
+      var evDate=new Date(fromDateStr(ds)); evDate.setDate(evDate.getDate()+offset);
+      var evDs=toDateStr(evDate);
+      var fires;
+      if(ev.recurring==='none'||!ev.recurring){ fires=ev.date===evDs; }
+      else { fires=isRecurringOccurrence(ev,evDs); }
+      if(fires) result.push({ev:ev,label:r,eventDate:evDs});
+    });
+  });
+  return result;
+}
+function renderReminderBanner(){
+  var todayDs=toDateStr(dateFromOffset(0));
+  var rems=getRemindersForDate(todayDs);
+  if(!rems.length)return'';
+  var rows=rems.map(function(r){
+    var labelMap={'1d':'tomorrow','2d':'in 2 days','1w':'in 1 week','2w':'in 2 weeks','1m':'in 1 month'};
+    return'<div class="rem-banner-item">'+
+      '<span class="rem-banner-title">'+escHtml(r.ev.title)+'</span>'+
+      '<span class="rem-banner-when">'+(labelMap[r.label]||r.label)+'</span>'+
+    '</div>';
+  }).join('');
+  return'<div class="rem-banner"><div class="rem-banner-hdr">🔔 '+rems.length+' upcoming reminder'+(rems.length>1?'s':'')+'</div>'+rows+'</div>';
+}
 
 // ============================================================
 // NOTES & FOLDERS
@@ -776,8 +871,9 @@ function dayCardHTML(date, compact) {
 function renderSingle() {
   var date=dateFromOffset(state.dayOffset);
   var ds=toDateStr(date);
+  var remBanner=state.dayOffset===0?renderReminderBanner():'';
   var banner=state.dayOffset===0?renderCarryOverBanner():'';
-  document.getElementById('singleDayContainer').innerHTML=banner+dayCardHTML(date,false);
+  document.getElementById('singleDayContainer').innerHTML=remBanner+banner+dayCardHTML(date,false);
   loadZstrip(ds);
   loadHebrewDate(ds);
   document.getElementById('backToTodayBtn').style.display=state.dayOffset===0?'none':'';
@@ -1921,6 +2017,13 @@ function renderCalendar() {
         chip.onclick=function(e){e.stopPropagation();openDayDetail(ds);}; evDiv.appendChild(chip);
       }); cell.appendChild(evDiv);
     }
+    var reminders=getRemindersForDate(ds);
+    if(reminders.length){
+      var remDot=document.createElement('div');
+      remDot.className='cal-reminder-dot';
+      remDot.title=reminders.map(function(r){return r.ev.title+' ('+r.label+' reminder)';}).join('\n');
+      cell.appendChild(remDot);
+    }
     cell.addEventListener('click',function(capturedDs){return function(){openDayDetail(capturedDs);};}(ds));
     grid.appendChild(cell);
     if (!otherMonth) hdatesToLoad.push(ds);
@@ -2551,18 +2654,10 @@ window.delCalEvOcc = function(id, ds, mode) {
 function openEditCalEvent(id, ds) {
   var data=getData(); var ev=data.calEvents.find(function(e){return e.id===id;}); if(!ev)return;
   state.editCalEventId=id; state.selectedCalEventColor=ev.color||'';
+  state.pendingEditCalDs=ds||ev.date;
   document.getElementById('calEventModalTitle').textContent='Edit Event';
-  document.getElementById('calEventTitle').value=ev.title;
-  document.getElementById('calEventDate').value=ds||ev.date;
-  document.getElementById('calEventTime').value=ev.time||'';
-  document.getElementById('calEventLocation').value=ev.location||'';
-  document.getElementById('calEventNotes').value=ev.notes||'';
-  var rec=ev.recurring||'none';
-  document.getElementById('calEventRecurring').value=rec;
-  document.getElementById('calEventUntilGroup').style.display=rec!=='none'?'':'none';
-  document.getElementById('calEventUntil').value=ev.recurringUntil||'';
+  populateCalEventUI(Object.assign({},ev,{date:ds||ev.date}));
   document.getElementById('calEventAddToDashboard').checked=false;
-  buildColorPicker('calEventColorPicker',ev.color||'',function(v){state.selectedCalEventColor=v;});
   closeModal('dayDetailModal');
   openModal('calEventModal');
   setTimeout(function(){document.getElementById('calEventTitle').focus();},80);
@@ -2839,24 +2934,16 @@ function saveRoutineModal() {
 function openAddCalEvent(ds) {
   state.editCalEventId=null; state.selectedCalEventColor='';
   document.getElementById('calEventModalTitle').textContent='Add Event';
-  document.getElementById('calEventTitle').value='';
-  document.getElementById('calEventDate').value=ds||toDateStr(new Date());
-  document.getElementById('calEventTime').value='';
-  document.getElementById('calEventLocation').value='';
-  document.getElementById('calEventNotes').value='';
-  document.getElementById('calEventRecurring').value='none';
-  document.getElementById('calEventUntilGroup').style.display='none';
-  document.getElementById('calEventUntil').value='';
+  populateCalEventUI({title:'',date:ds||toDateStr(new Date()),time:'',location:'',notes:'',recurring:'none',reminders:[]});
   document.getElementById('calEventAddToDashboard').checked=false;
-  buildColorPicker('calEventColorPicker','',function(v){state.selectedCalEventColor=v;});
   openModal('calEventModal');
   setTimeout(function(){document.getElementById('calEventTitle').focus();},80);
 }
 function saveCalEventModal() {
   var title=document.getElementById('calEventTitle').value.trim();
-  if (!title){ document.getElementById('calEventTitle').classList.add('error'); document.getElementById('calEventTitle').focus(); return; }
+  if(!title){document.getElementById('calEventTitle').classList.add('error');document.getElementById('calEventTitle').focus();return;}
   document.getElementById('calEventTitle').classList.remove('error');
-  var rec=document.getElementById('calEventRecurring').value;
+  var recur=getRecurFromUI();
   var d={
     title:title,
     date:document.getElementById('calEventDate').value,
@@ -2864,13 +2951,65 @@ function saveCalEventModal() {
     location:document.getElementById('calEventLocation').value.trim(),
     notes:document.getElementById('calEventNotes').value.trim(),
     color:state.selectedCalEventColor,
-    recurring:rec,
-    recurringUntil:rec!=='none'?(document.getElementById('calEventUntil').value||null):null
+    recurring:recur.recurring,
+    recurringN:recur.recurringN,
+    recurringUnit:recur.recurringUnit,
+    recurringUntil:recur.recurringUntil,
+    reminders:getRemindersFromUI()
   };
-  state.editCalEventId?updateCalEvent(state.editCalEventId,d):addCalEvent(d);
-  if (document.getElementById('calEventAddToDashboard').checked&&d.date) addTask(d.date,{title:d.title,time:d.time,color:d.color});
+  if(state.editCalEventId){
+    var data=getData();
+    var ev=data.calEvents.find(function(e){return e.id===state.editCalEventId;});
+    var isRec=ev&&ev.recurring&&ev.recurring!=='none';
+    if(isRec){
+      state.pendingEditCalData=d;
+      closeModal('calEventModal');
+      openModal('editCalScopeModal');
+      return;
+    }
+    updateCalEvent(state.editCalEventId,d);
+  } else {
+    addCalEvent(d);
+  }
+  if(document.getElementById('calEventAddToDashboard').checked&&d.date) addTask(d.date,{title:d.title,time:d.time,color:d.color});
   closeModal('calEventModal'); renderCalendar();
 }
+
+window.executeEditCalEvent = function(scope) {
+  var id=state.editCalEventId; var d=state.pendingEditCalData; var ds=state.pendingEditCalDs;
+  if(!id||!d)return;
+  var data=getData();
+  var ev=data.calEvents.find(function(e){return e.id===id;}); if(!ev)return;
+  if(scope==='single'){
+    if(!ev.exceptions)ev.exceptions=[];
+    if(ev.exceptions.indexOf(ds)===-1)ev.exceptions.push(ds);
+    data.calEvents.push({
+      id:uid(),_overrideFor:id,_overrideDate:ds,
+      title:d.title,date:ds,time:d.time||'',location:d.location||'',
+      notes:d.notes||'',color:d.color||'',recurring:'none',
+      recurringN:null,recurringUnit:null,recurringUntil:null,
+      exceptions:[],reminders:d.reminders||[]
+    });
+    saveCE(data.calEvents);
+  } else {
+    var prevD=fromDateStr(ds); prevD.setDate(prevD.getDate()-1);
+    var prevDs=toDateStr(prevD);
+    if(prevDs<ev.date){
+      deleteCalEvent(id);
+    } else {
+      ev.recurringUntil=prevDs;
+      ev.exceptions=(ev.exceptions||[]).filter(function(x){return x<ds;});
+      saveCE(data.calEvents);
+    }
+    var updated=getData().calEvents.filter(function(e){
+      return !(e._overrideFor===id&&e._overrideDate>=ds);
+    });
+    saveCE(updated);
+    addCalEvent(Object.assign({},d,{date:ds}));
+  }
+  state.pendingEditCalData=null; state.pendingEditCalDs=null;
+  closeModal('editCalScopeModal'); renderCalendar();
+};
 
 function setNoteType(type) {
   state.noteType=type;
@@ -3384,9 +3523,11 @@ function initListeners() {
   document.getElementById('closeCalEventModal').addEventListener('click', function(){ closeModal('calEventModal'); });
   document.getElementById('cancelCalEvent').addEventListener('click',     function(){ closeModal('calEventModal'); });
   document.getElementById('saveCalEvent').addEventListener('click', saveCalEventModal);
-  document.getElementById('calEventRecurring').addEventListener('change', function(){
-    document.getElementById('calEventUntilGroup').style.display=this.value!=='none'?'':'none';
+  document.getElementById('calEventDoRecur').addEventListener('change',function(){
+    document.getElementById('calEventRecurGroup').style.display=this.checked?'':'none';
   });
+  if(document.getElementById('closeEditCalScopeModal'))
+    document.getElementById('closeEditCalScopeModal').addEventListener('click',function(){closeModal('editCalScopeModal');});
   document.getElementById('closeDayDetailModal').addEventListener('click', function(){ closeModal('dayDetailModal'); });
   document.getElementById('calMonthViewBtn') && document.getElementById('calMonthViewBtn').addEventListener('click', function(){ renderCalendar(); });
 
