@@ -501,15 +501,17 @@ function renderCalReminderList(){
   var el=document.getElementById('calReminderList'); if(!el)return;
   if(!_calReminderDraft.length){el.innerHTML='<div class="cal-rem-empty">No reminders — click + Add to set one</div>';return;}
   el.innerHTML=_calReminderDraft.map(function(r,i){
+    var isAtEvent=r.unit==='event';
     return'<div class="cal-reminder-row">'+
-      '<input type="number" class="field cal-rem-n" value="'+r.n+'" min="1" max="9999" onchange="updateCalReminder('+i+',\'n\',this.value)">'+
+      (!isAtEvent?'<input type="number" class="field cal-rem-n" value="'+r.n+'" min="1" max="9999" onchange="updateCalReminder('+i+',\'n\',this.value)">':'<span class="cal-rem-spacer"></span>')+
       '<select class="field cal-rem-unit" onchange="updateCalReminder('+i+',\'unit\',this.value)">'+
         '<option value="hours"'+(r.unit==='hours'?' selected':'')+'>hours</option>'+
         '<option value="days"'+(r.unit==='days'?' selected':'')+'>days</option>'+
         '<option value="weeks"'+(r.unit==='weeks'?' selected':'')+'>weeks</option>'+
         '<option value="months"'+(r.unit==='months'?' selected':'')+'>months</option>'+
+        '<option value="event"'+(isAtEvent?' selected':'')+'>at time of event</option>'+
       '</select>'+
-      '<span class="cal-rem-before">before</span>'+
+      (!isAtEvent?'<span class="cal-rem-before">before</span>':'')+
       '<button class="cal-rem-del-btn" onclick="removeCalReminder('+i+')" title="Delete reminder">🗑 Delete</button>'+
     '</div>';
   }).join('');
@@ -527,9 +529,17 @@ function normalizeReminder(r){
   if(typeof r==='string'){var m={'1d':{n:1,unit:'days'},'2d':{n:2,unit:'days'},'1w':{n:1,unit:'weeks'},'2w':{n:2,unit:'weeks'},'1m':{n:1,unit:'months'}};return m[r]||{n:1,unit:'days'};}
   return r;
 }
-function getReminderOffsetDays(r){
+function getReminderOffsetDays(r, eventTime){
   var obj=normalizeReminder(r); var n=parseInt(obj.n)||1;
-  if(obj.unit==='hours')return Math.max(1,Math.ceil(n/24));
+  if(obj.unit==='event') return 0;
+  if(obj.unit==='hours'){
+    // Use event time or default to 9:00am
+    var t=(eventTime||'09:00').split(':');
+    var evMins=(parseInt(t[0])||9)*60+(parseInt(t[1])||0);
+    var remMins=evMins-n*60;
+    if(remMins>=0) return 0; // fires same day
+    return Math.ceil(-remMins/1440); // days before
+  }
   if(obj.unit==='weeks')return n*7;
   if(obj.unit==='months')return n*30;
   return n;
@@ -537,6 +547,7 @@ function getReminderOffsetDays(r){
 function reminderLabel(r){
   var obj=normalizeReminder(r); var n=parseInt(obj.n)||1;
   var u=obj.unit||'days';
+  if(u==='event') return 'at time of event';
   var singular=u.replace(/s$/,'');
   return n+' '+(n===1?singular:u)+' before';
 }
@@ -568,7 +579,7 @@ function getRemindersForDate(ds){
     if(ev._overrideFor)return;
     var rems=ev.reminders||[]; if(!rems.length)return;
     rems.forEach(function(r){
-      var offset=getReminderOffsetDays(r); if(!offset)return;
+      var offset=getReminderOffsetDays(r,ev.time); if(offset===null||offset===undefined||offset<0)return;
       var evDate=new Date(fromDateStr(ds)); evDate.setDate(evDate.getDate()+offset);
       var evDs=toDateStr(evDate);
       var fires;

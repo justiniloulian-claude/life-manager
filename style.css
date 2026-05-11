@@ -2363,6 +2363,7 @@ textarea.field { resize: vertical; }
 /* Dynamic reminder rows in cal event modal */
 .cal-reminder-row { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
 .cal-rem-n { width:64px !important; padding:6px 8px !important; text-align:center; }
+.cal-rem-spacer { width:64px; flex-shrink:0; }
 .cal-rem-unit { flex:1; }
 .cal-rem-before { font-size:13px; color:#555; white-space:nowrap; }
 .cal-rem-del-btn { display:flex; align-items:center; gap:4px; font-size:12px; padding:5px 10px; border:1px solid #e55; border-radius:6px; background:#fff0f0; color:#c33; cursor:pointer; white-space:nowrap; flex-shrink:0; transition:background 0.15s; }
