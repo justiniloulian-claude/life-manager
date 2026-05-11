@@ -2365,7 +2365,7 @@ textarea.field { resize: vertical; }
 .cal-rem-n { width:64px !important; padding:6px 8px !important; text-align:center; }
 .cal-rem-unit { flex:1; }
 .cal-rem-before { font-size:13px; color:#555; white-space:nowrap; }
-.cal-rem-del { font-size:12px; opacity:0.5; flex-shrink:0; }
-.cal-rem-del:hover { opacity:1; }
+.cal-rem-del-btn { display:flex; align-items:center; gap:4px; font-size:12px; padding:5px 10px; border:1px solid #e55; border-radius:6px; background:#fff0f0; color:#c33; cursor:pointer; white-space:nowrap; flex-shrink:0; transition:background 0.15s; }
+.cal-rem-del-btn:hover { background:#fdd; color:#a00; }
 .cal-rem-add-btn { font-size:12px; padding:5px 12px; margin-top:2px; }
 .cal-rem-empty { font-size:13px; color:#ccc; font-style:italic; padding:4px 0 6px; }

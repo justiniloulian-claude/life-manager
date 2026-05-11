@@ -502,14 +502,15 @@ function renderCalReminderList(){
   if(!_calReminderDraft.length){el.innerHTML='<div class="cal-rem-empty">No reminders — click + Add to set one</div>';return;}
   el.innerHTML=_calReminderDraft.map(function(r,i){
     return'<div class="cal-reminder-row">'+
-      '<input type="number" class="field cal-rem-n" value="'+r.n+'" min="1" max="365" onchange="updateCalReminder('+i+',\'n\',this.value)">'+
+      '<input type="number" class="field cal-rem-n" value="'+r.n+'" min="1" max="9999" onchange="updateCalReminder('+i+',\'n\',this.value)">'+
       '<select class="field cal-rem-unit" onchange="updateCalReminder('+i+',\'unit\',this.value)">'+
+        '<option value="hours"'+(r.unit==='hours'?' selected':'')+'>hours</option>'+
         '<option value="days"'+(r.unit==='days'?' selected':'')+'>days</option>'+
         '<option value="weeks"'+(r.unit==='weeks'?' selected':'')+'>weeks</option>'+
         '<option value="months"'+(r.unit==='months'?' selected':'')+'>months</option>'+
       '</select>'+
       '<span class="cal-rem-before">before</span>'+
-      '<button class="btn-icon cal-rem-del" onclick="removeCalReminder('+i+')" title="Remove">✕</button>'+
+      '<button class="cal-rem-del-btn" onclick="removeCalReminder('+i+')" title="Delete reminder">🗑 Delete</button>'+
     '</div>';
   }).join('');
 }
@@ -528,6 +529,7 @@ function normalizeReminder(r){
 }
 function getReminderOffsetDays(r){
   var obj=normalizeReminder(r); var n=parseInt(obj.n)||1;
+  if(obj.unit==='hours')return Math.max(1,Math.ceil(n/24));
   if(obj.unit==='weeks')return n*7;
   if(obj.unit==='months')return n*30;
   return n;
@@ -535,7 +537,8 @@ function getReminderOffsetDays(r){
 function reminderLabel(r){
   var obj=normalizeReminder(r); var n=parseInt(obj.n)||1;
   var u=obj.unit||'days';
-  return n+' '+(n===1?u.replace(/s$/,''):u)+' before';
+  var singular=u.replace(/s$/,'');
+  return n+' '+(n===1?singular:u)+' before';
 }
 function populateCalEventUI(ev){
   document.getElementById('calEventTitle').value=ev.title||'';
