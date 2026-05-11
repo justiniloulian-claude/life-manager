@@ -815,7 +815,7 @@ textarea.field { resize: vertical; }
 }
 .day-card-head-clickable:hover { background: #fafaf8; }
 .day-card-compact { cursor: pointer; }
-.day-card-compact .task-list { cursor: default; }
+.day-card-compact .task-list { cursor: pointer; }
 .day-card-compact .add-task-row { cursor: pointer; }
 
 /* ===== TASK NOTES PANEL ===== */

@@ -2172,7 +2172,7 @@ function renderNotes(){ renderNotesSidebar(); renderNotesMain(); }
 // DASHBOARD DAY POPUP (7-day card click)
 // ============================================================
 window.compactCardClick = function(ds, e) {
-  if (e.target.closest('button,input,a,.task-item')) return;
+  if (e.target.closest('button,input,a')) return;
   openDashDayPopup(ds);
 };
 window.taskClick = function(ds, id, isR, e) {
