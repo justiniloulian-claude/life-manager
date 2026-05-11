@@ -1793,9 +1793,8 @@ textarea.field { resize: vertical; }
 .note-format-bar {
   display: flex;
   gap: 4px;
-  padding: 6px 0 8px;
-  border-bottom: 1px solid #f0f0f0;
-  margin-bottom: 10px;
+  padding: 8px 20px 10px;
+  border-top: 1px solid #f0f0f0;
 }
 .fmt-btn {
   background: none;
