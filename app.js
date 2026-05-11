@@ -139,6 +139,10 @@ function getData() {
     monthlySecularHistory: JSON.parse(localStorage.getItem('dm_monthly_secular_history'))    || [],
     monthlyJewishDraft:    JSON.parse(localStorage.getItem('dm_monthly_jewish_draft'))       || {month:''},
     monthlySecularDraft:   JSON.parse(localStorage.getItem('dm_monthly_secular_draft'))      || {month:'',text:''},
+    weightEntries:    JSON.parse(localStorage.getItem('dm_weight_entries')      || '{}'),
+    weightGoal:       JSON.parse(localStorage.getItem('dm_weight_goal')         || 'null'),
+    weightHistory:    JSON.parse(localStorage.getItem('dm_weight_history')      || '[]'),
+    weightLastSunday: localStorage.getItem('dm_weight_last_sunday')             || '',
   };
 }
 function saveT(v)   { localStorage.setItem('dm_tasks',       JSON.stringify(v)); }
@@ -1047,6 +1051,112 @@ function getSundayStr(date) {
   return toDateStr(d);
 }
 
+function getWeekDays(sundayStr) {
+  var days=[]; var sun=fromDateStr(sundayStr);
+  for(var i=0;i<7;i++){var d=new Date(sun);d.setDate(sun.getDate()+i);days.push(toDateStr(d));}
+  return days;
+}
+function calcWeightStats(entries,weekDays){
+  var logged=weekDays.filter(function(ds){return entries[ds];}).map(function(ds){return{ds:ds,w:parseFloat(entries[ds])};});
+  if(!logged.length)return null;
+  var weights=logged.map(function(e){return e.w;});
+  var start=logged[0].w, current=logged[logged.length-1].w;
+  var avg=weights.reduce(function(a,b){return a+b;},0)/weights.length;
+  return{start:start,current:current,change:current-start,avg:avg,min:Math.min.apply(null,weights),max:Math.max.apply(null,weights),count:logged.length};
+}
+function renderWeightSparkline(entries,weekDays){
+  var logged=weekDays.map(function(ds,i){return{i:i,w:entries[ds]?parseFloat(entries[ds]):null};}).filter(function(p){return p.w!==null;});
+  if(logged.length<2)return'<div class="wt-spark-placeholder">'+(logged.length===1?'Log more days to see trend':'No entries yet')+'</div>';
+  var W=320,H=80,PAD=12;
+  var weights=logged.map(function(p){return p.w;});
+  var minW=Math.min.apply(null,weights),maxW=Math.max.apply(null,weights),range=maxW-minW||0.5;
+  var pts=logged.map(function(p){
+    return{x:PAD+(p.i/6)*(W-PAD*2),y:PAD+(1-(p.w-minW)/range)*(H-PAD*2)};
+  });
+  var path=pts.map(function(p,i){return(i===0?'M':'L')+p.x.toFixed(1)+','+p.y.toFixed(1);}).join(' ');
+  var area=path+' L'+pts[pts.length-1].x.toFixed(1)+','+(H-PAD)+' L'+pts[0].x.toFixed(1)+','+(H-PAD)+' Z';
+  var dots=pts.map(function(p){return'<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="3.5" fill="#6366f1" stroke="#fff" stroke-width="2"/>';}).join('');
+  return'<svg class="wt-spark" viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">'+
+    '<path d="'+area+'" fill="#6366f1" fill-opacity="0.08"/>'+
+    '<path d="'+path+'" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+
+    dots+'</svg>';
+}
+function checkWeightAutoArchive(){
+  var data=getData(); var currentSun=getSundayStr(); var lastSun=data.weightLastSunday;
+  if(lastSun&&lastSun<currentSun){
+    var weekDays=getWeekDays(lastSun);
+    var entries={};
+    weekDays.forEach(function(ds){if(data.weightEntries[ds])entries[ds]=data.weightEntries[ds];});
+    if(Object.keys(entries).length>0){
+      var stats=calcWeightStats(entries,weekDays);
+      var history=data.weightHistory||[]; history.unshift({weekStart:lastSun,entries:entries,stats:stats});
+      localStorage.setItem('dm_weight_history',JSON.stringify(history));
+    }
+    localStorage.setItem('dm_weight_last_sunday',currentSun);
+  } else if(!lastSun){
+    localStorage.setItem('dm_weight_last_sunday',currentSun);
+  }
+}
+function renderWeightTracker(){
+  var el=document.getElementById('weightTrackerContent'); if(!el)return;
+  checkWeightAutoArchive();
+  var data=getData();
+  var sundayStr=getSundayStr();
+  var weekDays=getWeekDays(sundayStr);
+  var todayDs=toDateStr(new Date());
+  var entries=data.weightEntries||{};
+  var goal=data.weightGoal;
+  var stats=calcWeightStats(entries,weekDays);
+  var todayWeight=entries[todayDs]||'';
+  // Goal
+  var goalHTML='';
+  if(goal){
+    var cur=stats?stats.current:null;
+    if(cur!==null){
+      var diff=parseFloat((cur-goal).toFixed(1));
+      goalHTML=diff<=0
+        ?'<div class="wt-goal wt-goal-reached">🎉 Goal reached! ('+goal+' lbs)</div>'
+        :'<div class="wt-goal">Goal: <strong>'+goal+' lbs</strong> — <span class="wt-goal-diff">'+diff+' lbs to go</span></div>';
+    } else {
+      goalHTML='<div class="wt-goal">Goal: <strong>'+goal+' lbs</strong></div>';
+    }
+  }
+  // Stats row
+  var statsHTML='';
+  if(stats&&stats.count>=1){
+    var cs=stats.change>0?'wt-stat-up':stats.change<0?'wt-stat-down':'';
+    var csign=stats.change>0?'+':'';
+    statsHTML='<div class="wt-stats-row">'+
+      '<div class="wt-stat"><div class="wt-stat-label">Start</div><div class="wt-stat-val">'+stats.start.toFixed(1)+'</div></div>'+
+      '<div class="wt-stat"><div class="wt-stat-label">Current</div><div class="wt-stat-val">'+stats.current.toFixed(1)+'</div></div>'+
+      '<div class="wt-stat"><div class="wt-stat-label">Change</div><div class="wt-stat-val '+cs+'">'+csign+stats.change.toFixed(1)+'</div></div>'+
+      '<div class="wt-stat"><div class="wt-stat-label">Avg</div><div class="wt-stat-val">'+stats.avg.toFixed(1)+'</div></div>'+
+      '<div class="wt-stat"><div class="wt-stat-label">Low</div><div class="wt-stat-val">'+stats.min.toFixed(1)+'</div></div>'+
+      '<div class="wt-stat"><div class="wt-stat-label">High</div><div class="wt-stat-val">'+stats.max.toFixed(1)+'</div></div>'+
+    '</div>';
+  }
+  // Sparkline
+  var sparkHTML='<div class="wt-spark-wrap">'+(stats&&stats.count>=2?renderWeightSparkline(entries,weekDays):'<div class="wt-spark-placeholder">'+(stats&&stats.count===1?'Log more days to see chart':'No entries this week yet')+'</div>')+'</div>';
+  // Daily list
+  var dayLabels=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var dailyHTML=weekDays.map(function(ds,i){
+    var w=entries[ds]; var isT=ds===todayDs;
+    var d=fromDateStr(ds);
+    var dLabel=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    return'<div class="wt-day-row'+(isT?' wt-day-today':'')+'">'+
+      '<span class="wt-day-label">'+dayLabels[i]+'<span class="wt-day-date"> '+dLabel+'</span></span>'+
+      (w?'<span class="wt-day-weight">'+parseFloat(w).toFixed(1)+' lbs</span>':'<span class="wt-day-empty">—</span>')+
+    '</div>';
+  }).join('');
+  el.innerHTML=goalHTML+
+    '<div class="wt-log-row">'+
+      '<input type="number" id="wtTodayInput" class="field wt-input" placeholder="Today\'s weight (lbs)" value="'+escHtml(String(todayWeight))+'" step="0.1" min="50" max="600">'+
+      '<button class="btn-primary wt-log-btn" onclick="logWeight()">Log</button>'+
+    '</div>'+
+    statsHTML+sparkHTML+
+    '<div class="wt-week-list">'+dailyHTML+'</div>';
+}
+
 function checkWeeklyAutoArchive() {
   var data = getData();
   var currentSunday = getSundayStr(new Date());
@@ -1507,6 +1617,7 @@ function renderHealth() {
   renderHealthWater(ds);
   renderDietPlan();
   renderActivityPlanner();
+  renderWeightTracker();
 }
 
 function renderActivityPlanner() {
@@ -3146,6 +3257,75 @@ function initSwipe() {
 }
 
 // ============================================================
+// WEIGHT TRACKER WINDOW FUNCTIONS
+// ============================================================
+window.logWeight = function(){
+  var input=document.getElementById('wtTodayInput'); if(!input)return;
+  var val=parseFloat(input.value);
+  if(!val||val<50||val>600){input.classList.add('error');input.focus();return;}
+  input.classList.remove('error');
+  var data=getData(); var todayDs=toDateStr(new Date());
+  data.weightEntries[todayDs]=val;
+  localStorage.setItem('dm_weight_entries',JSON.stringify(data.weightEntries));
+  renderWeightTracker();
+};
+window.openWeightGoalModal=function(){
+  var data=getData();
+  document.getElementById('wtGoalInput').value=data.weightGoal||'';
+  openModal('weightGoalModal');
+  setTimeout(function(){document.getElementById('wtGoalInput').focus();},80);
+};
+window.saveWeightGoal=function(){
+  var raw=document.getElementById('wtGoalInput').value.trim();
+  var val=parseFloat(raw);
+  if(raw===''){ localStorage.removeItem('dm_weight_goal'); }
+  else if(val>=50&&val<=600){ localStorage.setItem('dm_weight_goal',JSON.stringify(val)); }
+  closeModal('weightGoalModal'); renderWeightTracker();
+};
+window.openWeightHistory=function(){
+  var data=getData(); var history=data.weightHistory||[];
+  var el=document.getElementById('wtHistoryContent'); if(!el)return;
+  if(!history.length){
+    el.innerHTML='<div style="color:#aaa;font-size:13px;padding:16px 0;text-align:center">No past weeks yet. History builds automatically each Sunday.</div>';
+  } else {
+    var dayLabels=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    el.innerHTML=history.map(function(week,wi){
+      var weekDays=getWeekDays(week.weekStart);
+      var sun=fromDateStr(week.weekStart); var sat=new Date(sun); sat.setDate(sun.getDate()+6);
+      var lbl=sun.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+sat.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      var s=week.stats;
+      var csign=s&&s.change>0?'+':'';
+      var statsStr=s?s.start.toFixed(1)+' → '+s.current.toFixed(1)+' lbs ('+csign+s.change.toFixed(1)+')':'';
+      var dailyRows=weekDays.map(function(ds,i){
+        var w=week.entries[ds];
+        return w?'<div class="wt-hist-day"><span>'+dayLabels[i]+'</span><span>'+parseFloat(w).toFixed(1)+' lbs</span></div>':'';
+      }).filter(Boolean).join('');
+      return'<div class="wt-hist-week">'+
+        '<div class="wt-hist-week-hdr" onclick="toggleWtHistWeek('+wi+')">'+
+          '<span class="wt-hist-week-label">'+lbl+'</span>'+
+          (statsStr?'<span class="wt-hist-week-stats">'+statsStr+'</span>':'')+
+          '<span class="wt-hist-week-arrow" id="wt-hist-arrow-'+wi+'">▾</span>'+
+        '</div>'+
+        '<div class="wt-hist-week-body" id="wt-hist-body-'+wi+'">'+
+          (s?'<div class="wt-hist-stats-row"><span>Avg: '+s.avg.toFixed(1)+'</span><span>Low: '+s.min.toFixed(1)+'</span><span>High: '+s.max.toFixed(1)+'</span></div>':'')+
+          dailyRows+
+          renderWeightSparkline(week.entries,weekDays)+
+        '</div>'+
+      '</div>';
+    }).join('');
+  }
+  openModal('weightHistoryModal');
+};
+window.toggleWtHistWeek=function(wi){
+  var body=document.getElementById('wt-hist-body-'+wi);
+  var arrow=document.getElementById('wt-hist-arrow-'+wi);
+  if(!body)return;
+  var isOpen=body.style.display!=='none';
+  body.style.display=isOpen?'none':'';
+  if(arrow)arrow.textContent=isOpen?'▸':'▾';
+};
+
+// ============================================================
 // EVENT LISTENERS
 // ============================================================
 function initListeners() {
@@ -3395,6 +3575,13 @@ function initListeners() {
   document.getElementById('plannerThisWeekBtn').addEventListener('click', function(){ state.plannerWeekOffset=0; renderActivityPlanner(); });
 
   // Reminders
+  if(document.getElementById('closeWeightGoalModal'))
+    document.getElementById('closeWeightGoalModal').addEventListener('click',function(){closeModal('weightGoalModal');});
+  if(document.getElementById('cancelWeightGoalModal'))
+    document.getElementById('cancelWeightGoalModal').addEventListener('click',function(){closeModal('weightGoalModal');});
+  if(document.getElementById('closeWeightHistoryModal'))
+    document.getElementById('closeWeightHistoryModal').addEventListener('click',function(){closeModal('weightHistoryModal');});
+
   document.getElementById('addReminderBtn').addEventListener('click', function(){ state.editReminderId=null; document.getElementById('reminderModalTitle').textContent='Add Reminder'; document.getElementById('reminderText').value=''; document.getElementById('reminderCategory').value=''; openModal('reminderModal'); setTimeout(function(){document.getElementById('reminderText').focus();},80); });
   document.getElementById('closeReminderModal').addEventListener('click', function(){ closeModal('reminderModal'); });
   document.getElementById('cancelReminder').addEventListener('click',     function(){ closeModal('reminderModal'); });

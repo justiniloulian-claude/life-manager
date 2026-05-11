@@ -2263,3 +2263,46 @@ textarea.field { resize: vertical; }
   transition: background 0.12s, color 0.12s; line-height: 1.4;
 }
 .note-undo-btn:hover { background: #f5f5f5; color: #111; }
+
+/* ===== WEIGHT TRACKER ===== */
+.wt-content { padding: 16px 20px; }
+.wt-goal {
+  font-size: 14px; color: #444; margin-bottom: 14px;
+  padding: 10px 14px; background: #eef2ff; border-radius: 8px;
+  border-left: 3px solid #6366f1;
+}
+.wt-goal strong { color: #1a1a1a; }
+.wt-goal-reached { background: #f0fdf4; border-left-color: #10b981; color: #065f46; }
+.wt-goal-diff { color: #6366f1; font-weight: 600; }
+.wt-log-row { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
+.wt-input { flex: 1; min-width: 0; }
+.wt-log-btn { white-space: nowrap; flex-shrink: 0; }
+.wt-stats-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.wt-stat { flex: 1; min-width: 56px; background: #f9f9f9; border-radius: 8px; padding: 10px 6px; text-align: center; }
+.wt-stat-label { font-size: 10px; color: #aaa; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
+.wt-stat-val { font-size: 15px; font-weight: 700; color: #1a1a1a; }
+.wt-stat-down { color: #10b981; }
+.wt-stat-up   { color: #ef4444; }
+.wt-spark-wrap { margin-bottom: 16px; background: #fafafa; border-radius: 10px; padding: 8px; }
+.wt-spark { width: 100%; height: 80px; display: block; overflow: visible; }
+.wt-spark-placeholder { text-align: center; font-size: 13px; color: #ccc; padding: 24px 0; font-style: italic; }
+.wt-week-list { border: 1px solid #f0f0f0; border-radius: 10px; overflow: hidden; }
+.wt-day-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; border-bottom: 1px solid #f7f7f7; font-size: 13px; }
+.wt-day-row:last-child { border-bottom: none; }
+.wt-day-today { background: #fffbeb; }
+.wt-day-label { color: #444; font-weight: 500; }
+.wt-day-date  { color: #aaa; font-size: 11px; font-weight: 400; margin-left: 4px; }
+.wt-day-weight { color: #1a1a1a; font-weight: 700; }
+.wt-day-empty  { color: #ddd; }
+
+/* Weight History Modal */
+.wt-hist-week { border: 1px solid #eee; border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+.wt-hist-week-hdr { display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; background: #fafafa; transition: background 0.12s; }
+.wt-hist-week-hdr:hover { background: #f5f5f2; }
+.wt-hist-week-label { font-size: 13px; font-weight: 600; color: #1a1a1a; flex: 1; }
+.wt-hist-week-stats { font-size: 12px; color: #6366f1; }
+.wt-hist-week-arrow { font-size: 12px; color: #aaa; flex-shrink: 0; }
+.wt-hist-week-body { padding: 12px 16px; border-top: 1px solid #eee; }
+.wt-hist-stats-row { display: flex; gap: 16px; font-size: 12px; color: #888; margin-bottom: 10px; flex-wrap: wrap; }
+.wt-hist-day { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; border-bottom: 1px solid #f7f7f7; color: #555; }
+.wt-hist-day:last-of-type { border-bottom: none; margin-bottom: 10px; }
