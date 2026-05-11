@@ -271,6 +271,8 @@ body {
 .task-item:last-child { border-bottom: none; }
 .task-item:hover .task-actions { opacity: 1; }
 .task-item.is-done { opacity: 0.38; }
+.task-item.task-clickable { cursor: pointer; }
+.task-item.task-clickable:hover { background: rgba(0,0,0,0.025); }
 
 /* Routine = italicized title only */
 .task-item.is-routine { background: transparent; border-left-color: transparent; }
@@ -812,6 +814,9 @@ textarea.field { resize: vertical; }
   transition: background 0.15s;
 }
 .day-card-head-clickable:hover { background: #fafaf8; }
+.day-card-compact { cursor: pointer; }
+.day-card-compact .task-list { cursor: default; }
+.day-card-compact .add-task-row { cursor: pointer; }
 
 /* ===== TASK NOTES PANEL ===== */
 .task-notes-panel {

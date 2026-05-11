@@ -846,7 +846,7 @@ function taskHTML(task, ds, noActions) {
   }
   var notesPanel = (!noActions && hasTaskNotes)
     ? '<div class="task-notes-panel" style="display:none">'+escHtml(task.notes)+'</div>' : '';
-  return '<div class="task-item '+itemCls+(task.done?' is-done':'')+'" id="ti-'+task.id+'">' +
+  return '<div class="task-item '+itemCls+(task.done?' is-done':'')+(noActions?'':' task-clickable')+'" id="ti-'+task.id+'"'+(noActions?'':' onclick="taskClick(\''+ds+'\',\''+task.id+'\','+isR+',event)"')+'>' +
     '<input type="checkbox" class="task-check"'+(task.done?' checked':'')+' onchange="checkTask(\''+ds+'\',\''+task.id+'\','+isR+')">' +
     '<div class="task-body"><div class="task-title '+priorityCls+'">'+escHtml(task.title)+notesDot+'</div>' +
     '<div class="task-meta">'+tb+lb+'</div>'+notesPanel+'</div>' +
@@ -874,7 +874,7 @@ function dayCardHTML(date, compact) {
   // In compact (7-day) mode: clickable header opens day popup, no zmanim strip
   // In full mode: zmanim strip shown
   var headSection = compact
-    ? '<div class="day-card-head day-card-head-clickable" onclick="openDashDayPopup(\''+ds+'\')">'+head+'</div>'
+    ? '<div class="day-card-head">'+head+'</div>'
     : '<div class="day-card-head">'+head+'</div>';
   var zmanimSection = compact ? '' :
     '<div class="zmanim-strip" onclick="openZmanim(\''+ds+'\')">' +
@@ -882,10 +882,10 @@ function dayCardHTML(date, compact) {
     '<span class="z-loading">Loading times…</span><span class="z-expand">Tap for all times ›</span>' +
     '</div></div>';
 
-  return '<div class="day-card'+(today?' is-today':'')+'">' +
+  return '<div class="day-card'+(today?' is-today':'')+(compact?' day-card-compact':'')+'"'+(compact?' onclick="compactCardClick(\''+ds+'\',event)"':'')+'>'+
     headSection + zmanimSection +
     '<div class="task-list">'+tHTML+'</div>' +
-    '<button class="add-task-row" onclick="openAddTask(\''+ds+'\')">+ Add task or event</button>' +
+    '<button class="add-task-row" onclick="event.stopPropagation();openAddTask(\''+ds+'\')">+ Add task or event</button>' +
     '</div>';
 }
 
@@ -2171,6 +2171,15 @@ function renderNotes(){ renderNotesSidebar(); renderNotesMain(); }
 // ============================================================
 // DASHBOARD DAY POPUP (7-day card click)
 // ============================================================
+window.compactCardClick = function(ds, e) {
+  if (e.target.closest('button,input,a,.task-item')) return;
+  openDashDayPopup(ds);
+};
+window.taskClick = function(ds, id, isR, e) {
+  if (e.target.closest('button,input')) return;
+  if (isR) { openRoutineOverride(ds, id); }
+  else { openEditTask(ds, id); }
+};
 window.openDashDayPopup = function(ds) {
   state.dashDayModalDs = ds;
   var date = fromDateStr(ds);
@@ -2365,6 +2374,7 @@ window.executeMoveTask = function(fromDs, id, isR, toDs) {
   closeModal('moveDayModal'); refresh(); refreshDashDayModal();
 };
 window.openMoveTaskModal = function(ds, id, isR) {
+  closeModal('dashDayModal');
   state.moveTaskDs=ds; state.moveTaskId=id; state.moveTaskIsR=isR;
   var today=dateFromOffset(0); var grid=document.getElementById('moveDayGrid');
   if (!grid) return;
@@ -2381,6 +2391,7 @@ window.openMoveTaskModal = function(ds, id, isR) {
 };
 
 window.openTaskNotesLink = function(ds, taskId) {
+  closeModal('dashDayModal');
   state.linkNotesTaskDs=ds; state.linkNotesTaskId=taskId;
   var data=getData();
   var task=(data.tasks[ds]||[]).find(function(t){return t.id===taskId;}); if(!task)return;
@@ -2433,6 +2444,7 @@ window.openAddTask = function(ds) {
   setTimeout(function(){document.getElementById('taskTitle').focus();},80);
 };
 window.openEditTask = function(ds,id) {
+  closeModal('dashDayModal');
   var data=getData(); var t=(data.tasks[ds]||[]).find(function(t){return t.id===id;}); if(!t)return;
   state.editTaskId=id; state.editTaskDate=ds; state.selectedTaskColor=t.color||''; state.selectedTaskPriority=t.priority||'standard';
   document.getElementById('taskModalTitle').textContent='Edit Task';
@@ -2455,6 +2467,7 @@ window.openZmanim = async function(ds) {
 };
 // Open the one-time routine override modal for a specific date
 window.openRoutineOverride = function(ds, routineId) {
+  closeModal('dashDayModal');
   var data=getData();
   var r=data.routine.find(function(r){return r.id===routineId;}); if(!r)return;
   var ov=data.routineOverrides[ds+'_'+routineId]||{};
