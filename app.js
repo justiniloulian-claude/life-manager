@@ -90,6 +90,7 @@ const state = {
   noteType: 'text',
   noteCheckItems: [],
   notesSearchQuery: '',
+  taskModalLinkedNotes: [],
   zmanimCache: {},
   hebrewCache: {},
   location: null,
@@ -2596,6 +2597,74 @@ window.openMoveTaskModal = function(ds, id, isR) {
   openModal('moveDayModal');
 };
 
+// Build a categorized (by folder) note picker into `el`
+function buildNotePickerCategorized(linked, el) {
+  var data=getData();
+  var allNotes=data.notes.filter(function(n){return !n.deleted&&!n.archived;});
+  var folders=data.folders||[];
+  if(!allNotes.length){el.innerHTML='<div style="color:#aaa;font-size:13px">No notes found.</div>';return;}
+  var usedIds={};
+  var groups=[];
+  folders.forEach(function(f){
+    var fnotes=allNotes.filter(function(n){return getNoteFolderIds(n).indexOf(f.id)!==-1;});
+    if(fnotes.length){groups.push({folderId:f.id,name:f.name,color:f.color||'',notes:fnotes});fnotes.forEach(function(n){usedIds[n.id]=true;});}
+  });
+  var uncat=allNotes.filter(function(n){return !usedIds[n.id];});
+  if(uncat.length) groups.push({folderId:null,name:'Unfiled',color:'',notes:uncat});
+  el.innerHTML=groups.map(function(g,gi){
+    var border=g.color?'border-left:3px solid '+g.color+';':'border-left:3px solid #ddd;';
+    var notesHTML=g.notes.map(function(n){
+      var chk=linked.indexOf(n.id)!==-1;
+      var preview=n.content?escHtml(n.content.replace(/<[^>]*>/g,'').slice(0,60)):'';
+      return '<label class="note-pick-row">'+
+        '<input type="checkbox" class="note-pick-chk" data-nid="'+n.id+'"'+(chk?' checked':'')+'>'+
+        '<span class="note-pick-title">'+(n.title||'Untitled')+'</span>'+
+        (preview?'<span class="note-pick-preview">'+preview+'</span>':'')+
+      '</label>';
+    }).join('');
+    return '<div class="npg-wrap">'+
+      '<div class="npg-hdr" onclick="this.parentElement.classList.toggle(\'open\')" style="'+border+'">'+
+        '<span class="npg-icon">'+(g.folderId?'📁':'📄')+'</span>'+
+        '<span class="npg-name">'+escHtml(g.name)+'</span>'+
+        '<span class="npg-count">'+g.notes.length+'</span>'+
+        '<span class="npg-arrow">▸</span>'+
+      '</div>'+
+      '<div class="npg-body">'+notesHTML+'</div>'+
+    '</div>';
+  }).join('');
+}
+// Render the "linked" chips in the task modal
+function renderTaskModalLinkedDisplay() {
+  var el=document.getElementById('taskModalLinkedDisplay'); if(!el)return;
+  var data=getData();
+  if(!state.taskModalLinkedNotes.length){el.innerHTML='<span class="no-linked-notes">None linked</span>';return;}
+  el.innerHTML=state.taskModalLinkedNotes.map(function(nid){
+    var n=data.notes.find(function(n){return n.id===nid;}); if(!n)return'';
+    return '<span class="linked-note-chip">'+escHtml(n.title||'Untitled')+
+      '<button class="linked-chip-del" onclick="removeTaskModalLinkedNote(\''+nid+'\')">×</button></span>';
+  }).filter(Boolean).join('');
+}
+window.removeTaskModalLinkedNote=function(nid){
+  state.taskModalLinkedNotes=state.taskModalLinkedNotes.filter(function(id){return id!==nid;});
+  renderTaskModalLinkedDisplay();
+  var chk=document.querySelector('#taskModalNotePickerList .note-pick-chk[data-nid="'+nid+'"]');
+  if(chk)chk.checked=false;
+};
+window.toggleTaskModalNotePicker=function(){
+  var wrap=document.getElementById('taskModalNotePickerWrap'); if(!wrap)return;
+  var open=wrap.style.display!=='none';
+  var btn=document.getElementById('taskModalLinkNoteBtn');
+  if(open){wrap.style.display='none';if(btn)btn.textContent='📎 Link a Note';}
+  else{
+    buildNotePickerCategorized(state.taskModalLinkedNotes,document.getElementById('taskModalNotePickerList'));
+    wrap.style.display='';
+    if(btn)btn.textContent='✕ Close';
+  }
+};
+window.openLinkedNote=function(id){
+  closeModal('taskNotesLinkModal');
+  setTimeout(function(){openNoteView(id);},150);
+};
 window.openTaskNotesLink = function(ds, taskId) {
   closeModal('dashDayModal');
   state.linkNotesTaskDs=ds; state.linkNotesTaskId=taskId;
@@ -2604,23 +2673,21 @@ window.openTaskNotesLink = function(ds, taskId) {
   var linked=task.linkedNoteIds||[];
   var allNotes=data.notes.filter(function(n){return !n.deleted&&!n.archived;});
   var viewer=document.getElementById('linkedNotesViewer');
-  var picker=document.getElementById('notePickerList');
-  if (linked.length) {
+  if(linked.length){
     var lnotes=linked.map(function(nid){return allNotes.find(function(n){return n.id===nid;});}).filter(Boolean);
-    viewer.innerHTML='<div class="lnv-hdr">Linked Notes</div>'+lnotes.map(function(n){
-      return '<div class="lnv-item"><div class="lnv-title">'+(n.title||'Untitled')+'</div>'+
-        (n.content?'<div class="lnv-body">'+escHtml(n.content.slice(0,200))+(n.content.length>200?'…':'')+'</div>':'')+
-      '</div>';
-    }).join('');
+    viewer.innerHTML='<div class="lnv-hdr">Linked Notes <span style="font-weight:400;color:#aaa;font-size:11px">— click to open</span></div>'+
+      lnotes.map(function(n){
+        var preview=n.content?n.content.replace(/<[^>]*>/g,'').slice(0,200):'';
+        return '<div class="lnv-item lnv-clickable" onclick="openLinkedNote(\''+n.id+'\')">'+
+          '<div class="lnv-title">'+escHtml(n.title||'Untitled')+'</div>'+
+          (preview?'<div class="lnv-body">'+escHtml(preview)+(preview.length>=200?'…':'')+'</div>':'')+
+          '<span class="lnv-open-hint">Open full note →</span>'+
+        '</div>';
+      }).join('');
   } else {
     viewer.innerHTML='<div style="color:#aaa;font-size:13px;margin-bottom:12px">No notes linked yet.</div>';
   }
-  picker.innerHTML=allNotes.length?allNotes.map(function(n){
-    var checked=linked.includes(n.id);
-    return '<label class="note-pick-row"><input type="checkbox" class="note-pick-chk" data-nid="'+n.id+'"'+(checked?' checked':'')+'><span class="note-pick-title">'+(n.title||'Untitled')+'</span>'+
-      (n.content?'<span class="note-pick-preview">'+escHtml(n.content.slice(0,60))+'</span>':'')+
-    '</label>';
-  }).join(''):'<div style="color:#aaa;font-size:13px">No notes found.</div>';
+  buildNotePickerCategorized(linked, document.getElementById('notePickerList'));
   openModal('taskNotesLinkModal');
 };
 window.saveTaskNotesLink = function() {
@@ -2638,6 +2705,7 @@ window.toggleTaskNotes = function(btn) {
 
 window.openAddTask = function(ds) {
   state.editTaskId=null; state.editTaskDate=ds; state.selectedTaskColor=''; state.selectedTaskPriority='standard';
+  state.taskModalLinkedNotes=[];
   document.getElementById('taskModalTitle').textContent='Add Task or Event';
   document.getElementById('taskTitle').value='';
   document.getElementById('taskTime').value='';
@@ -2646,6 +2714,9 @@ window.openAddTask = function(ds) {
   document.getElementById('taskReminder').value='';
   document.getElementById('taskAddToCalendar').checked=false;
   document.querySelectorAll('.priority-btn').forEach(function(b){b.classList.toggle('active',b.dataset.priority==='standard');});
+  var pw=document.getElementById('taskModalNotePickerWrap');if(pw)pw.style.display='none';
+  var lb=document.getElementById('taskModalLinkNoteBtn');if(lb)lb.textContent='📎 Link a Note';
+  renderTaskModalLinkedDisplay();
   openModal('taskModal');
   setTimeout(function(){document.getElementById('taskTitle').focus();},80);
 };
@@ -2653,6 +2724,7 @@ window.openEditTask = function(ds,id) {
   closeModal('dashDayModal');
   var data=getData(); var t=(data.tasks[ds]||[]).find(function(t){return t.id===id;}); if(!t)return;
   state.editTaskId=id; state.editTaskDate=ds; state.selectedTaskColor=t.color||''; state.selectedTaskPriority=t.priority||'standard';
+  state.taskModalLinkedNotes=(t.linkedNoteIds||[]).slice();
   document.getElementById('taskModalTitle').textContent='Edit Task';
   document.getElementById('taskTitle').value=t.title;
   document.getElementById('taskTime').value=t.time||'';
@@ -2661,6 +2733,9 @@ window.openEditTask = function(ds,id) {
   document.getElementById('taskReminder').value=t.reminder||'';
   document.getElementById('taskAddToCalendar').checked=false;
   document.querySelectorAll('.priority-btn').forEach(function(b){b.classList.toggle('active',b.dataset.priority===(t.priority||'standard'));});
+  var pw=document.getElementById('taskModalNotePickerWrap');if(pw)pw.style.display='none';
+  var lb=document.getElementById('taskModalLinkNoteBtn');if(lb)lb.textContent='📎 Link a Note';
+  renderTaskModalLinkedDisplay();
   openModal('taskModal');
 };
 window.openZmanim = async function(ds) {
@@ -3135,7 +3210,7 @@ function saveTaskModal() {
   var title=document.getElementById('taskTitle').value.trim();
   if (!title){ document.getElementById('taskTitle').classList.add('error'); document.getElementById('taskTitle').focus(); return; }
   document.getElementById('taskTitle').classList.remove('error');
-  var d={title:title,time:document.getElementById('taskTime').value,location:document.getElementById('taskLocation').value.trim(),notes:document.getElementById('taskNotes').value.trim(),reminder:document.getElementById('taskReminder').value,color:state.selectedTaskColor,priority:state.selectedTaskPriority};
+  var d={title:title,time:document.getElementById('taskTime').value,location:document.getElementById('taskLocation').value.trim(),notes:document.getElementById('taskNotes').value.trim(),reminder:document.getElementById('taskReminder').value,color:state.selectedTaskColor,priority:state.selectedTaskPriority,linkedNoteIds:state.taskModalLinkedNotes.slice()};
   var addToCal=document.getElementById('taskAddToCalendar').checked;
   state.editTaskId ? updateTask(state.editTaskDate,state.editTaskId,d) : addTask(state.editTaskDate,d);
   if (addToCal) addCalEvent({title:d.title,date:state.editTaskDate,time:d.time,color:d.color});
@@ -3493,6 +3568,15 @@ function initListeners() {
   document.getElementById('closeTaskNotesLinkModal').addEventListener('click', function(){ closeModal('taskNotesLinkModal'); });
   document.getElementById('cancelTaskNotesLink').addEventListener('click',     function(){ closeModal('taskNotesLinkModal'); });
   document.getElementById('saveTaskNotesLink').addEventListener('click', saveTaskNotesLink);
+
+  // Task modal note picker — event delegation for checkbox changes
+  document.getElementById('taskModalNotePickerWrap').addEventListener('change', function(e){
+    if(!e.target.classList.contains('note-pick-chk'))return;
+    var nid=e.target.dataset.nid;
+    if(e.target.checked){if(state.taskModalLinkedNotes.indexOf(nid)===-1)state.taskModalLinkedNotes.push(nid);}
+    else{state.taskModalLinkedNotes=state.taskModalLinkedNotes.filter(function(id){return id!==nid;});}
+    renderTaskModalLinkedDisplay();
+  });
 
   // Task modal
   document.getElementById('closeTaskModal').addEventListener('click', function(){ closeModal('taskModal'); });
@@ -3904,6 +3988,41 @@ function initListeners() {
     if((e.metaKey||e.ctrlKey)&&e.key==='b'){e.preventDefault();document.execCommand('bold',false,null);}
     if((e.metaKey||e.ctrlKey)&&e.key==='i'){e.preventDefault();document.execCommand('italic',false,null);}
     if((e.metaKey||e.ctrlKey)&&e.key==='u'){e.preventDefault();document.execCommand('underline',false,null);}
+
+    // Tab: indent / Shift+Tab: unindent
+    if(e.key==='Tab'){
+      e.preventDefault();
+      if(e.shiftKey){
+        var ed=this; var sel=window.getSelection();
+        if(sel.rangeCount){
+          var cn=sel.getRangeAt(0).startContainer;
+          var el=cn.nodeType===3?cn.parentNode:cn;
+          while(el&&el.parentNode!==ed&&el!==ed)el=el.parentNode;
+          var blk=(el&&el!==ed)?el:ed;
+          var walker=document.createTreeWalker(blk,NodeFilter.SHOW_TEXT);
+          var tn=walker.nextNode();
+          if(tn){var m=tn.textContent.match(/^( {1,4})/);
+            if(m){var r2=document.createRange();r2.setStart(tn,0);r2.setEnd(tn,m[1].length);sel.removeAllRanges();sel.addRange(r2);document.execCommand('delete');}}
+        }
+      } else {
+        document.execCommand('insertText',false,'    ');
+      }
+      return;
+    }
+
+    // Auto-list: Enter continues bullet or numbered list
+    if(e.key==='Enter'&&!e.shiftKey&&!e.ctrlKey&&!e.metaKey){
+      var ed2=this; var sel2=window.getSelection();
+      if(!sel2.rangeCount)return;
+      var cn2=sel2.getRangeAt(0).startContainer;
+      var el2=cn2.nodeType===3?cn2.parentNode:cn2;
+      while(el2&&el2.parentNode!==ed2&&el2!==ed2)el2=el2.parentNode;
+      var lineText=(el2&&el2!==ed2)?el2.textContent:(cn2.nodeType===3?cn2.textContent:'');
+      var bulletM=lineText.match(/^(\s*- )/);
+      var numM=lineText.match(/^(\s*)(\d+)\. /);
+      if(bulletM){e.preventDefault();document.execCommand('insertHTML',false,'<br>'+bulletM[1]);}
+      else if(numM){e.preventDefault();document.execCommand('insertHTML',false,'<br>'+numM[1]+(parseInt(numM[2])+1)+'. ');}
+    }
   });
   document.getElementById('noteViewAddCheckItem').addEventListener('click', function(){
     state.viewNoteCheckItems.push({id:uid(),text:'',done:false}); renderNoteViewChecklist();

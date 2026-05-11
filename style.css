@@ -2370,3 +2370,29 @@ textarea.field { resize: vertical; }
 .cal-rem-del-btn:hover { background:#fdd; color:#a00; }
 .cal-rem-add-btn { font-size:12px; padding:5px 12px; margin-top:2px; }
 .cal-rem-empty { font-size:13px; color:#ccc; font-style:italic; padding:4px 0 6px; }
+
+/* Categorized note picker (task modal + link modal) */
+.npg-wrap { border-radius:7px; overflow:hidden; margin-bottom:6px; border:1px solid #eee; }
+.npg-hdr { display:flex; align-items:center; gap:6px; padding:8px 10px; background:#fafaf8; cursor:pointer; user-select:none; font-size:13px; font-weight:600; color:#333; }
+.npg-hdr:hover { background:#f0f0ec; }
+.npg-icon { font-size:14px; }
+.npg-name { flex:1; }
+.npg-count { font-size:11px; background:#e8e8e4; color:#666; border-radius:10px; padding:1px 7px; font-weight:500; }
+.npg-arrow { font-size:10px; color:#aaa; transition:transform 0.15s; }
+.npg-body { display:none; padding:4px 0; }
+.npg-wrap.open .npg-body { display:block; }
+.npg-wrap.open .npg-arrow { transform:rotate(90deg); }
+
+/* Task modal — linked note chips */
+.task-linked-display { display:flex; flex-wrap:wrap; gap:6px; min-height:24px; margin-bottom:8px; align-items:center; }
+.no-linked-notes { font-size:12px; color:#bbb; font-style:italic; }
+.linked-note-chip { display:inline-flex; align-items:center; gap:4px; background:#ede9fe; color:#5b21b6; border-radius:20px; padding:3px 10px 3px 12px; font-size:12px; font-weight:500; }
+.linked-chip-del { background:none; border:none; cursor:pointer; font-size:14px; color:#7c3aed; padding:0 0 0 2px; line-height:1; opacity:0.6; }
+.linked-chip-del:hover { opacity:1; }
+.task-link-note-btn { font-size:12px; padding:5px 12px; }
+
+/* Linked note items — clickable */
+.lnv-clickable { cursor:pointer; position:relative; transition:background 0.12s; }
+.lnv-clickable:hover { background:#f0efff; border-color:#c4b5fd; }
+.lnv-open-hint { display:block; font-size:11px; color:#7c3aed; margin-top:4px; font-weight:500; opacity:0; transition:opacity 0.12s; }
+.lnv-clickable:hover .lnv-open-hint { opacity:1; }

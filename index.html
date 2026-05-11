@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=30">
+  <link rel="stylesheet" href="style.css?v=31">
 </head>
 <body>
 
@@ -440,6 +440,12 @@
       <div class="field-check-row">
         <input type="checkbox" id="taskAddToCalendar">
         <label for="taskAddToCalendar">Also add to Calendar</label>
+      </div>
+      <label class="field-label" style="margin-top:12px">Linked Notes <span class="optional">optional</span></label>
+      <div id="taskModalLinkedDisplay" class="task-linked-display"></div>
+      <button type="button" class="btn-secondary task-link-note-btn" id="taskModalLinkNoteBtn" onclick="toggleTaskModalNotePicker()">📎 Link a Note</button>
+      <div id="taskModalNotePickerWrap" style="display:none;margin-top:8px">
+        <div id="taskModalNotePickerList" style="max-height:220px;overflow-y:auto;border:1px solid #eee;border-radius:8px;padding:4px"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -1197,6 +1203,6 @@
   </div>
 </div>
 
-<script src="app.js?v=30"></script>
+<script src="app.js?v=31"></script>
 </body>
 </html>
