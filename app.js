@@ -184,6 +184,30 @@ function uid()      { return Date.now().toString(36) + Math.random().toString(36
 // Module-level media recorder state
 var _mediaRecorder=null, _audioChunks=[], _recordTimerInt=null, _recordSecs=0, _currentAudioBlob=null;
 
+// Note editor undo/redo stacks
+var _noteUndoStack=[], _noteRedoStack=[], _noteUndoTimer=null;
+function _noteUndoPush(){
+  var ta=document.getElementById('noteViewContent'); if(!ta)return;
+  var v=ta.value;
+  if(_noteUndoStack.length&&_noteUndoStack[_noteUndoStack.length-1]===v)return;
+  _noteUndoStack.push(v); _noteRedoStack=[];
+  if(_noteUndoStack.length>200)_noteUndoStack.shift();
+}
+window.noteUndo=function(){
+  var ta=document.getElementById('noteViewContent'); if(!ta||_noteUndoStack.length<2)return;
+  _noteRedoStack.push(_noteUndoStack.pop());
+  ta.value=_noteUndoStack[_noteUndoStack.length-1]||'';
+  ta.style.height='auto'; ta.style.height=Math.max(120,ta.scrollHeight)+'px';
+  ta.dispatchEvent(new Event('input'));
+};
+window.noteRedo=function(){
+  var ta=document.getElementById('noteViewContent'); if(!ta||!_noteRedoStack.length)return;
+  var v=_noteRedoStack.pop(); _noteUndoStack.push(v);
+  ta.value=v;
+  ta.style.height='auto'; ta.style.height=Math.max(120,ta.scrollHeight)+'px';
+  ta.dispatchEvent(new Event('input'));
+};
+
 // ============================================================
 // INDEXEDDB FOR AUDIO
 // ============================================================
@@ -579,7 +603,7 @@ function purgeNoteById(id){
   saveN(data.notes.filter(function(n){return n.id!==id;}));
 }
 function purgeOldDeletedNotes(){
-  var data=getData(); var cutoff=new Date(); cutoff.setDate(cutoff.getDate()-7);
+  var data=getData(); var cutoff=new Date(); cutoff.setDate(cutoff.getDate()-30);
   var kept=data.notes.filter(function(n){
     if(!n.deleted)return true;
     return n.deletedAt&&new Date(n.deletedAt)>cutoff;
@@ -2042,11 +2066,11 @@ function renderFolderSubtree(folders, parentId, depth) {
     var dot=f.color?'<span class="folder-color-dot" style="background:'+f.color+'"></span>':'📁 ';
     var lockIcon=f.password?'<span class="folder-lock-icon">🔒</span>':'';
     var toggle=hasChildren?'<span class="folder-toggle-btn" onclick="event.stopPropagation();toggleFolderExpand(\''+f.id+'\')">'+(expanded?'▾':'▸')+'</span>':'<span class="folder-toggle-placeholder"></span>';
-    var indent=depth*14;
+    var indent=depth*18;
     var isDrag=depth===0;
     var row='<div class="sidebar-item folder-item'+(active===f.id?' active':'')+'" '+
       (isDrag?'draggable="true" data-fid="'+f.id+'" ondragstart="folderDragStart(event)" ondragover="folderDragOver(event)" ondragleave="folderDragLeave(event)" ondragend="folderDragEnd(event)" ondrop="folderDrop(event)"':'')+
-      ' style="padding-left:'+(12+indent)+'px" onclick="setNoteFolder(\''+f.id+'\')">'+
+      ' style="padding-left:'+(16+indent)+'px" onclick="setNoteFolder(\''+f.id+'\')">'+
       (depth===0?'<span class="folder-drag-handle">⠿</span>':'')+
       toggle+dot+lockIcon+escHtml(f.name)+
       '<div class="folder-item-actions">'+
@@ -2076,7 +2100,7 @@ function trashNoteCardHTML(note) {
     : '<div class="note-card-content">'+escHtml(note.content||'')+'</div>';
   var daysLeft='';
   if(note.deletedAt){
-    var d=Math.ceil((new Date(note.deletedAt).getTime()+7*24*60*60*1000-Date.now())/(1000*60*60*24));
+    var d=Math.ceil((new Date(note.deletedAt).getTime()+30*24*60*60*1000-Date.now())/(1000*60*60*24));
     daysLeft='<div class="note-deleted-info">Auto-deleted in '+Math.max(0,d)+' day'+(Math.max(0,d)!==1?'s':'')+'</div>';
   }
   return '<div class="note-card is-deleted'+colorClass+'">'+(note.title?'<div class="note-card-title">'+escHtml(note.title)+'</div>':'')+contentHTML+daysLeft+
@@ -2094,9 +2118,9 @@ function renderNotesMain() {
   if(state.activeFolderId==='trash'){
     var deleted=data.notes.filter(function(n){return n.deleted;});
     if(!deleted.length){
-      main.innerHTML='<div class="notes-empty"><div class="notes-empty-icon">🗑</div><p>Recently Deleted is empty.<br>Deleted notes stay here for 7 days.</p></div>';
+      main.innerHTML='<div class="notes-empty"><div class="notes-empty-icon">🗑</div><p>Recently Deleted is empty.<br>Deleted notes stay here for 30 days.</p></div>';
     } else {
-      main.innerHTML='<p style="color:#aaa;font-size:13px;margin-bottom:12px">Deleted notes are permanently removed after 7 days.</p><div class="notes-grid">'+deleted.map(trashNoteCardHTML).join('')+'</div>';
+      main.innerHTML='<p style="color:#aaa;font-size:13px;margin-bottom:12px">Deleted notes are permanently removed after 30 days.</p><div class="notes-grid">'+deleted.map(trashNoteCardHTML).join('')+'</div>';
     }
     return;
   }
@@ -2558,6 +2582,7 @@ window.openNoteView = function(id) {
     document.getElementById('noteViewCheckWrap').style.display='none';
     var ta=document.getElementById('noteViewContent');
     ta.value=n.content||'';
+    _noteUndoStack=[ta.value]; _noteRedoStack=[];
     // Reset height then grow to fit content
     setTimeout(function(){ ta.style.height='auto'; ta.style.height=Math.max(120,ta.scrollHeight)+'px'; },50);
   }
@@ -3546,7 +3571,7 @@ function initListeners() {
     this.title=n&&n.pinned?'Unpin note':'Pin note';
   });
   document.getElementById('noteViewTrashBtn').addEventListener('click', function(){
-    if(!confirm('Delete this note? You can restore it from Recently Deleted within 7 days.'))return;
+    if(!confirm('Delete this note? You can restore it from Recently Deleted within 30 days.'))return;
     var id=state.viewingNoteId;
     closeModal('noteViewModal');
     deleteNote(id);
@@ -3554,6 +3579,7 @@ function initListeners() {
   });
   document.getElementById('noteViewContent').addEventListener('input', function(){
     this.style.height='auto'; this.style.height=Math.max(120,this.scrollHeight)+'px';
+    clearTimeout(_noteUndoTimer); _noteUndoTimer=setTimeout(_noteUndoPush,400);
   });
   document.getElementById('noteViewAddCheckItem').addEventListener('click', function(){
     state.viewNoteCheckItems.push({id:uid(),text:'',done:false}); renderNoteViewChecklist();

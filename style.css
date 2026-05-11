@@ -735,13 +735,14 @@ textarea.field { resize: vertical; }
   margin-bottom: 10px;
 }
 .notes-grid {
-  columns: 4 180px;
-  column-gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: start;
   margin-bottom: 24px;
 }
 .note-card {
-  break-inside: avoid;
-  margin-bottom: 12px;
+  margin-bottom: 0;
   background: #fff;
   border: 1px solid #e8e8e8;
   border-radius: 10px;
@@ -1460,14 +1461,15 @@ textarea.field { resize: vertical; }
 
 /* ===== FOLDER SIDEBAR DRAG + EDIT ===== */
 .folder-drag-handle {
-  font-size: 14px;
+  position: absolute;
+  left: 3px;
+  font-size: 13px;
   color: #ddd;
   cursor: grab;
-  flex-shrink: 0;
-  margin-right: 2px;
   user-select: none;
   opacity: 0;
   transition: opacity 0.15s;
+  line-height: 1;
 }
 .folder-item:hover .folder-drag-handle { opacity: 1; }
 .folder-drag-handle:active { cursor: grabbing; }
@@ -2065,11 +2067,13 @@ textarea.field { resize: vertical; }
 
 /* Folder tree — toggle, lock, indented children */
 .folder-toggle-btn {
-  font-size: 10px; color: #bbb; cursor: pointer; margin-right: 4px;
+  font-size: 14px; color: #bbb; cursor: pointer;
   flex-shrink: 0; user-select: none; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px;
 }
 .folder-toggle-btn:hover { color: #555; }
-.folder-toggle-placeholder { display: inline-block; width: 14px; flex-shrink: 0; }
+.folder-toggle-placeholder { display: inline-block; width: 18px; flex-shrink: 0; }
 .folder-lock-icon { font-size: 11px; margin-left: 3px; opacity: 0.6; }
 
 /* Folder checkbox list in note modal */
@@ -2158,7 +2162,7 @@ textarea.field { resize: vertical; }
   .day-card-name { font-size: 19px; }
   .seven-day-grid { grid-template-columns: repeat(7, minmax(140px, 1fr)); }
   .notes-sidebar  { width: 170px; }
-  .notes-grid     { columns: 2 140px; }
+  .notes-grid     { grid-template-columns: repeat(2, 1fr); }
   .cal-month-label { min-width: 140px; font-size: 17px; }
   .learning-grid  { grid-template-columns: repeat(7, minmax(130px, 1fr)); }
   .dash-subnav    { padding: 8px 10px; }
@@ -2245,3 +2249,11 @@ textarea.field { resize: vertical; }
 .edit-scope-opts { display: flex; flex-direction: column; gap: 10px; }
 .btn-scope-opt { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; font-size: 14px; color: #1a1a1a; cursor: pointer; text-align: left; }
 .btn-scope-opt:hover { background: #f5f5f5; }
+
+/* Note editor undo/redo buttons */
+.note-undo-btn {
+  background: none; border: 1px solid #e5e7eb; border-radius: 6px;
+  font-size: 15px; color: #666; cursor: pointer; padding: 3px 8px;
+  transition: background 0.12s, color 0.12s; line-height: 1.4;
+}
+.note-undo-btn:hover { background: #f5f5f5; color: #111; }

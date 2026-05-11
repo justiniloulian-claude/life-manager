@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=19">
+  <link rel="stylesheet" href="style.css?v=20">
 </head>
 <body>
 
@@ -592,6 +592,8 @@
     <div class="note-view-header">
       <input type="text" id="noteViewTitleInput" class="note-view-title-input" placeholder="Title">
       <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+        <button class="note-undo-btn" onclick="noteUndo()" title="Undo">↩</button>
+        <button class="note-undo-btn" onclick="noteRedo()" title="Redo">↪</button>
         <button id="noteViewPinBtn" class="btn-icon" style="font-size:18px;opacity:0.4" title="Pin note">📌</button>
         <button id="noteViewTrashBtn" class="btn-icon" style="font-size:18px;opacity:0.5" title="Delete note">🗑</button>
         <button id="noteViewOptionsBtn" class="btn-secondary" style="font-size:12px;padding:5px 12px">⚙️ Options</button>
@@ -1153,6 +1155,6 @@
   </div>
 </div>
 
-<script src="app.js?v=19"></script>
+<script src="app.js?v=20"></script>
 </body>
 </html>
