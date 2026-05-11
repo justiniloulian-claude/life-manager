@@ -2382,6 +2382,8 @@ textarea.field { resize: vertical; }
 .npg-body { display:none; padding:4px 0; }
 .npg-wrap.open .npg-body { display:block; }
 .npg-wrap.open .npg-arrow { transform:rotate(90deg); }
+/* Nested sub-folders indent inside their parent body */
+.npg-body .npg-wrap { margin-left:12px; margin-bottom:4px; }
 
 /* Task modal — linked note chips */
 .task-linked-display { display:flex; flex-wrap:wrap; gap:6px; min-height:24px; margin-bottom:8px; align-items:center; }

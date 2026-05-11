@@ -2597,41 +2597,61 @@ window.openMoveTaskModal = function(ds, id, isR) {
   openModal('moveDayModal');
 };
 
-// Build a categorized (by folder) note picker into `el`
+// Build note rows HTML for a set of notes
+function notePickerRowsHTML(notes, linked) {
+  return notes.map(function(n){
+    var chk=linked.indexOf(n.id)!==-1;
+    var preview=n.content?escHtml(n.content.replace(/<[^>]*>/g,'').slice(0,60)):'';
+    return '<label class="note-pick-row">'+
+      '<input type="checkbox" class="note-pick-chk" data-nid="'+n.id+'"'+(chk?' checked':'')+'>'+
+      '<span class="note-pick-title">'+(n.title||'Untitled')+'</span>'+
+      (preview?'<span class="note-pick-preview">'+preview+'</span>':'')+
+    '</label>';
+  }).join('');
+}
+// Recursively build folder tree picker HTML
+function buildFolderPickerHTML(parentId, folders, allNotes, linked) {
+  var children=folders.filter(function(f){return (f.parentId||null)===(parentId||null);});
+  if(!children.length) return '';
+  return children.map(function(f){
+    var directNotes=allNotes.filter(function(n){return getNoteFolderIds(n).indexOf(f.id)!==-1;});
+    var subHTML=buildFolderPickerHTML(f.id,folders,allNotes,linked);
+    var border=f.color?'border-left:3px solid '+f.color+';':'border-left:3px solid #ddd;';
+    var hasSubFolders=folders.some(function(sf){return sf.parentId===f.id;});
+    var icon=hasSubFolders?'📂':'📁';
+    return '<div class="npg-wrap">'+
+      '<div class="npg-hdr" onclick="this.parentElement.classList.toggle(\'open\')" style="'+border+'">'+
+        '<span class="npg-icon">'+icon+'</span>'+
+        '<span class="npg-name">'+escHtml(f.name)+'</span>'+
+        (directNotes.length?'<span class="npg-count">'+directNotes.length+'</span>':'')+
+        '<span class="npg-arrow">▸</span>'+
+      '</div>'+
+      '<div class="npg-body">'+notePickerRowsHTML(directNotes,linked)+subHTML+'</div>'+
+    '</div>';
+  }).join('');
+}
+// Build a hierarchical (by folder tree) note picker into `el`
 function buildNotePickerCategorized(linked, el) {
   var data=getData();
   var allNotes=data.notes.filter(function(n){return !n.deleted&&!n.archived;});
   var folders=data.folders||[];
   if(!allNotes.length){el.innerHTML='<div style="color:#aaa;font-size:13px">No notes found.</div>';return;}
-  var usedIds={};
-  var groups=[];
-  folders.forEach(function(f){
-    var fnotes=allNotes.filter(function(n){return getNoteFolderIds(n).indexOf(f.id)!==-1;});
-    if(fnotes.length){groups.push({folderId:f.id,name:f.name,color:f.color||'',notes:fnotes});fnotes.forEach(function(n){usedIds[n.id]=true;});}
-  });
-  var uncat=allNotes.filter(function(n){return !usedIds[n.id];});
-  if(uncat.length) groups.push({folderId:null,name:'Unfiled',color:'',notes:uncat});
-  el.innerHTML=groups.map(function(g,gi){
-    var border=g.color?'border-left:3px solid '+g.color+';':'border-left:3px solid #ddd;';
-    var notesHTML=g.notes.map(function(n){
-      var chk=linked.indexOf(n.id)!==-1;
-      var preview=n.content?escHtml(n.content.replace(/<[^>]*>/g,'').slice(0,60)):'';
-      return '<label class="note-pick-row">'+
-        '<input type="checkbox" class="note-pick-chk" data-nid="'+n.id+'"'+(chk?' checked':'')+'>'+
-        '<span class="note-pick-title">'+(n.title||'Untitled')+'</span>'+
-        (preview?'<span class="note-pick-preview">'+preview+'</span>':'')+
-      '</label>';
-    }).join('');
-    return '<div class="npg-wrap">'+
-      '<div class="npg-hdr" onclick="this.parentElement.classList.toggle(\'open\')" style="'+border+'">'+
-        '<span class="npg-icon">'+(g.folderId?'📁':'📄')+'</span>'+
-        '<span class="npg-name">'+escHtml(g.name)+'</span>'+
-        '<span class="npg-count">'+g.notes.length+'</span>'+
+  var html=buildFolderPickerHTML(null,folders,allNotes,linked);
+  // Unfiled: notes not in any folder
+  var uncat=allNotes.filter(function(n){return !getNoteFolderIds(n).length;});
+  if(uncat.length){
+    html+='<div class="npg-wrap">'+
+      '<div class="npg-hdr" onclick="this.parentElement.classList.toggle(\'open\')" style="border-left:3px solid #ddd;">'+
+        '<span class="npg-icon">📄</span>'+
+        '<span class="npg-name">Unfiled</span>'+
+        '<span class="npg-count">'+uncat.length+'</span>'+
         '<span class="npg-arrow">▸</span>'+
       '</div>'+
-      '<div class="npg-body">'+notesHTML+'</div>'+
+      '<div class="npg-body">'+notePickerRowsHTML(uncat,linked)+'</div>'+
     '</div>';
-  }).join('');
+  }
+  if(!html){el.innerHTML='<div style="color:#aaa;font-size:13px">No notes found.</div>';return;}
+  el.innerHTML=html;
 }
 // Render the "linked" chips in the task modal
 function renderTaskModalLinkedDisplay() {
