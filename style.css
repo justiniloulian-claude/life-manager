@@ -2246,8 +2246,8 @@ textarea.field { resize: vertical; }
 
 /* ===== WEEKLY TAB ===== */
 .weekly-week-banner { font-size:15px; font-weight:600; color:#1a1a1a; margin-bottom:16px; padding:10px 14px; background:#fafaf8; border-radius:8px; border:1px solid #f0f0f0; }
-.weekly-tbl-hdr { display:grid; grid-template-columns:1fr 110px 140px 70px; gap:8px; padding:8px 14px; font-size:11px; font-weight:700; color:#aaa; text-transform:uppercase; letter-spacing:0.05em; border-bottom:2px solid #f0f0f0; }
-.weekly-item-row { display:grid; grid-template-columns:1fr 110px 140px 70px; gap:8px; align-items:center; padding:8px 14px; border-bottom:1px solid #f7f7f7; }
+.weekly-tbl-hdr { display:grid; grid-template-columns:1fr 110px 70px; gap:8px; padding:8px 14px; font-size:11px; font-weight:700; color:#aaa; text-transform:uppercase; letter-spacing:0.05em; border-bottom:2px solid #f0f0f0; }
+.weekly-item-row { display:grid; grid-template-columns:1fr 110px 70px; gap:8px; align-items:center; padding:8px 14px; border-bottom:1px solid #f7f7f7; }
 .weekly-item-row:hover { background:#fafaf8; }
 .weekly-item-text { font-size:14px; color:#1a1a1a; }
 .weekly-score-input { width:60px; padding:4px 8px; border:1px solid #e0e0e0; border-radius:6px; font-size:13px; text-align:center; font-family:inherit; }
@@ -2275,7 +2275,7 @@ textarea.field { resize: vertical; }
 
 @media (max-width:700px) {
   .monthly-cols { grid-template-columns:1fr; }
-  .weekly-tbl-hdr, .weekly-item-row { grid-template-columns:1fr 80px 100px 60px; }
+  .weekly-tbl-hdr, .weekly-item-row { grid-template-columns:1fr 80px 60px; }
 }
 
 /* Recurring picker */

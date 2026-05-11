@@ -1204,13 +1204,12 @@ function renderWeeklyTab() {
   var html = '<div class="weekly-week-banner">' + escHtml(getWeekBannerText()) + '</div>';
   html += '<div style="margin-bottom:12px"><button class="btn-primary" style="font-size:13px;padding:7px 14px" onclick="openAddWeeklyItem()">+ Add Item</button></div>';
   if (data.weeklyItems.length) {
-    html += '<div class="weekly-tbl-hdr"><span>Item</span><span>Score (1-10)</span><span>Focus next week (1-10)</span><span>Actions</span></div>';
+    html += '<div class="weekly-tbl-hdr"><span>Item</span><span>Score (1-10)</span><span>Actions</span></div>';
     html += data.weeklyItems.map(function(item) {
       var sc = scores[item.id] || {};
       return '<div class="weekly-item-row">'+
         '<div class="weekly-item-text">'+escHtml(item.text)+'</div>'+
         '<div><input type="number" class="weekly-score-input" min="1" max="10" value="'+escHtml(String(sc.score||''))+'" placeholder="—" onchange="updateWeeklyScore(\''+item.id+'\',\'score\',this.value)"></div>'+
-        '<div><input type="number" class="weekly-score-input" min="1" max="10" value="'+escHtml(String(sc.focus||''))+'" placeholder="—" onchange="updateWeeklyScore(\''+item.id+'\',\'focus\',this.value)"></div>'+
         '<div style="display:flex;gap:4px">'+
           '<button class="btn-icon" onclick="openEditWeeklyItem(\''+item.id+'\')">✏️</button>'+
           '<button class="btn-icon" onclick="removeWeeklyItem(\''+item.id+'\')">🗑</button>'+
@@ -1257,13 +1256,12 @@ window.toggleWeeklyHistEntry = function(el, entryId) {
   var data = getData();
   var e = data.weeklyHistory.find(function(x){return x.id===entryId;}); if (!e) return;
   body.innerHTML = '<div style="margin-top:8px">'+
-    '<div style="display:grid;grid-template-columns:1fr 80px 100px;gap:6px;font-size:11px;font-weight:700;color:#aaa;text-transform:uppercase;margin-bottom:4px;padding:0 2px">'+
-    '<span>Item</span><span>Score</span><span>Focus</span></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 80px;gap:6px;font-size:11px;font-weight:700;color:#aaa;text-transform:uppercase;margin-bottom:4px;padding:0 2px">'+
+    '<span>Item</span><span>Score</span></div>'+
     e.items.map(function(item){
-      return '<div style="display:grid;grid-template-columns:1fr 80px 100px;gap:6px;font-size:13px;padding:4px 2px;border-bottom:1px solid #f5f5f5">'+
+      return '<div style="display:grid;grid-template-columns:1fr 80px;gap:6px;font-size:13px;padding:4px 2px;border-bottom:1px solid #f5f5f5">'+
         '<span>'+escHtml(item.text)+'</span>'+
         '<span style="color:#555">'+(item.score||'—')+'</span>'+
-        '<span style="color:#555">'+(item.focus||'—')+'</span>'+
       '</div>';
     }).join('')+
   '</div>';
