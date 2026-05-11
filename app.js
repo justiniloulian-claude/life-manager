@@ -188,29 +188,22 @@ function uid()      { return Date.now().toString(36) + Math.random().toString(36
 // Module-level media recorder state
 var _mediaRecorder=null, _audioChunks=[], _recordTimerInt=null, _recordSecs=0, _currentAudioBlob=null;
 
-// Note editor undo/redo stacks
-var _noteUndoStack=[], _noteRedoStack=[], _noteUndoTimer=null;
-function _noteUndoPush(){
-  var ta=document.getElementById('noteViewContent'); if(!ta)return;
-  var v=ta.value;
-  if(_noteUndoStack.length&&_noteUndoStack[_noteUndoStack.length-1]===v)return;
-  _noteUndoStack.push(v); _noteRedoStack=[];
-  if(_noteUndoStack.length>200)_noteUndoStack.shift();
-}
+// Note editor undo/redo (contenteditable — use browser execCommand)
+var _noteUndoTimer=null;
 window.noteUndo=function(){
-  var ta=document.getElementById('noteViewContent'); if(!ta||_noteUndoStack.length<2)return;
-  _noteRedoStack.push(_noteUndoStack.pop());
-  ta.value=_noteUndoStack[_noteUndoStack.length-1]||'';
-  ta.style.height='auto'; ta.style.height=Math.max(120,ta.scrollHeight)+'px';
-  ta.dispatchEvent(new Event('input'));
+  var el=document.getElementById('noteViewContent'); if(!el)return;
+  el.focus(); document.execCommand('undo',false,null);
 };
 window.noteRedo=function(){
-  var ta=document.getElementById('noteViewContent'); if(!ta||!_noteRedoStack.length)return;
-  var v=_noteRedoStack.pop(); _noteUndoStack.push(v);
-  ta.value=v;
-  ta.style.height='auto'; ta.style.height=Math.max(120,ta.scrollHeight)+'px';
-  ta.dispatchEvent(new Event('input'));
+  var el=document.getElementById('noteViewContent'); if(!el)return;
+  el.focus(); document.execCommand('redo',false,null);
 };
+window.execFmt=function(cmd){
+  var el=document.getElementById('noteViewContent'); if(!el)return;
+  el.focus(); document.execCommand(cmd,false,null);
+};
+// Note drag state
+var _draggingNoteId=null;
 
 // ============================================================
 // INDEXEDDB FOR AUDIO
@@ -2233,6 +2226,47 @@ function trashNoteCardHTML(note) {
 window.restoreNoteCard = function(id){ restoreNote(id); renderNotes(); };
 window.permanentlyDeleteNote = function(id){ if(confirm('Permanently delete this note? This cannot be undone.')){ purgeNoteById(id); renderNotes(); } };
 
+// Note drag-and-drop reorder
+window.noteDragStart=function(e,id){
+  _draggingNoteId=id; e.dataTransfer.effectAllowed='move';
+  e.currentTarget.classList.add('note-dragging');
+};
+window.noteDragOver=function(e,id){
+  e.preventDefault(); e.stopPropagation();
+  if(id===_draggingNoteId)return;
+  var src=_draggingNoteId; if(!src)return;
+  var data=getData();
+  var srcNote=data.notes.find(function(n){return n.id===src;});
+  var tgtNote=data.notes.find(function(n){return n.id===id;});
+  if(!srcNote||!tgtNote||srcNote.pinned!==tgtNote.pinned)return;
+  e.currentTarget.classList.add('note-drag-over');
+};
+window.noteDragLeave=function(e){
+  e.currentTarget.classList.remove('note-drag-over');
+};
+window.noteDragEnd=function(e){
+  _draggingNoteId=null;
+  document.querySelectorAll('.note-dragging,.note-drag-over').forEach(function(el){
+    el.classList.remove('note-dragging','note-drag-over');
+  });
+};
+window.noteDragDrop=function(e,targetId){
+  e.preventDefault(); e.stopPropagation();
+  var srcId=_draggingNoteId; _draggingNoteId=null;
+  document.querySelectorAll('.note-dragging,.note-drag-over').forEach(function(el){
+    el.classList.remove('note-dragging','note-drag-over');
+  });
+  if(!srcId||srcId===targetId)return;
+  var data=getData(); var notes=data.notes;
+  var si=notes.findIndex(function(n){return n.id===srcId;});
+  var ti=notes.findIndex(function(n){return n.id===targetId;});
+  if(si===-1||ti===-1)return;
+  if(notes[si].pinned!==notes[ti].pinned)return;
+  var item=notes.splice(si,1)[0];
+  notes.splice(ti,0,item);
+  saveN(notes); renderNotes();
+};
+
 function renderNotesMain() {
   var data=getData(); var main=document.getElementById('notesMain');
 
@@ -2269,7 +2303,7 @@ function noteCardHTML(note) {
       note.items.slice(0,5).map(function(item){return '<div class="note-checklist-item'+(item.done?' done':'')+'">'+'<input type="checkbox"'+(item.done?' checked':'')+' disabled> <span>'+escHtml(item.text)+'</span></div>';}).join('')+
       (note.items.length>5?'<div style="font-size:12px;color:#aaa;margin-top:4px">+'+(note.items.length-5)+' more</div>':'')+
       '</div>';
-  } else { contentHTML='<div class="note-card-content">'+escHtml(note.content||'')+'</div>'; }
+  } else { contentHTML='<div class="note-card-content">'+(note.content||'')+'</div>'; }
   // Folder badges
   var data=getData(); var folderIds=getNoteFolderIds(note);
   var badges=folderIds.map(function(fid){
@@ -2279,7 +2313,11 @@ function noteCardHTML(note) {
   }).filter(Boolean).join('');
   var badgesHTML=badges?'<div class="note-folder-badges">'+badges+'</div>':'';
   var dateStr = fmtNoteDate(note.updatedAt||note.createdAt);
-  return '<div class="note-card'+colorClass+(note.pinned?' is-pinned':'')+'" onclick="openNoteView(\''+note.id+'\')">'+(note.pinned?'<span class="note-pin-flag">📌</span>':'')+
+  return '<div class="note-card'+colorClass+(note.pinned?' is-pinned':'')+'" '+
+    'draggable="true" data-note-id="'+note.id+'" data-pinned="'+(note.pinned?'1':'0')+'" '+
+    'ondragstart="noteDragStart(event,\''+note.id+'\')" ondragover="noteDragOver(event,\''+note.id+'\')" '+
+    'ondragleave="noteDragLeave(event)" ondragend="noteDragEnd(event)" ondrop="noteDragDrop(event,\''+note.id+'\')" '+
+    'onclick="openNoteView(\''+note.id+'\')">'+(note.pinned?'<span class="note-pin-flag">📌</span>':'')+
     (dateStr?'<div class="note-card-date">'+escHtml(dateStr)+'</div>':'')+
     (note.title?'<div class="note-card-title">'+escHtml(note.title)+'</div>':'')+contentHTML+badgesHTML+
     '<div class="note-card-actions">'+
@@ -2667,7 +2705,7 @@ function saveNoteViewModal() {
   if(n.type==='checklist'){
     n.items=state.viewNoteCheckItems.filter(function(i){return i.text.trim();});
   } else {
-    n.content=document.getElementById('noteViewContent').value;
+    n.content=document.getElementById('noteViewContent').innerHTML;
   }
   n.updatedAt=new Date().toISOString();
   saveN(data.notes);
@@ -2715,10 +2753,7 @@ window.openNoteView = function(id) {
     document.getElementById('noteViewTextWrap').style.display='';
     document.getElementById('noteViewCheckWrap').style.display='none';
     var ta=document.getElementById('noteViewContent');
-    ta.value=n.content||'';
-    _noteUndoStack=[ta.value]; _noteRedoStack=[];
-    // Reset height then grow to fit content
-    setTimeout(function(){ ta.style.height='auto'; ta.style.height=Math.max(120,ta.scrollHeight)+'px'; },50);
+    ta.innerHTML=n.content||'';
   }
 
   // Folder badges in footer
@@ -3816,8 +3851,12 @@ function initListeners() {
     renderNotes();
   });
   document.getElementById('noteViewContent').addEventListener('input', function(){
-    this.style.height='auto'; this.style.height=Math.max(120,this.scrollHeight)+'px';
-    clearTimeout(_noteUndoTimer); _noteUndoTimer=setTimeout(_noteUndoPush,400);
+    clearTimeout(_noteUndoTimer); _noteUndoTimer=setTimeout(function(){ saveNoteViewModal(); },600);
+  });
+  document.getElementById('noteViewContent').addEventListener('keydown', function(e){
+    if((e.metaKey||e.ctrlKey)&&e.key==='b'){e.preventDefault();document.execCommand('bold',false,null);}
+    if((e.metaKey||e.ctrlKey)&&e.key==='i'){e.preventDefault();document.execCommand('italic',false,null);}
+    if((e.metaKey||e.ctrlKey)&&e.key==='u'){e.preventDefault();document.execCommand('underline',false,null);}
   });
   document.getElementById('noteViewAddCheckItem').addEventListener('click', function(){
     state.viewNoteCheckItems.push({id:uid(),text:'',done:false}); renderNoteViewChecklist();

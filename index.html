@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=24">
+  <link rel="stylesheet" href="style.css?v=25">
 </head>
 <body>
 
@@ -614,7 +614,12 @@
     </div>
     <div class="note-view-body">
       <div id="noteViewTextWrap">
-        <textarea id="noteViewContent" class="note-view-textarea" placeholder="Take a note..."></textarea>
+        <div class="note-format-bar" id="noteFormatBar">
+          <button class="fmt-btn" onmousedown="event.preventDefault();execFmt('bold')" title="Bold (Cmd+B)"><b>B</b></button>
+          <button class="fmt-btn" onmousedown="event.preventDefault();execFmt('italic')" title="Italic (Cmd+I)"><i>I</i></button>
+          <button class="fmt-btn" onmousedown="event.preventDefault();execFmt('underline')" title="Underline (Cmd+U)"><u>U</u></button>
+        </div>
+        <div id="noteViewContent" class="note-view-editor" contenteditable="true" data-placeholder="Take a note..."></div>
       </div>
       <div id="noteViewCheckWrap" style="display:none">
         <div id="noteViewCheckItems"></div>
@@ -1197,6 +1202,6 @@
   </div>
 </div>
 
-<script src="app.js?v=24"></script>
+<script src="app.js?v=25"></script>
 </body>
 </html>
