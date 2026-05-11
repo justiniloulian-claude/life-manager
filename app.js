@@ -846,8 +846,11 @@ function taskHTML(task, ds, noActions) {
   }
   var notesPanel = (!noActions && hasTaskNotes)
     ? '<div class="task-notes-panel" style="display:none">'+escHtml(task.notes)+'</div>' : '';
-  return '<div class="task-item '+itemCls+(task.done?' is-done':'')+(noActions?'':' task-clickable')+'" id="ti-'+task.id+'"'+(noActions?'':' onclick="taskClick(\''+ds+'\',\''+task.id+'\','+isR+',event)"')+'>' +
-    '<input type="checkbox" class="task-check"'+(task.done?' checked':'')+' onchange="checkTask(\''+ds+'\',\''+task.id+'\','+isR+')">' +
+  var itemClick = noActions
+    ? ' onclick="openDashDayPopup(\''+ds+'\')"'
+    : ' onclick="taskClick(\''+ds+'\',\''+task.id+'\','+isR+',event)"';
+  return '<div class="task-item '+itemCls+(task.done?' is-done':'')+(noActions?' task-compact-click':' task-clickable')+'" id="ti-'+task.id+'"'+itemClick+'>' +
+    '<input type="checkbox" class="task-check"'+(task.done?' checked':'')+' onclick="event.stopPropagation()" onchange="checkTask(\''+ds+'\',\''+task.id+'\','+isR+')">' +
     '<div class="task-body"><div class="task-title '+priorityCls+'">'+escHtml(task.title)+notesDot+'</div>' +
     '<div class="task-meta">'+tb+lb+'</div>'+notesPanel+'</div>' +
     actionsHTML+'</div>';

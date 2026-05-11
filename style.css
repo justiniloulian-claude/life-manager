@@ -273,6 +273,7 @@ body {
 .task-item.is-done { opacity: 0.38; }
 .task-item.task-clickable { cursor: pointer; }
 .task-item.task-clickable:hover { background: rgba(0,0,0,0.025); }
+.task-item.task-compact-click { cursor: pointer; }
 
 /* Routine = italicized title only */
 .task-item.is-routine { background: transparent; border-left-color: transparent; }
