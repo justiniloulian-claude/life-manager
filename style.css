@@ -2306,3 +2306,6 @@ textarea.field { resize: vertical; }
 .wt-hist-stats-row { display: flex; gap: 16px; font-size: 12px; color: #888; margin-bottom: 10px; flex-wrap: wrap; }
 .wt-hist-day { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; border-bottom: 1px solid #f7f7f7; color: #555; }
 .wt-hist-day:last-of-type { border-bottom: none; margin-bottom: 10px; }
+.wt-day-actions { display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; margin-left: 8px; }
+.wt-day-row:hover .wt-day-actions { opacity: 1; }
+.wt-day-btn { font-size: 13px; padding: 2px 4px; }

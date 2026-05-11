@@ -1143,9 +1143,16 @@ function renderWeightTracker(){
     var w=entries[ds]; var isT=ds===todayDs;
     var d=fromDateStr(ds);
     var dLabel=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-    return'<div class="wt-day-row'+(isT?' wt-day-today':'')+'">'+
+    var actions=w
+      ?'<div class="wt-day-actions">'+
+          '<button class="btn-icon wt-day-btn" onclick="startEditWeightDay(\''+ds+'\')" title="Edit">✏️</button>'+
+          '<button class="btn-icon wt-day-btn" onclick="deleteWeightDay(\''+ds+'\')" title="Delete">🗑</button>'+
+        '</div>'
+      :'';
+    return'<div class="wt-day-row'+(isT?' wt-day-today':'')+'" id="wtr-'+ds+'">'+
       '<span class="wt-day-label">'+dayLabels[i]+'<span class="wt-day-date"> '+dLabel+'</span></span>'+
       (w?'<span class="wt-day-weight">'+parseFloat(w).toFixed(1)+' lbs</span>':'<span class="wt-day-empty">—</span>')+
+      actions+
     '</div>';
   }).join('');
   el.innerHTML=goalHTML+
@@ -3315,6 +3322,34 @@ window.openWeightHistory=function(){
     }).join('');
   }
   openModal('weightHistoryModal');
+};
+window.startEditWeightDay=function(ds){
+  var row=document.getElementById('wtr-'+ds); if(!row)return;
+  var data=getData(); var cur=data.weightEntries[ds]||'';
+  row.innerHTML=
+    '<span class="wt-day-label" style="flex-shrink:0">'+row.querySelector('.wt-day-label').innerHTML+'</span>'+
+    '<div style="display:flex;gap:6px;align-items:center;flex:1;justify-content:flex-end">'+
+      '<input type="number" class="field wt-inline-input" id="wt-edit-'+ds+'" value="'+cur+'" step="0.1" min="50" max="600" style="width:90px;padding:4px 8px;font-size:13px">'+
+      '<button class="btn-primary" style="font-size:12px;padding:4px 10px" onclick="saveWeightDay(\''+ds+'\')">✓</button>'+
+      '<button class="btn-cancel" style="font-size:12px;padding:4px 10px" onclick="renderWeightTracker()">✕</button>'+
+    '</div>';
+  var inp=document.getElementById('wt-edit-'+ds); if(inp){inp.focus();inp.select();}
+  inp.addEventListener('keydown',function(e){if(e.key==='Enter')saveWeightDay(ds);if(e.key==='Escape')renderWeightTracker();});
+};
+window.saveWeightDay=function(ds){
+  var inp=document.getElementById('wt-edit-'+ds); if(!inp)return;
+  var val=parseFloat(inp.value);
+  if(!val||val<50||val>600){inp.classList.add('error');inp.focus();return;}
+  var data=getData();
+  data.weightEntries[ds]=val;
+  localStorage.setItem('dm_weight_entries',JSON.stringify(data.weightEntries));
+  renderWeightTracker();
+};
+window.deleteWeightDay=function(ds){
+  var data=getData();
+  delete data.weightEntries[ds];
+  localStorage.setItem('dm_weight_entries',JSON.stringify(data.weightEntries));
+  renderWeightTracker();
 };
 window.toggleWtHistWeek=function(wi){
   var body=document.getElementById('wt-hist-body-'+wi);
