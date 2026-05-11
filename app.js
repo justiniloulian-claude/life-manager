@@ -495,9 +495,47 @@ function getRecurFromUI(){
   var until=document.getElementById('calEventUntil').value||null;
   return{recurring:'custom',recurringN:n,recurringUnit:unit,recurringUntil:until};
 }
-function getRemindersFromUI(){
-  var checks=document.querySelectorAll('.cal-reminder-check:checked');
-  return Array.prototype.map.call(checks,function(c){return c.value;});
+// Draft reminder list while modal is open
+var _calReminderDraft=[];
+function renderCalReminderList(){
+  var el=document.getElementById('calReminderList'); if(!el)return;
+  if(!_calReminderDraft.length){el.innerHTML='<div class="cal-rem-empty">No reminders — click + Add to set one</div>';return;}
+  el.innerHTML=_calReminderDraft.map(function(r,i){
+    return'<div class="cal-reminder-row">'+
+      '<input type="number" class="field cal-rem-n" value="'+r.n+'" min="1" max="365" onchange="updateCalReminder('+i+',\'n\',this.value)">'+
+      '<select class="field cal-rem-unit" onchange="updateCalReminder('+i+',\'unit\',this.value)">'+
+        '<option value="days"'+(r.unit==='days'?' selected':'')+'>days</option>'+
+        '<option value="weeks"'+(r.unit==='weeks'?' selected':'')+'>weeks</option>'+
+        '<option value="months"'+(r.unit==='months'?' selected':'')+'>months</option>'+
+      '</select>'+
+      '<span class="cal-rem-before">before</span>'+
+      '<button class="btn-icon cal-rem-del" onclick="removeCalReminder('+i+')" title="Remove">✕</button>'+
+    '</div>';
+  }).join('');
+}
+window.addCalReminder=function(){_calReminderDraft.push({n:1,unit:'days'});renderCalReminderList();};
+window.removeCalReminder=function(i){_calReminderDraft.splice(i,1);renderCalReminderList();};
+window.updateCalReminder=function(i,field,val){
+  if(!_calReminderDraft[i])return;
+  if(field==='n')_calReminderDraft[i].n=parseInt(val)||1;
+  else _calReminderDraft[i].unit=val;
+};
+function getRemindersFromUI(){return _calReminderDraft.map(function(r){return{n:parseInt(r.n)||1,unit:r.unit||'days'};});}
+function normalizeReminder(r){
+  // Backward compat: convert old string codes to object format
+  if(typeof r==='string'){var m={'1d':{n:1,unit:'days'},'2d':{n:2,unit:'days'},'1w':{n:1,unit:'weeks'},'2w':{n:2,unit:'weeks'},'1m':{n:1,unit:'months'}};return m[r]||{n:1,unit:'days'};}
+  return r;
+}
+function getReminderOffsetDays(r){
+  var obj=normalizeReminder(r); var n=parseInt(obj.n)||1;
+  if(obj.unit==='weeks')return n*7;
+  if(obj.unit==='months')return n*30;
+  return n;
+}
+function reminderLabel(r){
+  var obj=normalizeReminder(r); var n=parseInt(obj.n)||1;
+  var u=obj.unit||'days';
+  return n+' '+(n===1?u.replace(/s$/,''):u)+' before';
 }
 function populateCalEventUI(ev){
   document.getElementById('calEventTitle').value=ev.title||'';
@@ -515,27 +553,25 @@ function populateCalEventUI(ev){
     document.getElementById('calEventRecurUnit').value=unit;
     document.getElementById('calEventUntil').value=ev.recurringUntil||'';
   }
-  document.querySelectorAll('.cal-reminder-check').forEach(function(c){
-    c.checked=(ev.reminders||[]).indexOf(c.value)!==-1;
-  });
+  _calReminderDraft=(ev.reminders||[]).map(normalizeReminder);
+  renderCalReminderList();
   buildColorPicker('calEventColorPicker',ev.color||'',function(v){state.selectedCalEventColor=v;});
 }
 
 // Calendar reminder dot/banner helpers
-var REMINDER_OFFSETS={'1d':1,'2d':2,'1w':7,'2w':14,'1m':30};
 function getRemindersForDate(ds){
   var data=getData(); var result=[];
   data.calEvents.forEach(function(ev){
     if(ev._overrideFor)return;
     var rems=ev.reminders||[]; if(!rems.length)return;
     rems.forEach(function(r){
-      var offset=REMINDER_OFFSETS[r]; if(!offset)return;
+      var offset=getReminderOffsetDays(r); if(!offset)return;
       var evDate=new Date(fromDateStr(ds)); evDate.setDate(evDate.getDate()+offset);
       var evDs=toDateStr(evDate);
       var fires;
       if(ev.recurring==='none'||!ev.recurring){ fires=ev.date===evDs; }
       else { fires=isRecurringOccurrence(ev,evDs); }
-      if(fires) result.push({ev:ev,label:r,eventDate:evDs});
+      if(fires) result.push({ev:ev,label:reminderLabel(r),eventDate:evDs});
     });
   });
   return result;
@@ -545,10 +581,9 @@ function renderReminderBanner(){
   var rems=getRemindersForDate(todayDs);
   if(!rems.length)return'';
   var rows=rems.map(function(r){
-    var labelMap={'1d':'tomorrow','2d':'in 2 days','1w':'in 1 week','2w':'in 2 weeks','1m':'in 1 month'};
     return'<div class="rem-banner-item">'+
       '<span class="rem-banner-title">'+escHtml(r.ev.title)+'</span>'+
-      '<span class="rem-banner-when">'+(labelMap[r.label]||r.label)+'</span>'+
+      '<span class="rem-banner-when">'+escHtml(r.label)+'</span>'+
     '</div>';
   }).join('');
   return'<div class="rem-banner"><div class="rem-banner-hdr">🔔 '+rems.length+' upcoming reminder'+(rems.length>1?'s':'')+'</div>'+rows+'</div>';

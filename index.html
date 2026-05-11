@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=27">
+  <link rel="stylesheet" href="style.css?v=28">
 </head>
 <body>
 
@@ -546,13 +546,8 @@
         <input type="date" id="calEventUntil" class="field">
       </div>
       <label class="field-label" style="margin-top:10px">Reminders <span class="optional">optional</span></label>
-      <div class="reminder-checks">
-        <label class="rem-check-label"><input type="checkbox" class="cal-reminder-check" value="1d"> 1 day before</label>
-        <label class="rem-check-label"><input type="checkbox" class="cal-reminder-check" value="2d"> 2 days before</label>
-        <label class="rem-check-label"><input type="checkbox" class="cal-reminder-check" value="1w"> 1 week before</label>
-        <label class="rem-check-label"><input type="checkbox" class="cal-reminder-check" value="2w"> 2 weeks before</label>
-        <label class="rem-check-label"><input type="checkbox" class="cal-reminder-check" value="1m"> 1 month before</label>
-      </div>
+      <div id="calReminderList"></div>
+      <button type="button" class="btn-secondary cal-rem-add-btn" onclick="addCalReminder()">+ Add Reminder</button>
       <label class="field-label">Color <span class="optional">optional</span></label>
       <div class="color-picker" id="calEventColorPicker"></div>
       <div class="field-check-row">
@@ -1202,6 +1197,6 @@
   </div>
 </div>
 
-<script src="app.js?v=27"></script>
+<script src="app.js?v=28"></script>
 </body>
 </html>
