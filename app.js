@@ -902,7 +902,9 @@ function taskHTML(task, ds, noActions) {
     +' ondragleave="taskDragLeave(event)"'
     +' ondrop="taskDrop(event,\''+ds+'\',\''+task.id+'\')"'
     +' ondragend="taskDragEnd(event)"';
-  var dragHandle = '<span class="task-drag-handle" onclick="event.stopPropagation()" title="Drag to reorder">⠿</span>';
+  var dragHandle = !noActions
+    ? '<span class="task-drag-handle" onclick="event.stopPropagation()" title="Drag to reorder">⠿</span>'
+    : '';
   return '<div class="task-item '+itemCls+(task.done?' is-done':'')+(noActions?' task-compact-click':' task-clickable')+'" id="ti-'+task.id+'"'+itemClick+dragAttrs+'>' +
     dragHandle+
     '<input type="checkbox" class="task-check"'+(task.done?' checked':'')+' onclick="event.stopPropagation()" onchange="checkTask(\''+ds+'\',\''+task.id+'\','+isR+')">' +
