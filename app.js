@@ -58,6 +58,7 @@ const state = {
   editLearningItemId: null,
   selectedLearningSeder: '',
   dragLearn: null,
+  learningCopyItem: null,
   moveTaskDs: null, moveTaskId: null, moveTaskIsR: false,
   linkNotesTaskDs: null, linkNotesTaskId: null,
   activeCheshTab: 'daily',
@@ -1866,92 +1867,111 @@ function renderLearning() {
   grid.innerHTML=LEARNING_DAYS.map(function(day){
     var items=data.learning[day]||[];
     var sections={morning:[],afternoon:[],night:[],unscheduled:[]};
-    items.forEach(function(item){ sections[getLearningSection(item)].push(item); });
-    // time-based items sorted by time; seder-only items keep array order for drag
-    ['morning','afternoon','night'].forEach(function(sec){
-      sections[sec].sort(function(a,b){
-        var at=a.time||'', bt=b.time||'';
-        if(at&&bt) return at.localeCompare(bt);
-        if(at) return -1; if(bt) return 1;
-        return 0;
-      });
-    });
-    var bodyHTML='';
+    items.forEach(function(item){sections[getLearningSection(item)].push(item);});
     var mainSecs=[{key:'morning',label:'Morning Seder'},{key:'afternoon',label:'Afternoon Seder'},{key:'night',label:'Night Seder'}];
+    var bodyHTML='';
     mainSecs.forEach(function(sec){
       var sItems=sections[sec.key];
+      if(!sItems.length)return;
       bodyHTML+='<div class="learning-section-header">'+sec.label+'</div>';
-      if(!sItems.length){
-        bodyHTML+='<div class="learning-section-empty">—</div>';
-        return;
-      }
       bodyHTML+=sItems.map(function(item){
-        var canDrag=!item.time;
-        var dragAttrs=canDrag?' draggable="true" data-day="'+day+'" data-id="'+item.id+'" data-sec="'+sec.key+'"':'';
-        var dragHandle=canDrag?'<span class="drag-handle">⠿</span>':'';
-        var timeBadge=item.time?'<span class="learning-time-badge">'+fmt12(item.time)+'</span>':
-                      item.seder?'<span class="learning-seder-badge">'+sec.label+'</span>':'';
-        return '<div class="learning-item'+(canDrag?' lrn-draggable':'')+'"'+dragAttrs+'>' +
-          dragHandle+
-          '<div class="learning-item-body">' +
+        var timeBadge=item.time?'<span class="learning-time-badge">'+fmt12(item.time)+'</span>':'';
+        return '<div class="learning-item lrn-compact">'+
+          '<div class="learning-item-body">'+
             '<div class="learning-item-subject">'+escHtml(item.subject)+timeBadge+'</div>'+
             (item.source?'<div class="learning-item-source">'+escHtml(item.source)+'</div>':'')+
-            (item.notes ?'<div class="learning-item-notes">'+escHtml(item.notes)+'</div>' :'')+
-          '</div>' +
-          '<div class="learning-item-actions">' +
-            '<button class="btn-icon" onclick="openEditLearningItem(\''+day+'\',\''+item.id+'\')">✏️</button>'+
-            '<button class="btn-icon" onclick="deleteLrn(\''+day+'\',\''+item.id+'\')">🗑</button>'+
           '</div></div>';
       }).join('');
     });
     if(sections.unscheduled.length){
       bodyHTML+='<div class="learning-section-header">Unscheduled</div>';
       bodyHTML+=sections.unscheduled.map(function(item){
-        return '<div class="learning-item">' +
-          '<div class="learning-item-body">' +
+        return '<div class="learning-item lrn-compact">'+
+          '<div class="learning-item-body">'+
             '<div class="learning-item-subject">'+escHtml(item.subject)+'</div>'+
             (item.source?'<div class="learning-item-source">'+escHtml(item.source)+'</div>':'')+
-            (item.notes ?'<div class="learning-item-notes">'+escHtml(item.notes)+'</div>' :'')+
-          '</div>' +
-          '<div class="learning-item-actions">' +
-            '<button class="btn-icon" onclick="openEditLearningItem(\''+day+'\',\''+item.id+'\')">✏️</button>'+
-            '<button class="btn-icon" onclick="deleteLrn(\''+day+'\',\''+item.id+'\')">🗑</button>'+
           '</div></div>';
       }).join('');
     }
-    return '<div class="learning-day-col">' +
-      '<div class="learning-day-header">'+LEARNING_DAY_LABELS[day]+'</div>' +
-      '<div class="learning-day-body">'+bodyHTML+'</div>' +
-      '<button class="learning-add-row" onclick="openAddLearningItem(\''+day+'\')">+ Add</button>' +
+    if(!bodyHTML)bodyHTML='<div class="learning-section-empty" style="padding:14px;color:#ccc">Tap to add items</div>';
+    var cnt=items.length?'<span class="lrn-col-count">'+items.length+'</span>':'';
+    return '<div class="learning-day-col lrn-clickable" onclick="openLearningDayModal(\''+day+'\')">'+
+      '<div class="learning-day-header">'+LEARNING_DAY_LABELS[day]+cnt+'</div>'+
+      '<div class="learning-day-body">'+bodyHTML+'</div>'+
       '</div>';
   }).join('');
+}
 
-  // Attach drag-and-drop listeners to draggable items
-  grid.querySelectorAll('.lrn-draggable').forEach(function(el){
-    el.addEventListener('dragstart',function(e){
-      state.dragLearn={day:el.dataset.day,id:el.dataset.id,sec:el.dataset.sec};
-      el.classList.add('lrn-dragging');
-      e.dataTransfer.effectAllowed='move';
-    });
-    el.addEventListener('dragend',function(){
-      el.classList.remove('lrn-dragging');
-      grid.querySelectorAll('.lrn-drag-over').forEach(function(x){x.classList.remove('lrn-drag-over');});
-    });
-    el.addEventListener('dragover',function(e){
-      if(!state.dragLearn||state.dragLearn.id===el.dataset.id)return;
-      if(state.dragLearn.sec!==el.dataset.sec||state.dragLearn.day!==el.dataset.day)return;
-      e.preventDefault();
-      grid.querySelectorAll('.lrn-drag-over').forEach(function(x){x.classList.remove('lrn-drag-over');});
-      el.classList.add('lrn-drag-over');
-    });
-    el.addEventListener('drop',function(e){
-      e.preventDefault();
-      if(!state.dragLearn||state.dragLearn.id===el.dataset.id)return;
-      if(state.dragLearn.sec!==el.dataset.sec||state.dragLearn.day!==el.dataset.day)return;
-      reorderLearningItem(state.dragLearn.day,state.dragLearn.id,el.dataset.id);
-      state.dragLearn=null;
+window.openLearningDayModal=function(day){
+  state.learningDay=day;
+  document.getElementById('learningDayModalTitle').textContent=LEARNING_DAY_LABELS[day];
+  renderLearningDayModal(day);
+  openModal('learningDayModal');
+};
+
+function renderLearningDayModal(day){
+  var data=getData(); var items=data.learning[day]||[];
+  var sections={morning:[],afternoon:[],night:[],unscheduled:[]};
+  items.forEach(function(item){sections[getLearningSection(item)].push(item);});
+  ['morning','afternoon','night'].forEach(function(sec){
+    sections[sec].sort(function(a,b){
+      var at=a.time||'',bt=b.time||'';
+      if(at&&bt)return at.localeCompare(bt);
+      if(at)return -1; if(bt)return 1; return 0;
     });
   });
+  var mainSecs=[{key:'morning',label:'Morning Seder'},{key:'afternoon',label:'Afternoon Seder'},{key:'night',label:'Night Seder'}];
+  var html='';
+  mainSecs.forEach(function(sec){
+    var sItems=sections[sec.key];
+    html+='<div class="lrn-modal-section">';
+    html+='<div class="lrn-modal-sec-hdr">'+sec.label+
+      '<button class="lrn-sec-add" onclick="event.stopPropagation();openAddLearningItemInSeder(\''+day+'\',\''+sec.key+'\')">+ Add</button></div>';
+    if(!sItems.length){
+      html+='<div class="learning-section-empty" style="padding:8px 16px 12px">—</div>';
+    }else{
+      html+=sItems.map(function(item){
+        var timeBadge=item.time?'<span class="learning-time-badge">'+fmt12(item.time)+'</span>':'';
+        var hasNote=!!item.notes;
+        return '<div class="lrn-modal-item" id="lrni-'+item.id+'">'+
+          '<div class="lrn-modal-item-main">'+
+            '<div class="lrn-modal-item-title">'+escHtml(item.subject)+timeBadge+'</div>'+
+            '<div class="lrn-modal-item-actions">'+
+              (hasNote?'<button class="btn-icon" onclick="toggleLrnNote(\''+item.id+'\')" title="Notes">📝</button>':'')+
+              '<button class="btn-icon" onclick="openEditLearningItem(\''+day+'\',\''+item.id+'\')" title="Edit">✏️</button>'+
+              '<button class="btn-icon" onclick="deleteLrnModal(\''+day+'\',\''+item.id+'\')" title="Delete">🗑</button>'+
+              '<button class="btn-icon" onclick="openLearningCopy(\''+day+'\',\''+item.id+'\')" title="Duplicate to other days">⧉</button>'+
+            '</div>'+
+          '</div>'+
+          (item.source?'<div class="learning-item-source" style="margin-top:3px">'+escHtml(item.source)+'</div>':'')+
+          (hasNote?'<div class="lrn-note-body" id="lrn-note-'+item.id+'" style="display:none">'+escHtml(item.notes)+'</div>':'')+
+        '</div>';
+      }).join('');
+    }
+    html+='</div>';
+  });
+  if(sections.unscheduled.length){
+    html+='<div class="lrn-modal-section">';
+    html+='<div class="lrn-modal-sec-hdr">Unscheduled</div>';
+    html+=sections.unscheduled.map(function(item){
+      var hasNote=!!item.notes;
+      return '<div class="lrn-modal-item" id="lrni-'+item.id+'">'+
+        '<div class="lrn-modal-item-main">'+
+          '<div class="lrn-modal-item-title">'+escHtml(item.subject)+'</div>'+
+          '<div class="lrn-modal-item-actions">'+
+            (hasNote?'<button class="btn-icon" onclick="toggleLrnNote(\''+item.id+'\')" title="Notes">📝</button>':'')+
+            '<button class="btn-icon" onclick="openEditLearningItem(\''+day+'\',\''+item.id+'\')" title="Edit">✏️</button>'+
+            '<button class="btn-icon" onclick="deleteLrnModal(\''+day+'\',\''+item.id+'\')" title="Delete">🗑</button>'+
+            '<button class="btn-icon" onclick="openLearningCopy(\''+day+'\',\''+item.id+'\')" title="Duplicate to other days">⧉</button>'+
+          '</div>'+
+        '</div>'+
+        (item.source?'<div class="learning-item-source" style="margin-top:3px">'+escHtml(item.source)+'</div>':'')+
+        (hasNote?'<div class="lrn-note-body" id="lrn-note-'+item.id+'" style="display:none">'+escHtml(item.notes)+'</div>':'')+
+      '</div>';
+    }).join('');
+    html+='</div>';
+  }
+  document.getElementById('learningDayModalBody').innerHTML=html;
 }
 
 // ============================================================
@@ -3179,8 +3199,21 @@ window.openAddLearningItem = function(day){
   document.getElementById('learningNotes').value='';
   document.getElementById('learningTimeError').style.display='none';
   setLearningSedarUI('');
+  // Populate "Also add to" chips (all days except current)
+  var alsoHtml=LEARNING_DAYS.filter(function(d){return d!==day;}).map(function(d){
+    return '<button type="button" class="seder-btn lrn-also-btn" data-day="'+d+'">'+LEARNING_DAY_LABELS[d].substring(0,3)+'</button>';
+  }).join('');
+  document.getElementById('learningAlsoDays').innerHTML=alsoHtml;
+  document.querySelectorAll('#learningAlsoDays .lrn-also-btn').forEach(function(btn){
+    btn.addEventListener('click',function(){btn.classList.toggle('active');});
+  });
+  document.getElementById('learningAlsoSection').style.display='block';
   openModal('learningItemModal');
   setTimeout(function(){document.getElementById('learningSubject').focus();},80);
+};
+window.openAddLearningItemInSeder=function(day,seder){
+  openAddLearningItem(day);
+  setTimeout(function(){setLearningSedarUI(seder);},60);
 };
 window.openEditLearningItem = function(day,id){
   var data=getData(); var items=data.learning[day]||[]; var item=items.find(function(i){return i.id===id;}); if(!item)return;
@@ -3192,10 +3225,32 @@ window.openEditLearningItem = function(day,id){
   document.getElementById('learningNotes').value=item.notes||'';
   document.getElementById('learningTimeError').style.display='none';
   setLearningSedarUI(item.seder||'');
+  document.getElementById('learningAlsoSection').style.display='none';
   openModal('learningItemModal');
   setTimeout(function(){document.getElementById('learningSubject').focus();},80);
 };
 window.deleteLrn = function(day,id){ if(confirm('Remove this entry?')){ deleteLearningItem(day,id); renderLearning(); } };
+window.deleteLrnModal=function(day,id){
+  if(!confirm('Remove this entry?'))return;
+  deleteLearningItem(day,id);
+  renderLearningDayModal(day);
+  renderLearning();
+};
+window.toggleLrnNote=function(id){
+  var el=document.getElementById('lrn-note-'+id);
+  if(el)el.style.display=el.style.display==='none'?'block':'none';
+};
+window.openLearningCopy=function(day,id){
+  state.learningCopyItem={day:day,id:id};
+  var html=LEARNING_DAYS.filter(function(d){return d!==day;}).map(function(d){
+    return '<button type="button" class="seder-btn lrn-copy-btn" data-day="'+d+'">'+LEARNING_DAY_LABELS[d].substring(0,3)+'</button>';
+  }).join('');
+  document.getElementById('learningCopyDays').innerHTML=html;
+  document.querySelectorAll('#learningCopyDays .lrn-copy-btn').forEach(function(btn){
+    btn.addEventListener('click',function(){btn.classList.toggle('active');});
+  });
+  openModal('learningCopyModal');
+};
 
 // Financial — week selection
 window.setFinWeek = function(idx) { state.finWeekIdx=idx; renderFinWeekly(); };
@@ -3956,6 +4011,30 @@ function initListeners() {
   // Learning Seder
   document.getElementById('closeLearningItemModal').addEventListener('click', function(){ closeModal('learningItemModal'); });
   document.getElementById('cancelLearningItem').addEventListener('click',     function(){ closeModal('learningItemModal'); });
+  // Learning Day Modal
+  document.getElementById('closeLearningDayModal').addEventListener('click', function(){ closeModal('learningDayModal'); });
+  document.getElementById('learningDayAddBtn').addEventListener('click', function(){ openAddLearningItem(state.learningDay); });
+  // Learning Copy Modal
+  document.getElementById('closeLearningCopyModal').addEventListener('click', function(){ closeModal('learningCopyModal'); });
+  document.getElementById('cancelLearningCopy').addEventListener('click', function(){ closeModal('learningCopyModal'); });
+  document.getElementById('confirmLearningCopy').addEventListener('click', function(){
+    if(!state.learningCopyItem)return;
+    var src=state.learningCopyItem;
+    var data=getData();
+    var item=(data.learning[src.day]||[]).find(function(i){return i.id===src.id;});
+    if(!item)return;
+    var selectedDays=[];
+    document.querySelectorAll('#learningCopyDays .lrn-copy-btn.active').forEach(function(btn){selectedDays.push(btn.dataset.day);});
+    selectedDays.forEach(function(d){
+      addLearningItem(d,{subject:item.subject,source:item.source,notes:item.notes,time:item.time,seder:item.seder});
+    });
+    state.learningCopyItem=null;
+    closeModal('learningCopyModal');
+    renderLearning();
+    if(document.getElementById('learningDayModal').classList.contains('open')){
+      renderLearningDayModal(state.learningDay);
+    }
+  });
   document.getElementById('learningSedarGroup').addEventListener('click', function(e){
     var btn=e.target.closest('.seder-btn'); if(!btn)return;
     var s=btn.dataset.seder;
@@ -3971,7 +4050,6 @@ function initListeners() {
     var time=document.getElementById('learningTime').value;
     var seder=state.selectedLearningSeder;
     var errEl=document.getElementById('learningTimeError');
-    // Validate seder+time combo
     if(seder&&time){
       var h=parseInt(time.split(':')[0],10);
       var valid=(seder==='morning'&&h>=5&&h<12)||(seder==='afternoon'&&h>=12&&h<18)||(seder==='night'&&h>=18);
@@ -3983,8 +4061,21 @@ function initListeners() {
     }
     errEl.style.display='none';
     var d={subject:subject,source:document.getElementById('learningSource').value.trim(),notes:document.getElementById('learningNotes').value.trim(),time:time,seder:seder};
-    state.editLearningItemId?updateLearningItem(state.learningDay,state.editLearningItemId,d):addLearningItem(state.learningDay,d);
-    state.editLearningItemId=null; closeModal('learningItemModal'); renderLearning();
+    if(state.editLearningItemId){
+      updateLearningItem(state.learningDay,state.editLearningItemId,d);
+    }else{
+      addLearningItem(state.learningDay,d);
+      // Also add to any selected days
+      document.querySelectorAll('#learningAlsoDays .lrn-also-btn.active').forEach(function(btn){
+        addLearningItem(btn.dataset.day,d);
+      });
+    }
+    state.editLearningItemId=null;
+    closeModal('learningItemModal');
+    renderLearning();
+    if(document.getElementById('learningDayModal').classList.contains('open')){
+      renderLearningDayModal(state.learningDay);
+    }
   });
 
   // Financial tabs

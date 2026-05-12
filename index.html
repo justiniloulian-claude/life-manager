@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=41">
+  <link rel="stylesheet" href="style.css?v=42">
 </head>
 <body>
 
@@ -869,10 +869,46 @@
       <input type="text" id="learningSource" class="field" placeholder="e.g. Bava Metzia 12a, Shulchan Aruch OC 1">
       <label class="field-label">Notes <span class="optional">optional</span></label>
       <textarea id="learningNotes" class="field" rows="2" placeholder="Any extra details..."></textarea>
+      <div id="learningAlsoSection" style="display:none">
+        <label class="field-label" style="margin-top:10px">Also add to <span class="optional">optional</span></label>
+        <div id="learningAlsoDays" class="lrn-also-days"></div>
+      </div>
     </div>
     <div class="modal-footer">
       <button id="cancelLearningItem" class="btn-cancel">Cancel</button>
       <button id="saveLearningItem" class="btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Learning Day Modal -->
+<div id="learningDayModal" class="modal">
+  <div class="modal-box" style="max-width:500px">
+    <div class="modal-header">
+      <h2 id="learningDayModalTitle">Monday</h2>
+      <button class="modal-close" id="closeLearningDayModal">&times;</button>
+    </div>
+    <div class="modal-body" id="learningDayModalBody" style="padding:0;max-height:62vh;overflow-y:auto"></div>
+    <div class="modal-footer">
+      <button id="learningDayAddBtn" class="btn-primary">+ Add Item</button>
+    </div>
+  </div>
+</div>
+
+<!-- Learning Copy Modal -->
+<div id="learningCopyModal" class="modal">
+  <div class="modal-box" style="max-width:360px">
+    <div class="modal-header">
+      <h2>Duplicate to Days</h2>
+      <button class="modal-close" id="closeLearningCopyModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:#888;margin-bottom:12px">Copy this item to:</p>
+      <div id="learningCopyDays" class="lrn-also-days"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="cancelLearningCopy">Cancel</button>
+      <button class="btn-primary" id="confirmLearningCopy">Copy</button>
     </div>
   </div>
 </div>
@@ -1229,6 +1265,6 @@
   </div>
 </div>
 
-<script src="app.js?v=41"></script>
+<script src="app.js?v=42"></script>
 </body>
 </html>
