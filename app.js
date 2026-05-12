@@ -378,9 +378,18 @@ function getTasksForDate(ds) {
   }).filter(Boolean);
   var oneTasks=(data.tasks[ds]||[]).filter(function(t){return !t._rc;});
   var all=routineTasks.concat(oneTasks);
+  // Apply stored drag order if available (covers routine + one-time tasks)
+  var orderData=JSON.parse(localStorage.getItem('dm_task_order')||'{}');
+  var order=orderData[ds];
+  if(order&&order.length){
+    var map={}; all.forEach(function(t){map[t.id]=t;});
+    var ordered=[];
+    order.forEach(function(id){if(map[id])ordered.push(map[id]);});
+    all.forEach(function(t){if(!ordered.find(function(o){return o.id===t.id;}))ordered.push(t);});
+    all=ordered;
+  }
   var inc=all.filter(function(t){return !t.done;});
   var don=all.filter(function(t){return t.done;});
-  // Preserve drag order — no auto time-sort; done tasks go to the bottom
   return inc.concat(don);
 }
 function toggleDone(ds,id,isRoutine) {
@@ -2674,25 +2683,38 @@ window.taskDragStart=function(e,ds,id){
 };
 window.taskDragOver=function(e){
   e.preventDefault(); e.dataTransfer.dropEffect='move';
-  var row=e.currentTarget; if(row&&!row.classList.contains('task-drag-over'))row.classList.add('task-drag-over');
+  var target=e.currentTarget;
+  if(!target||(_dragTaskInfo&&target.id==='ti-'+_dragTaskInfo.id))return;
+  document.querySelectorAll('.task-drag-above,.task-drag-below').forEach(function(el){el.classList.remove('task-drag-above','task-drag-below');});
+  var rect=target.getBoundingClientRect();
+  target.classList.add(e.clientY<rect.top+rect.height/2?'task-drag-above':'task-drag-below');
 };
 window.taskDragLeave=function(e){
-  var row=e.currentTarget; if(row)row.classList.remove('task-drag-over');
+  var t=e.currentTarget; if(t){t.classList.remove('task-drag-above','task-drag-below');}
 };
-window.taskDrop=function(e,ds,id){
+window.taskDrop=function(e,ds,toId){
   e.preventDefault();
-  var row=e.currentTarget; if(row)row.classList.remove('task-drag-over');
-  if(!_dragTaskInfo||_dragTaskInfo.id===id||_dragTaskInfo.ds!==ds)return;
-  var data=getData(); var tasks=data.tasks[ds]||[];
-  var fromIdx=tasks.findIndex(function(t){return t.id===_dragTaskInfo.id;});
-  var toIdx=tasks.findIndex(function(t){return t.id===id;});
+  var target=e.currentTarget;
+  var insertBefore=target&&target.classList.contains('task-drag-above');
+  if(target)target.classList.remove('task-drag-above','task-drag-below');
+  if(!_dragTaskInfo||_dragTaskInfo.id===toId||_dragTaskInfo.ds!==ds)return;
+  var fromId=_dragTaskInfo.id;
+  // Build full ordered ID list from rendered tasks for this day
+  var allTasks=getTasksForDate(ds);
+  var ids=allTasks.map(function(t){return t.id;});
+  var fromIdx=ids.indexOf(fromId); var toIdx=ids.indexOf(toId);
   if(fromIdx===-1||toIdx===-1)return;
-  var moved=tasks.splice(fromIdx,1)[0]; tasks.splice(toIdx,0,moved);
-  data.tasks[ds]=tasks; saveT(data.tasks); refresh(); refreshDashDayModal();
+  ids.splice(fromIdx,1);
+  var newTo=ids.indexOf(toId);
+  ids.splice(insertBefore?newTo:newTo+1,0,fromId);
+  // Save order
+  var orderData=JSON.parse(localStorage.getItem('dm_task_order')||'{}');
+  orderData[ds]=ids; localStorage.setItem('dm_task_order',JSON.stringify(orderData));
+  refresh(); refreshDashDayModal();
 };
 window.taskDragEnd=function(e){
   _dragTaskInfo=null;
-  document.querySelectorAll('.task-dragging,.task-drag-over').forEach(function(el){el.classList.remove('task-dragging','task-drag-over');});
+  document.querySelectorAll('.task-dragging,.task-drag-above,.task-drag-below').forEach(function(el){el.classList.remove('task-dragging','task-drag-above','task-drag-below');});
 };
 
 // ============================================================

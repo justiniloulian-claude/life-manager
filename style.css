@@ -2402,7 +2402,8 @@ textarea.field { resize: vertical; }
 .task-drag-handle { cursor:grab; font-size:16px; color:#ccc; padding:0 4px 0 0; flex-shrink:0; user-select:none; line-height:1; opacity:0; transition:opacity 0.15s; }
 .task-item:hover .task-drag-handle { opacity:1; }
 .task-item.task-dragging { opacity:0.4; border:2px dashed #a78bfa; }
-.task-item.task-drag-over { border-top:3px solid #7c3aed; background:#f5f3ff; }
+.task-item.task-drag-above { border-top:3px solid #7c3aed; }
+.task-item.task-drag-below { border-bottom:3px solid #7c3aed; }
 
 /* Missed tasks modal */
 .missed-date-group { margin-bottom:18px; }
