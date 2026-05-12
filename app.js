@@ -4009,47 +4009,58 @@ function initListeners() {
     if((e.metaKey||e.ctrlKey)&&e.key==='i'){e.preventDefault();document.execCommand('italic',false,null);}
     if((e.metaKey||e.ctrlKey)&&e.key==='u'){e.preventDefault();document.execCommand('underline',false,null);}
 
-    // Tab: indent / Shift+Tab: unindent
+    // Helper: get current line's first text node and full text
+    function getNoteLineInfo(editor) {
+      var sel=window.getSelection(); if(!sel.rangeCount)return{tn:null,text:''};
+      var cn=sel.getRangeAt(0).startContainer;
+      var el=cn.nodeType===3?cn.parentNode:cn;
+      while(el&&el.parentNode!==editor&&el!==editor)el=el.parentNode;
+      var inBlock=(el&&el!==editor);
+      if(inBlock){
+        // Cursor is inside a child div — walk to first text node of that div
+        var w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);
+        return{tn:w.nextNode(),text:el.textContent};
+      } else {
+        // Cursor is directly in editor (flat / <br> structure) — use current text node
+        var tn=cn.nodeType===3?cn:null;
+        return{tn:tn,text:tn?tn.textContent:''};
+      }
+    }
+
+    // Tab: indent whole list line / Shift+Tab: unindent
     if(e.key==='Tab'){
       e.preventDefault();
-      var edT=this; var selT=window.getSelection();
-      if(!selT.rangeCount)return;
-      var cnT=selT.getRangeAt(0).startContainer;
-      var elT=cnT.nodeType===3?cnT.parentNode:cnT;
-      while(elT&&elT.parentNode!==edT&&elT!==edT)elT=elT.parentNode;
-      var blkT=(elT&&elT!==edT)?elT:edT;
-      var walkerT=document.createTreeWalker(blkT,NodeFilter.SHOW_TEXT);
-      var tnT=walkerT.nextNode();
+      var edT=this; var selT=window.getSelection(); if(!selT.rangeCount)return;
+      var infoT=getNoteLineInfo(edT);
+      var tnT=infoT.tn; var ltT=infoT.text;
       if(e.shiftKey){
-        // Remove up to 4 leading spaces from line start
-        if(tnT){var mT=tnT.textContent.match(/^( {1,4})/);
+        if(tnT){var mT=ltT.match(/^( {1,4})/);
           if(mT){var rT=document.createRange();rT.setStart(tnT,0);rT.setEnd(tnT,mT[1].length);selT.removeAllRanges();selT.addRange(rT);document.execCommand('delete');}}
       } else {
-        var ltT=blkT.textContent;
         var isListT=/^\s*-/.test(ltT)||/^\s*\d+\./.test(ltT);
         if(isListT&&tnT){
-          // Indent: insert 4 spaces at start of the line
           var rT2=document.createRange();rT2.setStart(tnT,0);rT2.collapse(true);selT.removeAllRanges();selT.addRange(rT2);
-          document.execCommand('insertText',false,'    ');
-        } else {
-          document.execCommand('insertText',false,'    ');
         }
+        document.execCommand('insertText',false,'    ');
       }
       return;
     }
 
     // Auto-list: Enter continues bullet or numbered list (space after marker is optional)
+    // Let browser create the new block, then immediately prepend the list prefix
     if(e.key==='Enter'&&!e.shiftKey&&!e.ctrlKey&&!e.metaKey){
-      var ed2=this; var sel2=window.getSelection();
-      if(!sel2.rangeCount)return;
-      var cn2=sel2.getRangeAt(0).startContainer;
-      var el2=cn2.nodeType===3?cn2.parentNode:cn2;
-      while(el2&&el2.parentNode!==ed2&&el2!==ed2)el2=el2.parentNode;
-      var lineText=(el2&&el2!==ed2)?el2.textContent:(cn2.nodeType===3?cn2.textContent:'');
-      var bulletM=lineText.match(/^(\s*)-/);
-      var numM=lineText.match(/^(\s*)(\d+)\./);
-      if(bulletM){e.preventDefault();document.execCommand('insertHTML',false,'<br>'+bulletM[1]+'- ');}
-      else if(numM){e.preventDefault();document.execCommand('insertHTML',false,'<br>'+numM[1]+(parseInt(numM[2])+1)+'. ');}
+      var ed2=this;
+      var info2=getNoteLineInfo(ed2);
+      var lt2=info2.text;
+      var bulletM=lt2.match(/^(\s*)-/);
+      var numM=lt2.match(/^(\s*)(\d+)\./);
+      if(bulletM){
+        var pfx=bulletM[1]+'- ';
+        setTimeout(function(){document.execCommand('insertText',false,pfx);},0);
+      } else if(numM){
+        var pfx2=numM[1]+(parseInt(numM[2])+1)+'. ';
+        setTimeout(function(){document.execCommand('insertText',false,pfx2);},0);
+      }
     }
   });
   document.getElementById('noteViewAddCheckItem').addEventListener('click', function(){
