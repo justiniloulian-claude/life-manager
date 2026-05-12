@@ -1927,9 +1927,8 @@ function renderLearning() {
       if(!sItems.length)return;
       bodyHTML+='<div class="learning-section-header">'+sec.label+'</div>';
       bodyHTML+=sItems.map(function(item){
-        var canDrag=!item.time;
         var timeBadge=item.time?'<span class="learning-time-badge">'+fmt12(item.time)+'</span>':'';
-        return '<div class="learning-item lrn-compact'+(canDrag?' lrn-draggable':'')+'"'+(canDrag?lrnDragAttrs(day,item.id,sec.key):'')+'>'+
+        return '<div class="learning-item lrn-compact lrn-draggable"'+lrnDragAttrs(day,item.id,sec.key)+'>'+
           '<div class="learning-item-body">'+
             '<div class="learning-item-subject">'+escHtml(item.subject)+timeBadge+'</div>'+
             (item.source?'<div class="learning-item-source">'+escHtml(item.source)+'</div>':'')+
@@ -1967,13 +1966,7 @@ function renderLearningDayModal(day){
   var data=getData(); var items=data.learning[day]||[];
   var sections={morning:[],afternoon:[],night:[],unscheduled:[]};
   items.forEach(function(item){sections[getLearningSection(item)].push(item);});
-  ['morning','afternoon','night'].forEach(function(sec){
-    sections[sec].sort(function(a,b){
-      var at=a.time||'',bt=b.time||'';
-      if(at&&bt)return at.localeCompare(bt);
-      if(at)return -1; if(bt)return 1; return 0;
-    });
-  });
+  // No auto-sort — array order within each section is fully user-controlled via drag
   var mainSecs=[{key:'morning',label:'Morning Seder'},{key:'afternoon',label:'Afternoon Seder'},{key:'night',label:'Night Seder'}];
   var html='';
   mainSecs.forEach(function(sec){
@@ -1985,13 +1978,11 @@ function renderLearningDayModal(day){
       html+='<div class="learning-section-empty" style="padding:8px 16px 12px">—</div>';
     }else{
       html+=sItems.map(function(item){
-        var canDrag=!item.time;
         var timeBadge=item.time?'<span class="learning-time-badge">'+fmt12(item.time)+'</span>':'';
         var hasNote=!!item.notes;
-        var dragHandle=canDrag?'<span class="lrn-drag-handle">⠿</span>':'';
-        return '<div class="lrn-modal-item" id="lrni-'+item.id+'"'+(canDrag?lrnDragAttrs(day,item.id,sec.key):'')+'>'+
+        return '<div class="lrn-modal-item" id="lrni-'+item.id+'"'+lrnDragAttrs(day,item.id,sec.key)+'>'+
           '<div class="lrn-modal-item-main">'+
-            dragHandle+
+            '<span class="lrn-drag-handle">⠿</span>'+
             '<div class="lrn-modal-item-title">'+escHtml(item.subject)+timeBadge+'</div>'+
             '<div class="lrn-modal-item-actions">'+
               (hasNote?'<button class="btn-icon" onclick="toggleLrnNote(\''+item.id+'\')" title="Notes">📝</button>':'')+
