@@ -2832,7 +2832,7 @@ window.openEditNote = function(id) {
   document.getElementById('noteTitle').value=n.title||'';
   document.getElementById('notePinned').checked=n.pinned||false;
   setNoteType(n.type);
-  document.getElementById('noteContent').value=n.content||'';
+  document.getElementById('noteContent').innerHTML=n.content||'';
   state.noteCheckItems=(n.items||[]).map(function(i){return {id:uid(),text:i.text,done:i.done};});
   renderCheckItems();
   buildColorPicker('noteColorPicker',n.color||'',function(v){state.selectedNoteColor=v;});
@@ -3382,14 +3382,15 @@ function openNoteModal() {
   state.editNoteId=null; state.selectedNoteColor=''; state.noteType='text'; state.noteCheckItems=[];
   var initFolder=(state.activeFolderId!=='all'&&state.activeFolderId!=='pinned')?state.activeFolderId:'';
   document.getElementById('noteModalTitle').textContent='New Note';
-  document.getElementById('noteTitle').value=''; document.getElementById('noteContent').value=''; document.getElementById('notePinned').checked=false;
+  document.getElementById('noteTitle').value=''; document.getElementById('noteContent').innerHTML=''; document.getElementById('notePinned').checked=false;
   setNoteType('text'); renderCheckItems();
   buildColorPicker('noteColorPicker','',function(v){state.selectedNoteColor=v;});
   populateFolderSelect(initFolder);
   openModal('noteModal'); setTimeout(function(){document.getElementById('noteTitle').focus();},80);
 }
 function saveNoteModal() {
-  var content=state.noteType==='text'?document.getElementById('noteContent').value.trim():'';
+  var rawNC=document.getElementById('noteContent').innerHTML;
+  var content=state.noteType==='text'?(rawNC==='<br>'?'':rawNC):'';
   var title=document.getElementById('noteTitle').value.trim();
   if (!title&&!content&&!state.noteCheckItems.length){ document.getElementById('noteTitle').classList.add('error'); return; }
   document.getElementById('noteTitle').classList.remove('error');
@@ -4004,65 +4005,43 @@ function initListeners() {
   document.getElementById('noteViewContent').addEventListener('input', function(){
     clearTimeout(_noteUndoTimer); _noteUndoTimer=setTimeout(function(){ saveNoteViewModal(); },600);
   });
-  document.getElementById('noteViewContent').addEventListener('keydown', function(e){
+  // Shared keydown handler for all note contenteditable editors
+  function noteEditorKeydown(e) {
     if((e.metaKey||e.ctrlKey)&&e.key==='b'){e.preventDefault();document.execCommand('bold',false,null);}
     if((e.metaKey||e.ctrlKey)&&e.key==='i'){e.preventDefault();document.execCommand('italic',false,null);}
     if((e.metaKey||e.ctrlKey)&&e.key==='u'){e.preventDefault();document.execCommand('underline',false,null);}
-
-    // Helper: get current line's first text node and full text
-    function getNoteLineInfo(editor) {
+    function getNoteLineInfo(editor){
       var sel=window.getSelection(); if(!sel.rangeCount)return{tn:null,text:''};
       var cn=sel.getRangeAt(0).startContainer;
       var el=cn.nodeType===3?cn.parentNode:cn;
       while(el&&el.parentNode!==editor&&el!==editor)el=el.parentNode;
       var inBlock=(el&&el!==editor);
-      if(inBlock){
-        // Cursor is inside a child div — walk to first text node of that div
-        var w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);
-        return{tn:w.nextNode(),text:el.textContent};
-      } else {
-        // Cursor is directly in editor (flat / <br> structure) — use current text node
-        var tn=cn.nodeType===3?cn:null;
-        return{tn:tn,text:tn?tn.textContent:''};
-      }
+      if(inBlock){var w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);return{tn:w.nextNode(),text:el.textContent};}
+      else{var tn=cn.nodeType===3?cn:null;return{tn:tn,text:tn?tn.textContent:''};}
     }
-
-    // Tab: indent whole list line / Shift+Tab: unindent
     if(e.key==='Tab'){
       e.preventDefault();
       var edT=this; var selT=window.getSelection(); if(!selT.rangeCount)return;
-      var infoT=getNoteLineInfo(edT);
-      var tnT=infoT.tn; var ltT=infoT.text;
+      var infoT=getNoteLineInfo(edT); var tnT=infoT.tn; var ltT=infoT.text;
       if(e.shiftKey){
         if(tnT){var mT=ltT.match(/^( {1,4})/);
           if(mT){var rT=document.createRange();rT.setStart(tnT,0);rT.setEnd(tnT,mT[1].length);selT.removeAllRanges();selT.addRange(rT);document.execCommand('delete');}}
       } else {
         var isListT=/^\s*-/.test(ltT)||/^\s*\d+\./.test(ltT);
-        if(isListT&&tnT){
-          var rT2=document.createRange();rT2.setStart(tnT,0);rT2.collapse(true);selT.removeAllRanges();selT.addRange(rT2);
-        }
+        if(isListT&&tnT){var rT2=document.createRange();rT2.setStart(tnT,0);rT2.collapse(true);selT.removeAllRanges();selT.addRange(rT2);}
         document.execCommand('insertText',false,'    ');
       }
       return;
     }
-
-    // Auto-list: Enter continues bullet or numbered list (space after marker is optional)
-    // Let browser create the new block, then immediately prepend the list prefix
     if(e.key==='Enter'&&!e.shiftKey&&!e.ctrlKey&&!e.metaKey){
-      var ed2=this;
-      var info2=getNoteLineInfo(ed2);
-      var lt2=info2.text;
-      var bulletM=lt2.match(/^(\s*)-/);
-      var numM=lt2.match(/^(\s*)(\d+)\./);
-      if(bulletM){
-        var pfx=bulletM[1]+'- ';
-        setTimeout(function(){document.execCommand('insertText',false,pfx);},0);
-      } else if(numM){
-        var pfx2=numM[1]+(parseInt(numM[2])+1)+'. ';
-        setTimeout(function(){document.execCommand('insertText',false,pfx2);},0);
-      }
+      var ed2=this; var info2=getNoteLineInfo(ed2); var lt2=info2.text;
+      var bulletM=lt2.match(/^(\s*)-/); var numM=lt2.match(/^(\s*)(\d+)\./);
+      if(bulletM){var pfx=bulletM[1]+'- ';setTimeout(function(){document.execCommand('insertText',false,pfx);},0);}
+      else if(numM){var pfx2=numM[1]+(parseInt(numM[2])+1)+'. ';setTimeout(function(){document.execCommand('insertText',false,pfx2);},0);}
     }
-  });
+  }
+  document.getElementById('noteViewContent').addEventListener('keydown', noteEditorKeydown);
+  document.getElementById('noteContent').addEventListener('keydown', noteEditorKeydown);
   document.getElementById('noteViewAddCheckItem').addEventListener('click', function(){
     state.viewNoteCheckItems.push({id:uid(),text:'',done:false}); renderNoteViewChecklist();
     var inputs=document.getElementById('noteViewCheckItems').querySelectorAll('.note-view-check-input');

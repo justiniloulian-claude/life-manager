@@ -2393,6 +2393,11 @@ textarea.field { resize: vertical; }
 .linked-chip-del:hover { opacity:1; }
 .task-link-note-btn { font-size:12px; padding:5px 12px; }
 
+/* Note create modal — contenteditable editor */
+.note-create-editor { min-height:140px; line-height:1.6; white-space:pre-wrap; cursor:text; }
+.note-create-editor:empty:before { content:attr(data-placeholder); color:#bbb; pointer-events:none; }
+.note-create-fmt-bar { border-top:1px solid #f0f0f0; padding:6px 0 2px; display:flex; gap:6px; }
+
 /* Linked note items — clickable */
 .lnv-clickable { cursor:pointer; position:relative; transition:background 0.12s; }
 .lnv-clickable:hover { background:#f0efff; border-color:#c4b5fd; }

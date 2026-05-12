@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=35">
+  <link rel="stylesheet" href="style.css?v=36">
 </head>
 <body>
 
@@ -641,7 +641,12 @@
     <div class="modal-body">
       <input type="text" id="noteTitle" class="field" placeholder="Title (optional)">
       <div id="noteTextArea">
-        <textarea id="noteContent" class="field" rows="7" placeholder="Take a note..." style="resize:vertical"></textarea>
+        <div id="noteContent" class="field note-create-editor" contenteditable="true" data-placeholder="Take a note..."></div>
+        <div class="note-format-bar note-create-fmt-bar">
+          <button class="fmt-btn" onmousedown="event.preventDefault();document.execCommand('bold',false,null)" title="Bold (Cmd+B)"><b>B</b></button>
+          <button class="fmt-btn" onmousedown="event.preventDefault();document.execCommand('italic',false,null)" title="Italic (Cmd+I)"><i>I</i></button>
+          <button class="fmt-btn" onmousedown="event.preventDefault();document.execCommand('underline',false,null)" title="Underline (Cmd+U)"><u>U</u></button>
+        </div>
       </div>
       <div id="noteCheckArea" style="display:none">
         <div id="noteCheckItems"></div>
@@ -1203,6 +1208,6 @@
   </div>
 </div>
 
-<script src="app.js?v=35"></script>
+<script src="app.js?v=36"></script>
 </body>
 </html>
