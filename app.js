@@ -1862,6 +1862,58 @@ var LEARNING_SECTIONS=[
   {key:'unscheduled',label:'Unscheduled',hours:'No time set'},
 ];
 
+// ---- Learning drag system ----
+var _dragLrnInfo=null;
+window.lrnDragStart=function(e,day,id,sec){
+  _dragLrnInfo={day:day,id:id,sec:sec};
+  e.dataTransfer.effectAllowed='move';
+  setTimeout(function(){
+    document.querySelectorAll('[data-lrn-id="'+id+'"]').forEach(function(el){el.classList.add('lrn-dragging');});
+  },0);
+};
+window.lrnDragOver=function(e){
+  e.preventDefault(); e.dataTransfer.dropEffect='move';
+  var target=e.currentTarget;
+  if(!target||(_dragLrnInfo&&target.dataset.lrnId===_dragLrnInfo.id))return;
+  document.querySelectorAll('.lrn-drag-above,.lrn-drag-below').forEach(function(el){el.classList.remove('lrn-drag-above','lrn-drag-below');});
+  var rect=target.getBoundingClientRect();
+  target.classList.add(e.clientY<rect.top+rect.height/2?'lrn-drag-above':'lrn-drag-below');
+};
+window.lrnDragLeave=function(e){
+  var t=e.currentTarget; if(t)t.classList.remove('lrn-drag-above','lrn-drag-below');
+};
+window.lrnDrop=function(e,day,toId,sec){
+  e.preventDefault();
+  var target=e.currentTarget;
+  var insertBefore=target&&target.classList.contains('lrn-drag-above');
+  if(target)target.classList.remove('lrn-drag-above','lrn-drag-below');
+  if(!_dragLrnInfo||_dragLrnInfo.id===toId||_dragLrnInfo.day!==day||_dragLrnInfo.sec!==sec)return;
+  var fromId=_dragLrnInfo.id;
+  var data=getData(); var items=data.learning[day]||[];
+  var fromIdx=items.findIndex(function(i){return i.id===fromId;});
+  var toIdx=items.findIndex(function(i){return i.id===toId;});
+  if(fromIdx===-1||toIdx===-1)return;
+  var dragged=items.splice(fromIdx,1)[0];
+  var newTo=items.findIndex(function(i){return i.id===toId;});
+  items.splice(insertBefore?newTo:newTo+1,0,dragged);
+  data.learning[day]=items; saveLrn(data.learning);
+  renderLearning();
+  if(document.getElementById('learningDayModal').classList.contains('open')) renderLearningDayModal(day);
+};
+window.lrnDragEnd=function(e){
+  _dragLrnInfo=null;
+  document.querySelectorAll('.lrn-dragging,.lrn-drag-above,.lrn-drag-below').forEach(function(el){el.classList.remove('lrn-dragging','lrn-drag-above','lrn-drag-below');});
+};
+
+function lrnDragAttrs(day,id,sec){
+  return ' draggable="true" data-lrn-id="'+id+'"'
+    +' ondragstart="lrnDragStart(event,\''+day+'\',\''+id+'\',\''+sec+'\')"'
+    +' ondragover="lrnDragOver(event)"'
+    +' ondragleave="lrnDragLeave(event)"'
+    +' ondrop="lrnDrop(event,\''+day+'\',\''+id+'\',\''+sec+'\')"'
+    +' ondragend="lrnDragEnd(event)"';
+}
+
 function renderLearning() {
   var data=getData(); var grid=document.getElementById('learningGrid'); if(!grid)return;
   grid.innerHTML=LEARNING_DAYS.map(function(day){
@@ -1875,8 +1927,9 @@ function renderLearning() {
       if(!sItems.length)return;
       bodyHTML+='<div class="learning-section-header">'+sec.label+'</div>';
       bodyHTML+=sItems.map(function(item){
+        var canDrag=!item.time;
         var timeBadge=item.time?'<span class="learning-time-badge">'+fmt12(item.time)+'</span>':'';
-        return '<div class="learning-item lrn-compact">'+
+        return '<div class="learning-item lrn-compact'+(canDrag?' lrn-draggable':'')+'"'+(canDrag?lrnDragAttrs(day,item.id,sec.key):'')+'>'+
           '<div class="learning-item-body">'+
             '<div class="learning-item-subject">'+escHtml(item.subject)+timeBadge+'</div>'+
             (item.source?'<div class="learning-item-source">'+escHtml(item.source)+'</div>':'')+
@@ -1886,7 +1939,7 @@ function renderLearning() {
     if(sections.unscheduled.length){
       bodyHTML+='<div class="learning-section-header">Unscheduled</div>';
       bodyHTML+=sections.unscheduled.map(function(item){
-        return '<div class="learning-item lrn-compact">'+
+        return '<div class="learning-item lrn-compact lrn-draggable"'+lrnDragAttrs(day,item.id,'unscheduled')+'>'+
           '<div class="learning-item-body">'+
             '<div class="learning-item-subject">'+escHtml(item.subject)+'</div>'+
             (item.source?'<div class="learning-item-source">'+escHtml(item.source)+'</div>':'')+
@@ -1898,6 +1951,7 @@ function renderLearning() {
     return '<div class="learning-day-col lrn-clickable" onclick="openLearningDayModal(\''+day+'\')">'+
       '<div class="learning-day-header">'+LEARNING_DAY_LABELS[day]+cnt+'</div>'+
       '<div class="learning-day-body">'+bodyHTML+'</div>'+
+      '<button class="learning-add-row" onclick="event.stopPropagation();openAddLearningItem(\''+day+'\')">+ Add</button>'+
       '</div>';
   }).join('');
 }
@@ -1931,10 +1985,13 @@ function renderLearningDayModal(day){
       html+='<div class="learning-section-empty" style="padding:8px 16px 12px">—</div>';
     }else{
       html+=sItems.map(function(item){
+        var canDrag=!item.time;
         var timeBadge=item.time?'<span class="learning-time-badge">'+fmt12(item.time)+'</span>':'';
         var hasNote=!!item.notes;
-        return '<div class="lrn-modal-item" id="lrni-'+item.id+'">'+
+        var dragHandle=canDrag?'<span class="lrn-drag-handle">⠿</span>':'';
+        return '<div class="lrn-modal-item" id="lrni-'+item.id+'"'+(canDrag?lrnDragAttrs(day,item.id,sec.key):'')+'>'+
           '<div class="lrn-modal-item-main">'+
+            dragHandle+
             '<div class="lrn-modal-item-title">'+escHtml(item.subject)+timeBadge+'</div>'+
             '<div class="lrn-modal-item-actions">'+
               (hasNote?'<button class="btn-icon" onclick="toggleLrnNote(\''+item.id+'\')" title="Notes">📝</button>':'')+
@@ -1955,8 +2012,9 @@ function renderLearningDayModal(day){
     html+='<div class="lrn-modal-sec-hdr">Unscheduled</div>';
     html+=sections.unscheduled.map(function(item){
       var hasNote=!!item.notes;
-      return '<div class="lrn-modal-item" id="lrni-'+item.id+'">'+
+      return '<div class="lrn-modal-item" id="lrni-'+item.id+'"'+lrnDragAttrs(day,item.id,'unscheduled')+'>'+
         '<div class="lrn-modal-item-main">'+
+          '<span class="lrn-drag-handle">⠿</span>'+
           '<div class="lrn-modal-item-title">'+escHtml(item.subject)+'</div>'+
           '<div class="lrn-modal-item-actions">'+
             (hasNote?'<button class="btn-icon" onclick="toggleLrnNote(\''+item.id+'\')" title="Notes">📝</button>':'')+
