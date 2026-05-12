@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=36">
+  <link rel="stylesheet" href="style.css?v=37">
 </head>
 <body>
 
@@ -498,6 +498,27 @@
     <div class="modal-footer">
       <button id="cancelRoutineItem" class="btn-cancel">Cancel</button>
       <button id="saveRoutineItem" class="btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Missed Tasks Modal -->
+<div id="missedTasksModal" class="modal">
+  <div class="modal-box modal-wide" style="max-width:600px">
+    <div class="modal-header">
+      <h2>⏰ Unfinished Tasks</h2>
+      <button class="modal-close" id="closeMissedTasksModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="missedTasksSubtitle" class="modal-note" style="margin-bottom:16px"></p>
+      <div id="missedTasksList" style="max-height:55vh;overflow-y:auto"></div>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <div style="display:flex;gap:8px">
+        <button class="btn-secondary" onclick="missedTasksBulk('today')">→ Move All to Today</button>
+        <button class="btn-secondary" onclick="missedTasksBulk('keep')">Keep All</button>
+      </div>
+      <button class="btn-primary" onclick="applyMissedTasks()">Apply</button>
     </div>
   </div>
 </div>
@@ -1208,6 +1229,6 @@
   </div>
 </div>
 
-<script src="app.js?v=36"></script>
+<script src="app.js?v=37"></script>
 </body>
 </html>

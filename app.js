@@ -896,7 +896,19 @@ function taskHTML(task, ds, noActions) {
   var itemClick = noActions
     ? ' onclick="openDashDayPopup(\''+ds+'\')"'
     : ' onclick="taskClick(\''+ds+'\',\''+task.id+'\','+isR+',event)"';
-  return '<div class="task-item '+itemCls+(task.done?' is-done':'')+(noActions?' task-compact-click':' task-clickable')+'" id="ti-'+task.id+'"'+itemClick+'>' +
+  var dragAttrs = !noActions
+    ? ' draggable="true"'
+      +' ondragstart="taskDragStart(event,\''+ds+'\',\''+task.id+'\')"'
+      +' ondragover="taskDragOver(event)"'
+      +' ondragleave="taskDragLeave(event)"'
+      +' ondrop="taskDrop(event,\''+ds+'\',\''+task.id+'\')"'
+      +' ondragend="taskDragEnd(event)"'
+    : '';
+  var dragHandle = !noActions
+    ? '<span class="task-drag-handle" onclick="event.stopPropagation()" title="Drag to reorder">⠿</span>'
+    : '';
+  return '<div class="task-item '+itemCls+(task.done?' is-done':'')+(noActions?' task-compact-click':' task-clickable')+'" id="ti-'+task.id+'"'+itemClick+dragAttrs+'>' +
+    dragHandle+
     '<input type="checkbox" class="task-check"'+(task.done?' checked':'')+' onclick="event.stopPropagation()" onchange="checkTask(\''+ds+'\',\''+task.id+'\','+isR+')">' +
     '<div class="task-body"><div class="task-title '+priorityCls+'">'+escHtml(task.title)+notesDot+'</div>' +
     '<div class="task-meta">'+tb+lb+'</div>'+notesPanel+'</div>' +
@@ -2454,7 +2466,7 @@ function showPage(pageId) {
   var activeTab=document.querySelector('.header-nav-tab[data-page="'+pageId+'"]');
   if (activeTab) activeTab.classList.add('active');
   state.currentPage=pageId;
-  if (pageId==='dashboard') setDashView('seven');
+  if (pageId==='dashboard') { setDashView('seven'); checkMissedTasks(); }
   if (pageId==='calendar')  renderCalendar();
   if (pageId==='notes')     renderNotes();
   if (pageId==='learning')  renderLearning();
@@ -2653,6 +2665,110 @@ function buildNotePickerCategorized(linked, el) {
   if(!html){el.innerHTML='<div style="color:#aaa;font-size:13px">No notes found.</div>';return;}
   el.innerHTML=html;
 }
+// ============================================================
+// DRAG-TO-REORDER TASKS (today view only)
+// ============================================================
+var _dragTaskInfo=null;
+window.taskDragStart=function(e,ds,id){
+  _dragTaskInfo={ds:ds,id:id};
+  e.dataTransfer.effectAllowed='move';
+  setTimeout(function(){var el=document.getElementById('ti-'+id);if(el)el.classList.add('task-dragging');},0);
+};
+window.taskDragOver=function(e){
+  e.preventDefault(); e.dataTransfer.dropEffect='move';
+  var row=e.currentTarget; if(row&&!row.classList.contains('task-drag-over'))row.classList.add('task-drag-over');
+};
+window.taskDragLeave=function(e){
+  var row=e.currentTarget; if(row)row.classList.remove('task-drag-over');
+};
+window.taskDrop=function(e,ds,id){
+  e.preventDefault();
+  var row=e.currentTarget; if(row)row.classList.remove('task-drag-over');
+  if(!_dragTaskInfo||_dragTaskInfo.id===id||_dragTaskInfo.ds!==ds)return;
+  var data=getData(); var tasks=data.tasks[ds]||[];
+  var fromIdx=tasks.findIndex(function(t){return t.id===_dragTaskInfo.id;});
+  var toIdx=tasks.findIndex(function(t){return t.id===id;});
+  if(fromIdx===-1||toIdx===-1)return;
+  var moved=tasks.splice(fromIdx,1)[0]; tasks.splice(toIdx,0,moved);
+  data.tasks[ds]=tasks; saveT(data.tasks); refresh();
+};
+window.taskDragEnd=function(e){
+  _dragTaskInfo=null;
+  document.querySelectorAll('.task-dragging,.task-drag-over').forEach(function(el){el.classList.remove('task-dragging','task-drag-over');});
+};
+
+// ============================================================
+// MISSED TASKS — surface unfinished tasks from skipped days
+// ============================================================
+var _missedTasks=[];
+function checkMissedTasks(){
+  var todayDs=toDateStr(new Date());
+  var lastDs=localStorage.getItem('dm_last_opened')||todayDs;
+  localStorage.setItem('dm_last_opened',todayDs);
+  if(lastDs>=todayDs)return;
+  var data=getData(); var missed=[];
+  var cur=new Date(fromDateStr(lastDs)); cur.setDate(cur.getDate()+1);
+  var today=new Date(fromDateStr(todayDs));
+  while(cur<today){
+    var ds=toDateStr(cur);
+    (data.tasks[ds]||[]).forEach(function(t){
+      if(t.type!=='routine'&&!t.done) missed.push({task:t,ds:ds,action:null,pickDate:''});
+    });
+    cur.setDate(cur.getDate()+1);
+  }
+  if(!missed.length)return;
+  _missedTasks=missed;
+  openMissedTasksModal();
+}
+function openMissedTasksModal(){
+  document.getElementById('missedTasksSubtitle').textContent=
+    _missedTasks.length+' unfinished task'+(_missedTasks.length>1?'s':'')+' from days you were away';
+  renderMissedTasksList();
+  openModal('missedTasksModal');
+}
+function renderMissedTasksList(){
+  var el=document.getElementById('missedTasksList'); if(!el)return;
+  var byDate={};
+  _missedTasks.forEach(function(m,idx){if(!byDate[m.ds])byDate[m.ds]=[];byDate[m.ds].push({m:m,idx:idx});});
+  el.innerHTML=Object.keys(byDate).sort().map(function(ds){
+    var d=fromDateStr(ds);
+    var lbl=d.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+    var rows=byDate[ds].map(function(item){
+      var m=item.m; var i=item.idx;
+      var btns=['today','keep','delete','pick'].map(function(a){
+        var labels={today:'→ Today',keep:'Keep',delete:'🗑 Delete',pick:'📅 Pick Date'};
+        var active=m.action===a?' mta-active':'';
+        return '<button class="missed-action-btn'+active+'" onclick="setMissedTaskAction('+i+',\''+a+'\')">'+labels[a]+'</button>';
+      }).join('');
+      var datePicker=m.action==='pick'?'<input type="date" class="field missed-date-pick" value="'+m.pickDate+'" onchange="setMissedTaskPickDate('+i+',this.value)">':'';
+      return '<div class="missed-task-row"><div class="missed-task-title">'+escHtml(m.task.title)+'</div>'+
+        '<div class="missed-task-actions">'+btns+datePicker+'</div></div>';
+    }).join('');
+    return '<div class="missed-date-group"><div class="missed-date-hdr">'+lbl+'</div>'+rows+'</div>';
+  }).join('');
+}
+window.setMissedTaskAction=function(idx,action){
+  if(!_missedTasks[idx])return;
+  _missedTasks[idx].action=action;
+  if(action!=='pick')_missedTasks[idx].pickDate='';
+  renderMissedTasksList();
+};
+window.setMissedTaskPickDate=function(idx,val){if(_missedTasks[idx])_missedTasks[idx].pickDate=val;};
+window.missedTasksBulk=function(action){_missedTasks.forEach(function(m){m.action=action;});renderMissedTasksList();};
+window.applyMissedTasks=function(){
+  var todayDs=toDateStr(new Date()); var data=getData();
+  _missedTasks.forEach(function(m){
+    if(!m.action||m.action==='keep')return;
+    data.tasks[m.ds]=(data.tasks[m.ds]||[]).filter(function(t){return t.id!==m.task.id;});
+    if(m.action==='delete')return;
+    var targetDs=m.action==='today'?todayDs:m.pickDate;
+    if(!targetDs)return;
+    if(!data.tasks[targetDs])data.tasks[targetDs]=[];
+    data.tasks[targetDs].push(Object.assign({},m.task));
+  });
+  saveT(data.tasks); closeModal('missedTasksModal'); refresh();
+};
+
 // Render the "linked" chips in the task modal
 function renderTaskModalLinkedDisplay() {
   var el=document.getElementById('taskModalLinkedDisplay'); if(!el)return;
@@ -3564,6 +3680,7 @@ function initListeners() {
   });
 
   // Single day nav
+  document.getElementById('closeMissedTasksModal').addEventListener('click', function(){ closeModal('missedTasksModal'); });
   document.getElementById('prevDayBtn').addEventListener('click',     function(){ state.dayOffset--; renderSingle(); });
   document.getElementById('nextDayBtn').addEventListener('click',     function(){ state.dayOffset++; renderSingle(); });
   document.getElementById('backToTodayBtn').addEventListener('click', function(){ state.dayOffset=0; renderSingle(); });
@@ -4116,6 +4233,7 @@ function init() {
   initListeners();
   initSwipe();
   setDashView('seven');
+  checkMissedTasks();
 }
 
 document.addEventListener('DOMContentLoaded', init);
