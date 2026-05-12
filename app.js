@@ -391,6 +391,12 @@ function getTasksForDate(ds) {
   }
   var inc=all.filter(function(t){return !t.done;});
   var don=all.filter(function(t){return t.done;});
+  // Partial sort: timed tasks enforce time order among themselves;
+  // untimed tasks stay exactly where drag placed them.
+  var timedIdxs=[],timedItems=[];
+  inc.forEach(function(t,i){if(t.time){timedIdxs.push(i);timedItems.push(t);}});
+  timedItems.sort(function(a,b){return a.time.localeCompare(b.time);});
+  timedIdxs.forEach(function(pos,i){inc[pos]=timedItems[i];});
   return inc.concat(don);
 }
 function toggleDone(ds,id,isRoutine) {
