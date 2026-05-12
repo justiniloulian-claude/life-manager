@@ -896,17 +896,13 @@ function taskHTML(task, ds, noActions) {
   var itemClick = noActions
     ? ' onclick="openDashDayPopup(\''+ds+'\')"'
     : ' onclick="taskClick(\''+ds+'\',\''+task.id+'\','+isR+',event)"';
-  var dragAttrs = !noActions
-    ? ' draggable="true"'
-      +' ondragstart="taskDragStart(event,\''+ds+'\',\''+task.id+'\')"'
-      +' ondragover="taskDragOver(event)"'
-      +' ondragleave="taskDragLeave(event)"'
-      +' ondrop="taskDrop(event,\''+ds+'\',\''+task.id+'\')"'
-      +' ondragend="taskDragEnd(event)"'
-    : '';
-  var dragHandle = !noActions
-    ? '<span class="task-drag-handle" onclick="event.stopPropagation()" title="Drag to reorder">⠿</span>'
-    : '';
+  var dragAttrs = ' draggable="true"'
+    +' ondragstart="taskDragStart(event,\''+ds+'\',\''+task.id+'\')"'
+    +' ondragover="taskDragOver(event)"'
+    +' ondragleave="taskDragLeave(event)"'
+    +' ondrop="taskDrop(event,\''+ds+'\',\''+task.id+'\')"'
+    +' ondragend="taskDragEnd(event)"';
+  var dragHandle = '<span class="task-drag-handle" onclick="event.stopPropagation()" title="Drag to reorder">⠿</span>';
   return '<div class="task-item '+itemCls+(task.done?' is-done':'')+(noActions?' task-compact-click':' task-clickable')+'" id="ti-'+task.id+'"'+itemClick+dragAttrs+'>' +
     dragHandle+
     '<input type="checkbox" class="task-check"'+(task.done?' checked':'')+' onclick="event.stopPropagation()" onchange="checkTask(\''+ds+'\',\''+task.id+'\','+isR+')">' +
