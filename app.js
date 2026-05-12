@@ -4012,25 +4012,33 @@ function initListeners() {
     // Tab: indent / Shift+Tab: unindent
     if(e.key==='Tab'){
       e.preventDefault();
+      var edT=this; var selT=window.getSelection();
+      if(!selT.rangeCount)return;
+      var cnT=selT.getRangeAt(0).startContainer;
+      var elT=cnT.nodeType===3?cnT.parentNode:cnT;
+      while(elT&&elT.parentNode!==edT&&elT!==edT)elT=elT.parentNode;
+      var blkT=(elT&&elT!==edT)?elT:edT;
+      var walkerT=document.createTreeWalker(blkT,NodeFilter.SHOW_TEXT);
+      var tnT=walkerT.nextNode();
       if(e.shiftKey){
-        var ed=this; var sel=window.getSelection();
-        if(sel.rangeCount){
-          var cn=sel.getRangeAt(0).startContainer;
-          var el=cn.nodeType===3?cn.parentNode:cn;
-          while(el&&el.parentNode!==ed&&el!==ed)el=el.parentNode;
-          var blk=(el&&el!==ed)?el:ed;
-          var walker=document.createTreeWalker(blk,NodeFilter.SHOW_TEXT);
-          var tn=walker.nextNode();
-          if(tn){var m=tn.textContent.match(/^( {1,4})/);
-            if(m){var r2=document.createRange();r2.setStart(tn,0);r2.setEnd(tn,m[1].length);sel.removeAllRanges();sel.addRange(r2);document.execCommand('delete');}}
-        }
+        // Remove up to 4 leading spaces from line start
+        if(tnT){var mT=tnT.textContent.match(/^( {1,4})/);
+          if(mT){var rT=document.createRange();rT.setStart(tnT,0);rT.setEnd(tnT,mT[1].length);selT.removeAllRanges();selT.addRange(rT);document.execCommand('delete');}}
       } else {
-        document.execCommand('insertText',false,'    ');
+        var ltT=blkT.textContent;
+        var isListT=/^\s*-/.test(ltT)||/^\s*\d+\./.test(ltT);
+        if(isListT&&tnT){
+          // Indent: insert 4 spaces at start of the line
+          var rT2=document.createRange();rT2.setStart(tnT,0);rT2.collapse(true);selT.removeAllRanges();selT.addRange(rT2);
+          document.execCommand('insertText',false,'    ');
+        } else {
+          document.execCommand('insertText',false,'    ');
+        }
       }
       return;
     }
 
-    // Auto-list: Enter continues bullet or numbered list
+    // Auto-list: Enter continues bullet or numbered list (space after marker is optional)
     if(e.key==='Enter'&&!e.shiftKey&&!e.ctrlKey&&!e.metaKey){
       var ed2=this; var sel2=window.getSelection();
       if(!sel2.rangeCount)return;
@@ -4038,9 +4046,9 @@ function initListeners() {
       var el2=cn2.nodeType===3?cn2.parentNode:cn2;
       while(el2&&el2.parentNode!==ed2&&el2!==ed2)el2=el2.parentNode;
       var lineText=(el2&&el2!==ed2)?el2.textContent:(cn2.nodeType===3?cn2.textContent:'');
-      var bulletM=lineText.match(/^(\s*- )/);
-      var numM=lineText.match(/^(\s*)(\d+)\. /);
-      if(bulletM){e.preventDefault();document.execCommand('insertHTML',false,'<br>'+bulletM[1]);}
+      var bulletM=lineText.match(/^(\s*)-/);
+      var numM=lineText.match(/^(\s*)(\d+)\./);
+      if(bulletM){e.preventDefault();document.execCommand('insertHTML',false,'<br>'+bulletM[1]+'- ');}
       else if(numM){e.preventDefault();document.execCommand('insertHTML',false,'<br>'+numM[1]+(parseInt(numM[2])+1)+'. ');}
     }
   });

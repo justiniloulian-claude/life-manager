@@ -2373,12 +2373,12 @@ textarea.field { resize: vertical; }
 
 /* Categorized note picker (task modal + link modal) */
 .npg-wrap { border-radius:7px; overflow:hidden; margin-bottom:6px; border:1px solid #eee; }
-.npg-hdr { display:flex; align-items:center; gap:6px; padding:8px 10px; background:#fafaf8; cursor:pointer; user-select:none; font-size:13px; font-weight:600; color:#333; }
+.npg-hdr { display:flex; align-items:center; gap:8px; padding:11px 12px; background:#fafaf8; cursor:pointer; user-select:none; font-size:14px; font-weight:600; color:#333; }
 .npg-hdr:hover { background:#f0f0ec; }
-.npg-icon { font-size:14px; }
+.npg-icon { font-size:16px; }
 .npg-name { flex:1; }
-.npg-count { font-size:11px; background:#e8e8e4; color:#666; border-radius:10px; padding:1px 7px; font-weight:500; }
-.npg-arrow { font-size:10px; color:#aaa; transition:transform 0.15s; }
+.npg-count { font-size:12px; background:#e8e8e4; color:#666; border-radius:10px; padding:2px 8px; font-weight:500; }
+.npg-arrow { font-size:18px; color:#666; transition:transform 0.15s; line-height:1; font-style:normal; }
 .npg-body { display:none; padding:4px 0; }
 .npg-wrap.open .npg-body { display:block; }
 .npg-wrap.open .npg-arrow { transform:rotate(90deg); }
