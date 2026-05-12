@@ -380,8 +380,8 @@ function getTasksForDate(ds) {
   var all=routineTasks.concat(oneTasks);
   var inc=all.filter(function(t){return !t.done;});
   var don=all.filter(function(t){return t.done;});
-  var withT=inc.filter(function(t){return t.time;}).sort(function(a,b){return a.time.localeCompare(b.time);});
-  return withT.concat(inc.filter(function(t){return !t.time;})).concat(don);
+  // Preserve drag order — no auto time-sort; done tasks go to the bottom
+  return inc.concat(don);
 }
 function toggleDone(ds,id,isRoutine) {
   var data=getData();
@@ -2688,7 +2688,7 @@ window.taskDrop=function(e,ds,id){
   var toIdx=tasks.findIndex(function(t){return t.id===id;});
   if(fromIdx===-1||toIdx===-1)return;
   var moved=tasks.splice(fromIdx,1)[0]; tasks.splice(toIdx,0,moved);
-  data.tasks[ds]=tasks; saveT(data.tasks); refresh();
+  data.tasks[ds]=tasks; saveT(data.tasks); refresh(); refreshDashDayModal();
 };
 window.taskDragEnd=function(e){
   _dragTaskInfo=null;
