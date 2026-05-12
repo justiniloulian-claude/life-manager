@@ -2380,8 +2380,8 @@ textarea.field { resize: vertical; }
 .npg-count { font-size:12px; background:#e8e8e4; color:#666; border-radius:10px; padding:2px 8px; font-weight:500; }
 .npg-arrow { font-size:18px; color:#666; transition:transform 0.15s; line-height:1; font-style:normal; }
 .npg-body { display:none; padding:4px 0; }
-.npg-wrap.open .npg-body { display:block; }
-.npg-wrap.open .npg-arrow { transform:rotate(90deg); }
+.npg-wrap.open > .npg-body { display:block; }
+.npg-wrap.open > .npg-hdr .npg-arrow { transform:rotate(90deg); }
 /* Nested sub-folders indent inside their parent body */
 .npg-body .npg-wrap { margin-left:12px; margin-bottom:4px; }
 
