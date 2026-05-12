@@ -1132,6 +1132,28 @@ textarea.field { resize: vertical; }
 /* Clickable day column */
 .learning-day-col.lrn-clickable { cursor: pointer; }
 .learning-day-col.lrn-clickable:hover { border-color: #d0c8f0; box-shadow: 0 2px 10px rgba(124,58,237,0.08); }
+/* Today column — B + C + D combined */
+.learning-day-col.lrn-today-col {
+  background: #f5f3ff;
+  border-color: #c4b5fd;
+  border-left: 3px solid #7c3aed;
+}
+.learning-day-col.lrn-today-col .learning-day-header {
+  background: #ede9fe;
+  border-bottom: 2px solid #a78bfa;
+}
+.lrn-today-badge {
+  display: inline-block;
+  font-size: 10px;
+  background: #7c3aed;
+  color: #fff;
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 6px;
+  font-weight: 500;
+  vertical-align: middle;
+  line-height: 1.6;
+}
 /* Compact items in 7-day grid (no actions) */
 .learning-item.lrn-compact { padding: 6px 12px; }
 .learning-item.lrn-compact .learning-item-actions { display: none; }

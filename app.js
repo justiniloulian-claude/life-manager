@@ -1914,9 +1914,13 @@ function lrnDragAttrs(day,id,sec){
     +' ondragend="lrnDragEnd(event)"';
 }
 
+var LRN_DAY_DOW={mon:1,tue:2,wed:3,thu:4,fri:5,sat:6,sun:0};
+
 function renderLearning() {
   var data=getData(); var grid=document.getElementById('learningGrid'); if(!grid)return;
+  var todayDow=new Date().getDay();
   grid.innerHTML=LEARNING_DAYS.map(function(day){
+    var isToday=LRN_DAY_DOW[day]===todayDow;
     var items=data.learning[day]||[];
     var sections={morning:[],afternoon:[],night:[],unscheduled:[]};
     items.forEach(function(item){sections[getLearningSection(item)].push(item);});
@@ -1947,8 +1951,9 @@ function renderLearning() {
     }
     if(!bodyHTML)bodyHTML='<div class="learning-section-empty" style="padding:14px;color:#ccc">Tap to add items</div>';
     var cnt=items.length?'<span class="lrn-col-count">'+items.length+'</span>':'';
-    return '<div class="learning-day-col lrn-clickable" onclick="openLearningDayModal(\''+day+'\')">'+
-      '<div class="learning-day-header">'+LEARNING_DAY_LABELS[day]+cnt+'</div>'+
+    var todayBadge=isToday?'<span class="lrn-today-badge">Today</span>':'';
+    return '<div class="learning-day-col lrn-clickable'+(isToday?' lrn-today-col':'')+'" onclick="openLearningDayModal(\''+day+'\')">'+
+      '<div class="learning-day-header">'+LEARNING_DAY_LABELS[day]+todayBadge+cnt+'</div>'+
       '<div class="learning-day-body">'+bodyHTML+'</div>'+
       '<button class="learning-add-row" onclick="event.stopPropagation();openAddLearningItem(\''+day+'\')">+ Add</button>'+
       '</div>';
