@@ -921,7 +921,7 @@ function taskHTML(task, ds, noActions) {
   var dragHandle = !noActions
     ? '<span class="task-drag-handle" onclick="event.stopPropagation()" title="Drag to reorder">⠿</span>'
     : '';
-  var ctxMenu=(!isR&&!noActions)?' oncontextmenu="taskContextMenu(event,\''+ds+'\',\''+task.id+'\')"':'';
+  var ctxMenu=!isR?' oncontextmenu="taskContextMenu(event,\''+ds+'\',\''+task.id+'\')"':'';
   return '<div class="task-item '+itemCls+(task.done?' is-done':'')+(noActions?' task-compact-click':' task-clickable')+'" id="ti-'+task.id+'"'+itemClick+dragAttrs+ctxMenu+'>' +
     dragHandle+
     '<input type="checkbox" class="task-check"'+(task.done?' checked':'')+' onclick="event.stopPropagation()" onchange="checkTask(\''+ds+'\',\''+task.id+'\','+isR+')">' +
@@ -2364,7 +2364,7 @@ function renderCalendar() {
       holidays.forEach(function(h){
         var chip=document.createElement('div');
         chip.className='cal-event-chip '+(h._holType==='jewish'?'cc-jewish-hol':'cc-us-hol');
-        chip.textContent=h.title;
+        chip.textContent=(h._holType==='jewish'?'✡️ ':'🇺🇸 ')+h.title;
         chip.onclick=(function(d){return function(e){e.stopPropagation();openDayDetail(d);};})(ds);
         evDiv.appendChild(chip);
       });
