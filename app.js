@@ -921,7 +921,8 @@ function taskHTML(task, ds, noActions) {
   var dragHandle = !noActions
     ? '<span class="task-drag-handle" onclick="event.stopPropagation()" title="Drag to reorder">⠿</span>'
     : '';
-  return '<div class="task-item '+itemCls+(task.done?' is-done':'')+(noActions?' task-compact-click':' task-clickable')+'" id="ti-'+task.id+'"'+itemClick+dragAttrs+'>' +
+  var ctxMenu=(!isR&&!noActions)?' oncontextmenu="taskContextMenu(event,\''+ds+'\',\''+task.id+'\')"':'';
+  return '<div class="task-item '+itemCls+(task.done?' is-done':'')+(noActions?' task-compact-click':' task-clickable')+'" id="ti-'+task.id+'"'+itemClick+dragAttrs+ctxMenu+'>' +
     dragHandle+
     '<input type="checkbox" class="task-check"'+(task.done?' checked':'')+' onclick="event.stopPropagation()" onchange="checkTask(\''+ds+'\',\''+task.id+'\','+isR+')">' +
     '<div class="task-body"><div class="task-title '+priorityCls+'">'+escHtml(task.title)+notesDot+'</div>' +
@@ -958,7 +959,8 @@ function dayCardHTML(date, compact) {
     '<span class="z-loading">Loading times…</span><span class="z-expand">Tap for all times ›</span>' +
     '</div></div>';
 
-  return '<div class="day-card'+(today?' is-today':'')+(compact?' day-card-compact':'')+'"'+(compact?' onclick="compactCardClick(\''+ds+'\',event)"':'')+'>'+
+  var crossDayAttrs=compact?' ondragover="dayCardDragOver(event,\''+ds+'\')" ondragleave="dayCardDragLeave(event)" ondrop="dayCardDrop(event,\''+ds+'\')"':'';
+  return '<div class="day-card'+(today?' is-today':'')+(compact?' day-card-compact':'')+'"'+(compact?' onclick="compactCardClick(\''+ds+'\',event)"':'')+crossDayAttrs+'>'+
     headSection + zmanimSection +
     '<div class="task-list">'+tHTML+'</div>' +
     '<button class="add-task-row" onclick="event.stopPropagation();openAddTask(\''+ds+'\')">+ Add task or event</button>' +
@@ -2274,9 +2276,72 @@ function renderFinWishlist() {
 // ============================================================
 // RENDER — CALENDAR
 // ============================================================
+// ============================================================
+// HOLIDAYS — US & Jewish
+// ============================================================
+function getNthWeekday(year,month,weekday,n){
+  var d=new Date(year,month,1);
+  var diff=(weekday-d.getDay()+7)%7;
+  d.setDate(1+diff+(n-1)*7); return d;
+}
+function getLastWeekday(year,month,weekday){
+  var d=new Date(year,month+1,0);
+  var diff=(d.getDay()-weekday+7)%7;
+  d.setDate(d.getDate()-diff); return d;
+}
+function getUSHolidays(year){
+  var h=[]; function add(d,t){h.push({date:toDateStr(d),title:t,_holType:'us'});}
+  add(new Date(year,0,1),"New Year's Day");
+  add(getNthWeekday(year,0,1,3),"MLK Jr. Day");
+  add(getNthWeekday(year,1,1,3),"Presidents' Day");
+  add(getNthWeekday(year,4,0,2),"Mother's Day");
+  add(getLastWeekday(year,4,1),"Memorial Day");
+  add(new Date(year,5,19),"Juneteenth");
+  add(getNthWeekday(year,5,0,3),"Father's Day");
+  add(new Date(year,6,4),"Independence Day");
+  add(getNthWeekday(year,8,1,1),"Labor Day");
+  add(getNthWeekday(year,9,1,2),"Columbus Day");
+  add(new Date(year,10,11),"Veterans Day");
+  add(getNthWeekday(year,10,4,4),"Thanksgiving");
+  add(new Date(year,11,25),"Christmas Day");
+  return h;
+}
+var _jewishHolCache={};
+function getJewishHolidaysForYear(year,callback){
+  if(_jewishHolCache[year]){if(callback)callback(_jewishHolCache[year]);return;}
+  var stored=localStorage.getItem('dm_jewish_hol_'+year);
+  if(stored){try{var p=JSON.parse(stored);_jewishHolCache[year]=p;if(callback)callback(p);return;}catch(e){}}
+  var url='https://www.hebcal.com/hebcal/?v=1&cfg=json&maj=on&min=on&mod=on&nx=on&year='+year+'&ss=off&mf=off&c=off&geo=none&M=off&s=off&leyning=off&i=off';
+  fetch(url).then(function(r){return r.json();}).then(function(data){
+    var items=(data.items||[]).filter(function(item){
+      if(item.category!=='holiday')return false;
+      if(item.title&&item.title.indexOf('Chol ha-Moed')>=0)return false;
+      return true;
+    }).map(function(item){return{date:item.date.substring(0,10),title:item.title,_holType:'jewish'};});
+    _jewishHolCache[year]=items;
+    localStorage.setItem('dm_jewish_hol_'+year,JSON.stringify(items));
+    if(callback)callback(items);
+  }).catch(function(){if(callback)callback([]);});
+}
+function getHolidaysForDate(ds){
+  var year=parseInt(ds.substring(0,4),10);
+  var us=getUSHolidays(year).filter(function(h){return h.date===ds;});
+  var jewish=(_jewishHolCache[year]||[]).filter(function(h){return h.date===ds;});
+  return us.concat(jewish);
+}
+
 function renderCalendar() {
   var year=state.calYear, month=state.calMonth, now=new Date();
-  document.getElementById('calMonthLabel').textContent=new Date(year,month,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  var labelText=new Date(year,month,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  document.getElementById('calMonthLabel').textContent=labelText;
+  // Fetch Jewish holidays for year(s) visible — re-render when loaded
+  if(!_jewishHolCache[year]){
+    getJewishHolidaysForYear(year,function(){renderCalendar();});
+  }
+  var prevYear=month===0?year-1:year, nextYear=month===11?year+1:year;
+  if(prevYear!==year&&!_jewishHolCache[prevYear])getJewishHolidaysForYear(prevYear,null);
+  if(nextYear!==year&&!_jewishHolCache[nextYear])getJewishHolidaysForYear(nextYear,null);
+
   var firstDay=new Date(year,month,1).getDay(), daysInMonth=new Date(year,month+1,0).getDate(), daysInPrevMonth=new Date(year,month,0).getDate();
   var grid=document.getElementById('calGrid'); grid.innerHTML='';
   var totalCells=Math.ceil((firstDay+daysInMonth)/7)*7; var hdatesToLoad=[];
@@ -2292,15 +2357,25 @@ function renderCalendar() {
     var numEl=document.createElement('div'); numEl.className='cal-cell-top';
     numEl.innerHTML='<div class="cal-day-num">'+dayNum+'</div><div class="cal-hdate" id="chd-'+ds+'"></div>';
     cell.appendChild(numEl);
+    var holidays=getHolidaysForDate(ds);
     var events=getEventsForDate(ds);
-    if (events.length){
+    if(holidays.length||events.length){
       var evDiv=document.createElement('div'); evDiv.className='cal-events';
+      holidays.forEach(function(h){
+        var chip=document.createElement('div');
+        chip.className='cal-event-chip '+(h._holType==='jewish'?'cc-jewish-hol':'cc-us-hol');
+        chip.textContent=h.title;
+        chip.onclick=(function(d){return function(e){e.stopPropagation();openDayDetail(d);};})(ds);
+        evDiv.appendChild(chip);
+      });
       events.forEach(function(ev){
         var c=colorByValue(ev.color); var chip=document.createElement('div');
         chip.className='cal-event-chip '+(c.chipCls||'');
         chip.textContent=(ev.time?fmt12(ev.time)+' ':'')+ev.title;
-        chip.onclick=function(e){e.stopPropagation();openDayDetail(ds);}; evDiv.appendChild(chip);
-      }); cell.appendChild(evDiv);
+        chip.onclick=(function(d){return function(e){e.stopPropagation();openDayDetail(d);};})(ds);
+        evDiv.appendChild(chip);
+      });
+      cell.appendChild(evDiv);
     }
     var reminders=getRemindersForDate(ds);
     if(reminders.length){
@@ -2309,7 +2384,7 @@ function renderCalendar() {
       remDot.title=reminders.map(function(r){return r.ev.title+' ('+r.label+' reminder)';}).join('\n');
       cell.appendChild(remDot);
     }
-    cell.addEventListener('click',function(capturedDs){return function(){openDayDetail(capturedDs);};}(ds));
+    cell.addEventListener('click',(function(d){return function(){openDayDetail(d);};})(ds));
     grid.appendChild(cell);
     if (!otherMonth) hdatesToLoad.push(ds);
   }
@@ -3161,10 +3236,16 @@ window.openEditFolder = function(id) {
 window.openDayDetail = function(ds) {
   var date=fromDateStr(ds);
   document.getElementById('dayDetailTitle').textContent=date.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  var holidays=getHolidaysForDate(ds);
   var events=getEventsForDate(ds); var body=document.getElementById('dayDetailBody');
-  if (!events.length){ body.innerHTML='<p style="color:#aaa;font-size:14px;padding:8px 0">No events on this day.</p>'; }
+  if (!events.length&&!holidays.length){ body.innerHTML='<p style="color:#aaa;font-size:14px;padding:8px 0">No events on this day.</p>'; }
   else {
-    body.innerHTML=events.map(function(ev){
+    var holHTML=holidays.map(function(h){
+      var icon=h._holType==='jewish'?'✡️':'🇺🇸';
+      return '<div class="cal-event-detail-row" style="background:'+(h._holType==='jewish'?'#fefbf0':'#fff5f5')+'">'+
+        '<div class="cal-event-detail-title">'+icon+' '+escHtml(h.title)+'</div></div>';
+    }).join('');
+    body.innerHTML=holHTML+events.map(function(ev){
       var isRec=ev.recurring&&ev.recurring!=='none';
       var recIcon=isRec?'<span class="cal-recurring-icon" title="Recurring: '+escHtml(ev.recurring)+'">🔄</span>':'';
       var delBtns=isRec
@@ -3190,6 +3271,84 @@ window.openDayDetail = function(ds) {
   document.getElementById('addEventOnDay').onclick=function(){ closeModal('dayDetailModal'); openAddCalEvent(ds); };
   openModal('dayDetailModal');
 };
+// ============================================================
+// CALENDAR MONTH PICKER
+// ============================================================
+var _calPickerYear=new Date().getFullYear();
+var MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function openCalMonthPicker(){
+  _calPickerYear=state.calYear;
+  renderCalMonthPickerGrid();
+  var picker=document.getElementById('calMonthPicker');
+  picker.style.display='block';
+  // Position below the label
+  var label=document.getElementById('calMonthLabel');
+  var rect=label.getBoundingClientRect();
+  picker.style.top=(rect.bottom+6)+'px';
+  picker.style.left=rect.left+'px';
+}
+function closeCalMonthPicker(){document.getElementById('calMonthPicker').style.display='none';}
+function renderCalMonthPickerGrid(){
+  document.getElementById('calPickerYear').textContent=_calPickerYear;
+  var grid=document.getElementById('calPickerMonths');
+  grid.innerHTML=MONTH_NAMES.map(function(m,i){
+    var active=(_calPickerYear===state.calYear&&i===state.calMonth);
+    return '<button class="cal-picker-month-btn'+(active?' active':'')+'" data-month="'+i+'">'+m+'</button>';
+  }).join('');
+}
+window.calPickerSelectMonth=function(month){
+  state.calYear=_calPickerYear; state.calMonth=month;
+  closeCalMonthPicker(); renderCalendar();
+};
+
+// ============================================================
+// CROSS-DAY TASK DRAG (7-day view)
+// ============================================================
+window.dayCardDragOver=function(e,ds){
+  if(!_dragTaskInfo||_dragTaskInfo.ds===ds)return;
+  var data=getData();
+  var isOnetime=(data.tasks[_dragTaskInfo.ds]||[]).some(function(t){return t.id===_dragTaskInfo.id&&!t._rc;});
+  if(!isOnetime)return; // block routine tasks
+  e.preventDefault(); e.stopPropagation();
+  e.dataTransfer.dropEffect='move';
+  document.querySelectorAll('.day-card-drop-target').forEach(function(el){el.classList.remove('day-card-drop-target');});
+  e.currentTarget.classList.add('day-card-drop-target');
+};
+window.dayCardDragLeave=function(e){
+  if(!e.currentTarget.contains(e.relatedTarget))
+    e.currentTarget.classList.remove('day-card-drop-target');
+};
+window.dayCardDrop=function(e,ds){
+  e.preventDefault(); e.stopPropagation();
+  document.querySelectorAll('.day-card-drop-target').forEach(function(el){el.classList.remove('day-card-drop-target');});
+  if(!_dragTaskInfo||_dragTaskInfo.ds===ds)return;
+  var fromDs=_dragTaskInfo.ds; var taskId=_dragTaskInfo.id;
+  var data=getData();
+  var task=(data.tasks[fromDs]||[]).find(function(t){return t.id===taskId&&!t._rc;});
+  if(!task)return; // not found or is routine completion record
+  data.tasks[fromDs]=(data.tasks[fromDs]||[]).filter(function(t){return t.id!==taskId;});
+  if(!data.tasks[ds])data.tasks[ds]=[];
+  data.tasks[ds].push(Object.assign({},task,{id:uid(),done:false}));
+  saveT(data.tasks);
+  var orderData=JSON.parse(localStorage.getItem('dm_task_order')||'{}');
+  delete orderData[fromDs]; delete orderData[ds];
+  localStorage.setItem('dm_task_order',JSON.stringify(orderData));
+  _dragTaskInfo=null; refresh();
+};
+
+// ============================================================
+// TASK RIGHT-CLICK CONTEXT MENU
+// ============================================================
+var _ctxTask=null;
+window.taskContextMenu=function(e,ds,id){
+  e.preventDefault(); e.stopPropagation();
+  _ctxTask={ds:ds,id:id};
+  var menu=document.getElementById('taskContextMenu');
+  menu.style.display='block';
+  var x=Math.min(e.clientX,window.innerWidth-180), y=Math.min(e.clientY,window.innerHeight-80);
+  menu.style.left=x+'px'; menu.style.top=y+'px';
+};
+
 window.delCalEvOcc = function(id, ds, mode) {
   var data=getData();
   var ev=data.calEvents.find(function(e){return e.id===id;}); if(!ev)return;
@@ -3555,8 +3714,11 @@ function saveCalEventModal() {
       return;
     }
     updateCalEvent(state.editCalEventId,d);
+    // Navigate to the new date's month so the user can see it
+    if(d.date){var nd=fromDateStr(d.date);state.calYear=nd.getFullYear();state.calMonth=nd.getMonth();}
   } else {
     addCalEvent(d);
+    if(d.date){var nd2=fromDateStr(d.date);state.calYear=nd2.getFullYear();state.calMonth=nd2.getMonth();}
   }
   if(document.getElementById('calEventAddToDashboard').checked&&d.date) addTask(d.date,{title:d.title,time:d.time,color:d.color});
   closeModal('calEventModal'); renderCalendar();
@@ -3572,7 +3734,7 @@ window.executeEditCalEvent = function(scope) {
     if(ev.exceptions.indexOf(ds)===-1)ev.exceptions.push(ds);
     data.calEvents.push({
       id:uid(),_overrideFor:id,_overrideDate:ds,
-      title:d.title,date:ds,time:d.time||'',location:d.location||'',
+      title:d.title,date:d.date||ds,time:d.time||'',location:d.location||'',
       notes:d.notes||'',color:d.color||'',recurring:'none',
       recurringN:null,recurringUnit:null,recurringUntil:null,
       exceptions:[],reminders:d.reminders||[]
@@ -4252,6 +4414,42 @@ function initListeners() {
     var d={idea:idea,status:document.getElementById('moneyIdeaStatus').value,notes:document.getElementById('moneyIdeaNotes').value.trim()};
     state.editMoneyIdeaId?updateMoneyIdea(state.editMoneyIdeaId,d):addMoneyIdea(d);
     state.editMoneyIdeaId=null; closeModal('moneyIdeaModal'); renderFinancial();
+  });
+
+  // Calendar month picker
+  document.getElementById('calMonthLabel').addEventListener('click',function(e){
+    e.stopPropagation();
+    var picker=document.getElementById('calMonthPicker');
+    if(picker.style.display==='block'){closeCalMonthPicker();}else{openCalMonthPicker();}
+  });
+  document.getElementById('calPickerYearPrev').addEventListener('click',function(){_calPickerYear--;renderCalMonthPickerGrid();});
+  document.getElementById('calPickerYearNext').addEventListener('click',function(){_calPickerYear++;renderCalMonthPickerGrid();});
+  document.getElementById('calPickerToday').addEventListener('click',function(){
+    var now=new Date(); state.calYear=now.getFullYear(); state.calMonth=now.getMonth();
+    closeCalMonthPicker(); renderCalendar();
+  });
+  document.getElementById('calPickerMonths').addEventListener('click',function(e){
+    var btn=e.target.closest('.cal-picker-month-btn'); if(!btn)return;
+    calPickerSelectMonth(parseInt(btn.dataset.month,10));
+  });
+  document.addEventListener('click',function(e){
+    var picker=document.getElementById('calMonthPicker');
+    if(picker&&picker.style.display==='block'&&!picker.contains(e.target)&&e.target.id!=='calMonthLabel'){
+      closeCalMonthPicker();
+    }
+    if(document.getElementById('taskContextMenu').style.display==='block'&&!document.getElementById('taskContextMenu').contains(e.target)){
+      document.getElementById('taskContextMenu').style.display='none';
+    }
+  });
+  document.getElementById('taskCtxDuplicate').addEventListener('click',function(){
+    if(!_ctxTask)return;
+    var data=getData();
+    var task=(data.tasks[_ctxTask.ds]||[]).find(function(t){return t.id===_ctxTask.id;});
+    if(!task)return;
+    if(!data.tasks[_ctxTask.ds])data.tasks[_ctxTask.ds]=[];
+    data.tasks[_ctxTask.ds].push(Object.assign({},task,{id:uid(),done:false,createdAt:new Date().toISOString()}));
+    saveT(data.tasks); refresh();
+    document.getElementById('taskContextMenu').style.display='none'; _ctxTask=null;
   });
 
   // Calendar

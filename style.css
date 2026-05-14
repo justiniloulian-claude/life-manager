@@ -668,6 +668,29 @@ textarea.field { resize: vertical; }
 .cc-rose     { background: #ffd6dd; color: #9b1d3a; }
 .cc-cream    { background: #fef6e4; color: #7c5a1e; }
 .cc-indigo   { background: #dce3f8; color: #2d3f8f; }
+/* Holiday chips */
+.cc-us-hol     { background: #fee2e2; color: #991b1b; font-weight: 600; }
+.cc-jewish-hol { background: #fef3c7; color: #92400e; font-weight: 600; }
+/* Clickable month label */
+.cal-month-label-btn { cursor: pointer; border-radius: 6px; padding: 2px 8px; transition: background 0.15s; }
+.cal-month-label-btn:hover { background: #f0eef9; }
+/* Month picker grid buttons */
+.cal-picker-month-btn {
+  padding: 7px 4px; border: 1px solid #e8e8e8; border-radius: 8px;
+  background: #fafaf8; font-size: 13px; cursor: pointer; font-family: inherit;
+  transition: all 0.12s;
+}
+.cal-picker-month-btn:hover { background: #ede9fe; border-color: #c4b5fd; color: #5b21b6; }
+.cal-picker-month-btn.active { background: #7c3aed; color: #fff; border-color: #7c3aed; }
+/* Cross-day drag target */
+.day-card.day-card-drop-target { outline: 2px dashed #7c3aed; outline-offset: -3px; background: #f5f3ff; }
+/* Task right-click context menu */
+.ctx-menu-item {
+  display: block; width: 100%; padding: 9px 16px;
+  background: none; border: none; text-align: left;
+  font-size: 13px; font-family: inherit; cursor: pointer; color: #1a1a1a;
+}
+.ctx-menu-item:hover { background: #f5f3ff; color: #7c3aed; }
 
 /* ===== NOTES ===== */
 .notes-toolbar {
