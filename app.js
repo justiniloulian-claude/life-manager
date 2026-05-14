@@ -2837,10 +2837,12 @@ window.taskDragStart=function(e,ds,id){
   setTimeout(function(){var el=document.getElementById('ti-'+id);if(el)el.classList.add('task-dragging');},0);
 };
 window.taskDragOver=function(e){
-  e.preventDefault(); e.dataTransfer.dropEffect='move';
+  e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect='move';
   var target=e.currentTarget;
   if(!target||(_dragTaskInfo&&target.id==='ti-'+_dragTaskInfo.id))return;
   document.querySelectorAll('.task-drag-above,.task-drag-below').forEach(function(el){el.classList.remove('task-drag-above','task-drag-below');});
+  // Clear whole-card drop highlight when hovering over a specific task
+  document.querySelectorAll('.day-card-drop-target').forEach(function(el){el.classList.remove('day-card-drop-target');});
   var rect=target.getBoundingClientRect();
   target.classList.add(e.clientY<rect.top+rect.height/2?'task-drag-above':'task-drag-below');
 };
@@ -2848,24 +2850,52 @@ window.taskDragLeave=function(e){
   var t=e.currentTarget; if(t){t.classList.remove('task-drag-above','task-drag-below');}
 };
 window.taskDrop=function(e,ds,toId){
-  e.preventDefault();
+  e.preventDefault(); e.stopPropagation();
   var target=e.currentTarget;
   var insertBefore=target&&target.classList.contains('task-drag-above');
   if(target)target.classList.remove('task-drag-above','task-drag-below');
-  if(!_dragTaskInfo||_dragTaskInfo.id===toId||_dragTaskInfo.ds!==ds)return;
+  if(!_dragTaskInfo||_dragTaskInfo.id===toId)return;
   var fromId=_dragTaskInfo.id;
-  // Build full ordered ID list from rendered tasks for this day
-  var allTasks=getTasksForDate(ds);
-  var ids=allTasks.map(function(t){return t.id;});
-  var fromIdx=ids.indexOf(fromId); var toIdx=ids.indexOf(toId);
-  if(fromIdx===-1||toIdx===-1)return;
-  ids.splice(fromIdx,1);
-  var newTo=ids.indexOf(toId);
-  ids.splice(insertBefore?newTo:newTo+1,0,fromId);
-  // Save order
-  var orderData=JSON.parse(localStorage.getItem('dm_task_order')||'{}');
-  orderData[ds]=ids; localStorage.setItem('dm_task_order',JSON.stringify(orderData));
-  refresh(); refreshDashDayModal();
+  var fromDs=_dragTaskInfo.ds;
+
+  if(fromDs===ds){
+    // ── Same-day reorder ──
+    var allTasks=getTasksForDate(ds);
+    var ids=allTasks.map(function(t){return t.id;});
+    var fromIdx=ids.indexOf(fromId); var toIdx=ids.indexOf(toId);
+    if(fromIdx===-1||toIdx===-1)return;
+    ids.splice(fromIdx,1);
+    var newTo=ids.indexOf(toId);
+    ids.splice(insertBefore?newTo:newTo+1,0,fromId);
+    var orderData=JSON.parse(localStorage.getItem('dm_task_order')||'{}');
+    orderData[ds]=ids; localStorage.setItem('dm_task_order',JSON.stringify(orderData));
+    refresh(); refreshDashDayModal();
+  } else {
+    // ── Cross-day move: insert at exact position ──
+    var data=getData();
+    var task=(data.tasks[fromDs]||[]).find(function(t){return t.id===fromId&&!t._rc;});
+    if(!task)return; // routine — blocked
+    // Remove from source day
+    data.tasks[fromDs]=(data.tasks[fromDs]||[]).filter(function(t){return t.id!==fromId;});
+    // Build new task for target day
+    var newId=uid();
+    if(!data.tasks[ds])data.tasks[ds]=[];
+    data.tasks[ds].push(Object.assign({},task,{id:newId,done:false}));
+    saveT(data.tasks);
+    // Place at the correct position in target day
+    var targetTasks=getTasksForDate(ds); // new task is at end
+    var tIds=targetTasks.map(function(t){return t.id;});
+    var nIdx=tIds.indexOf(newId); var tIdx=tIds.indexOf(toId);
+    if(nIdx!==-1&&tIdx!==-1){
+      tIds.splice(nIdx,1);
+      var newTo2=tIds.indexOf(toId);
+      tIds.splice(insertBefore?newTo2:newTo2+1,0,newId);
+    }
+    var orderData2=JSON.parse(localStorage.getItem('dm_task_order')||'{}');
+    delete orderData2[fromDs]; orderData2[ds]=tIds;
+    localStorage.setItem('dm_task_order',JSON.stringify(orderData2));
+    _dragTaskInfo=null; refresh(); refreshDashDayModal();
+  }
 };
 window.taskDragEnd=function(e){
   _dragTaskInfo=null;
