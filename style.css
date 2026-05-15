@@ -2514,3 +2514,58 @@ textarea.field { resize: vertical; }
 .lnv-clickable:hover { background:#f0efff; border-color:#c4b5fd; }
 .lnv-open-hint { display:block; font-size:11px; color:#7c3aed; margin-top:4px; font-weight:500; opacity:0; transition:opacity 0.12s; }
 .lnv-clickable:hover .lnv-open-hint { opacity:1; }
+
+/* ============================================================
+   Financial — Net Summary (Monthly tab)
+   ============================================================ */
+.fin-net-summary {
+  background:#fff;
+  border:1px solid #e8e8e4;
+  border-radius:12px;
+  padding:0 20px;
+  margin:16px 0;
+}
+.fin-net-row {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:16px 0;
+}
+.fin-net-label { display:flex; flex-direction:column; gap:2px; }
+.fin-net-title { font-size:14px; font-weight:600; color:#1a1a1a; }
+.fin-net-sub { font-size:12px; color:#999; }
+.fin-net-value { font-size:18px; font-weight:700; white-space:nowrap; }
+.fin-net-pos { color:#10b981; }
+.fin-net-neg { color:#ef4444; }
+.fin-net-divider { height:1px; background:#f0f0ec; margin:0 -0px; }
+
+/* ============================================================
+   Financial — Bonus History
+   ============================================================ */
+.bon-history-tag {
+  display:inline-block;
+  font-size:10px;
+  background:#f0f0ec;
+  color:#999;
+  border-radius:10px;
+  padding:1px 6px;
+  margin-left:6px;
+  font-weight:500;
+  vertical-align:middle;
+}
+.bon-history-row { opacity:0.65; }
+.fin-bon-history-toggle-wrap { padding:10px 0 4px; }
+.fin-bon-history-btn {
+  background:none;
+  border:none;
+  color:#7c3aed;
+  font-size:13px;
+  font-weight:500;
+  cursor:pointer;
+  padding:4px 0;
+  text-decoration:underline;
+  text-underline-offset:2px;
+}
+.fin-bon-history-btn:hover { color:#5b21b6; }
+.fin-bon-history-block { margin-top:8px; opacity:0.8; }

@@ -63,8 +63,8 @@ const state = {
   linkNotesTaskDs: null, linkNotesTaskId: null,
   activeCheshTab: 'daily',
   editWeeklyItemId: null,
-  activeFinTab: 'weekly',
-  finWeekIdx: 0,
+  activeFinTab: 'monthly',
+  finBonHistoryVisible: false,
   editFinExpId: null,
   editFinIncId: null,
   editFinBonId: null,
@@ -116,7 +116,7 @@ function getData() {
     finExpenses: JSON.parse(localStorage.getItem('dm_fin_expenses') || '[]'),
     finBonuses:  JSON.parse(localStorage.getItem('dm_fin_bonuses')  || '[]'),
     finWishlist: JSON.parse(localStorage.getItem('dm_fin_wishlist') || '[]'),
-    finPoints:   JSON.parse(localStorage.getItem('dm_fin_points')   || '0'),
+    finPoints:   0,
     finBank:     JSON.parse(localStorage.getItem('dm_fin_bank')     || '0'),
     moneymaking:      JSON.parse(localStorage.getItem('dm_moneymaking')       || '[]'),
     routineOverrides:      JSON.parse(localStorage.getItem('dm_routine_overrides'))          || {},
@@ -496,7 +496,7 @@ function addCalEvent(d){
 }
 function updateCalEvent(id,d){
   var data=getData(); var e=data.calEvents.find(function(e){return e.id===id;});
-  if(e){e.title=d.title;e.date=d.date;e.time=d.time||'';e.location=d.location||'';e.notes=d.notes||'';e.color=d.color||'';e.recurring=d.recurring||'none';e.recurringN=d.recurringN||null;e.recurringUnit=d.recurringUnit||null;e.recurringUntil=d.recurringUntil||null;e.reminders=d.reminders||[];}
+  if(e){e.title=d.title;if(d.date)e.date=d.date;e.time=d.time||'';e.location=d.location||'';e.notes=d.notes||'';e.color=d.color||'';e.recurring=d.recurring||'none';e.recurringN=d.recurringN||null;e.recurringUnit=d.recurringUnit||null;e.recurringUntil=d.recurringUntil||null;e.reminders=d.reminders||[];}
   saveCE(data.calEvents);
 }
 function deleteCalEvent(id){ var data=getData(); saveCE(data.calEvents.filter(function(e){return e.id!==id;})); }
@@ -834,21 +834,21 @@ function seedFinancialIfEmpty() {
   }
   if (!data.finWishlist.length) {
     saveFinWish([
-      {id:uid(),name:'Sunglasses',           cost:110,  tier:'really-want',pointsEligible:false,pointsEarmarked:0,eta:'',notes:'',order:0},
-      {id:uid(),name:'Nice watch',           cost:80,   tier:'really-want',pointsEligible:false,pointsEarmarked:0,eta:'',notes:'',order:1},
-      {id:uid(),name:'Light spring coat',    cost:100,  tier:'really-want',pointsEligible:false,pointsEarmarked:0,eta:'',notes:'',order:2},
-      {id:uid(),name:'Tennis racket set',    cost:250,  tier:'want',       pointsEligible:false,pointsEarmarked:0,eta:'',notes:'Pending confirmation from Skinny',order:0},
-      {id:uid(),name:'Beard trimmer (Ufree)',cost:35,   tier:'want',       pointsEligible:true, pointsEarmarked:0,eta:'',notes:'',order:1},
-      {id:uid(),name:'Ugg house slippers',   cost:50,   tier:'want',       pointsEligible:false,pointsEarmarked:0,eta:'',notes:'',order:2},
-      {id:uid(),name:'Gloves',               cost:40,   tier:'want',       pointsEligible:false,pointsEarmarked:0,eta:'',notes:'',order:3},
-      {id:uid(),name:'Scarves',              cost:0,    tier:'want',       pointsEligible:false,pointsEarmarked:0,eta:'',notes:'Gift from dad',order:4},
-      {id:uid(),name:'Rain/snow shoes',      cost:250,  tier:'want',       pointsEligible:false,pointsEarmarked:0,eta:'',notes:'',order:5},
-      {id:uid(),name:'3× Colognes (Amazon)', cost:450,  tier:'want',       pointsEligible:true, pointsEarmarked:0,eta:'',notes:'',order:6},
-      {id:uid(),name:'On Cloud + dress shoes',cost:500, tier:'want',       pointsEligible:false,pointsEarmarked:0,eta:'',notes:'',order:7},
-      {id:uid(),name:'AirPods 4 ANC',        cost:129,  tier:'can-wait',   pointsEligible:true, pointsEarmarked:0,eta:'',notes:'Pro 3 at $249 has significantly better ANC',order:0},
-      {id:uid(),name:'3 suits (Rahmani)',    cost:1400, tier:'can-wait',   pointsEligible:false,pointsEarmarked:0,eta:'',notes:'',order:1},
-      {id:uid(),name:'iPhone',               cost:750,  tier:'can-wait',   pointsEligible:true, pointsEarmarked:0,eta:'',notes:'',order:2},
-      {id:uid(),name:'MacBook',              cost:1500, tier:'can-wait',   pointsEligible:true, pointsEarmarked:0,eta:'',notes:'',order:3}
+      {id:uid(),name:'Sunglasses',           cost:110,  tier:'really-want',eta:'',notes:'',order:0},
+      {id:uid(),name:'Nice watch',           cost:80,   tier:'really-want',eta:'',notes:'',order:1},
+      {id:uid(),name:'Light spring coat',    cost:100,  tier:'really-want',eta:'',notes:'',order:2},
+      {id:uid(),name:'Tennis racket set',    cost:250,  tier:'want',       eta:'',notes:'Pending confirmation from Skinny',order:0},
+      {id:uid(),name:'Beard trimmer (Ufree)',cost:35,   tier:'want',       eta:'',notes:'',order:1},
+      {id:uid(),name:'Ugg house slippers',   cost:50,   tier:'want',       eta:'',notes:'',order:2},
+      {id:uid(),name:'Gloves',               cost:40,   tier:'want',       eta:'',notes:'',order:3},
+      {id:uid(),name:'Scarves',              cost:0,    tier:'want',       eta:'',notes:'Gift from dad',order:4},
+      {id:uid(),name:'Rain/snow shoes',      cost:250,  tier:'want',       eta:'',notes:'',order:5},
+      {id:uid(),name:'3× Colognes (Amazon)', cost:450,  tier:'want',       eta:'',notes:'',order:6},
+      {id:uid(),name:'On Cloud + dress shoes',cost:500, tier:'want',       eta:'',notes:'',order:7},
+      {id:uid(),name:'AirPods 4 ANC',        cost:129,  tier:'can-wait',   eta:'',notes:'Pro 3 at $249 has significantly better ANC',order:0},
+      {id:uid(),name:'3 suits (Rahmani)',    cost:1400, tier:'can-wait',   eta:'',notes:'',order:1},
+      {id:uid(),name:'iPhone',               cost:750,  tier:'can-wait',   eta:'',notes:'',order:2},
+      {id:uid(),name:'MacBook',              cost:1500, tier:'can-wait',   eta:'',notes:'',order:3}
     ]);
   }
   if (!data.moneymaking.length) {
@@ -2043,7 +2043,6 @@ var FREQ_LABEL={weekly:'Weekly',biweekly:'Biweekly',monthly:'Monthly'};
 
 function renderFinancial() {
   var tab=state.activeFinTab;
-  if(tab==='weekly')   renderFinWeekly();
   if(tab==='monthly')  renderFinMonthly();
   if(tab==='income')   renderFinIncome();
   if(tab==='wishlist') renderFinWishlist();
@@ -2146,6 +2145,17 @@ function renderFinMonthly() {
       '</span></div>';
   }
   var el=document.getElementById('finMonthlyContent'); if(!el)return;
+  var netFixLo=incLo-fixHi; var netFixHi=incHi-fixHi;
+  var flexLo2=mTot(flexExp,'amountLow');
+  var netAllLo=incLo-fixHi-flexHi; var netAllHi=incHi-fixHi-flexLo2;
+  function netAmt(lo,hi){
+    var lo2=Math.round(lo); var hi2=Math.round(hi);
+    if(lo2===hi2)return(lo2>=0?'<span class="fin-net-pos">$'+fmtDollar(lo2)+'</span>':'<span class="fin-net-neg">−$'+fmtDollar(Math.abs(lo2))+'</span>');
+    var loStr=lo2>=0?'$'+fmtDollar(lo2):'−$'+fmtDollar(Math.abs(lo2));
+    var hiStr=hi2>=0?'$'+fmtDollar(hi2):'−$'+fmtDollar(Math.abs(hi2));
+    var cls=hi2>=0?'fin-net-pos':'fin-net-neg';
+    return '<span class="'+cls+'">'+loStr+' – '+hiStr+'</span>';
+  }
   el.innerHTML=
     '<div class="fin-metric-grid">'+
       '<div class="fin-metric-card"><div class="fin-metric-lbl">Monthly Income</div><div class="fin-metric-val inc">'+fmtAmt(incLo,incHi)+'</div></div>'+
@@ -2166,6 +2176,23 @@ function renderFinMonthly() {
         '<span class="fin-legend-dot" style="background:#10b981"></span> Free cash'+
       '</div>'+
     '</div>'+
+    '<div class="fin-net-summary">'+
+      '<div class="fin-net-row">'+
+        '<div class="fin-net-label">'+
+          '<span class="fin-net-title">Net after fixed</span>'+
+          '<span class="fin-net-sub">Income minus fixed commitments</span>'+
+        '</div>'+
+        '<div class="fin-net-value">'+netAmt(netFixLo,netFixHi)+'</div>'+
+      '</div>'+
+      '<div class="fin-net-divider"></div>'+
+      '<div class="fin-net-row">'+
+        '<div class="fin-net-label">'+
+          '<span class="fin-net-title">Net after fixed + flexible</span>'+
+          '<span class="fin-net-sub">Income minus all committed expenses</span>'+
+        '</div>'+
+        '<div class="fin-net-value">'+netAmt(netAllLo,netAllHi)+'</div>'+
+      '</div>'+
+    '</div>'+
     '<div class="fin-monthly-cards">'+
       '<div class="fin-section"><div class="fin-section-header"><h3>Income Breakdown</h3></div>'+
         '<div class="fin-tbl-wrap">'+(data.finIncome.length?data.finIncome.map(function(i){return mRow(i,'inc');}).join('')+'<div class="fin-mrow fin-total-mrow"><span class="fin-total-lbl">Total Income</span><span></span><span></span><span class="fin-tbl-amt inc">'+fmtAmt(incLo,incHi)+'</span><span></span></div>':'<div class="fin-empty">No income streams.</div>')+'</div></div>'+
@@ -2178,7 +2205,7 @@ function renderFinMonthly() {
 
 function renderFinIncome() {
   var data=getData(); var el=document.getElementById('finIncomeContent'); if(!el)return;
-  var pts=parseInt(data.finPoints)||0;
+  var now=new Date();
   function iRow(item) {
     var lo=parseFloat(item.amountLow)||0; var hi=parseFloat(item.amountHigh)||lo;
     return '<div class="fin-tbl-row">'+
@@ -2187,19 +2214,35 @@ function renderFinIncome() {
       '<span class="fin-tbl-amt inc">'+fmtAmt(lo,hi)+'</span>'+
       '<span class="fin-tbl-act"><button class="btn-icon-sm" onclick="openEditFinInc(\''+item.id+'\')">✏️</button><button class="btn-icon-sm" onclick="delFinInc(\''+item.id+'\')">🗑</button></span></div>';
   }
-  function bRow(item) {
+  function bRow(item,isHistory) {
     var lo=parseFloat(item.amountLow)||0; var hi=parseFloat(item.amountHigh)||lo;
     var sc=item.status==='Received'?'bon-got':item.status==='Better deal possible'?'bon-better':'bon-pending';
-    return '<div class="fin-tbl-row">'+
-      '<span class="fin-tbl-name">'+escHtml(item.name)+(item.notes?'<span class="fin-note-dot" title="'+escHtml(item.notes)+'"> ·</span>':'')+'</span>'+
+    var historyTag=isHistory?'<span class="bon-history-tag">archived</span>':'';
+    return '<div class="fin-tbl-row'+(isHistory?' bon-history-row':'')+'">'+
+      '<span class="fin-tbl-name">'+escHtml(item.name)+historyTag+(item.notes?'<span class="fin-note-dot" title="'+escHtml(item.notes)+'"> ·</span>':'')+'</span>'+
       '<span class="fin-bon-status '+sc+'">'+escHtml(item.status)+'</span>'+
       '<span class="fin-tbl-amt inc">'+fmtAmt(lo,hi)+'</span>'+
       '<span class="fin-tbl-act"><button class="btn-icon-sm" onclick="openEditFinBon(\''+item.id+'\')">✏️</button><button class="btn-icon-sm" onclick="delFinBon(\''+item.id+'\')">🗑</button></span></div>';
   }
-  var earmarked=data.finWishlist.filter(function(w){return (w.pointsEarmarked||0)>0;});
-  var ptsNote=earmarked.length?
-    'Earmarked: '+earmarked.map(function(w){return escHtml(w.name)+' ('+w.pointsEarmarked+' pts)';}).join(', ')+'  — Total used: '+(earmarked.reduce(function(s,w){return s+(w.pointsEarmarked||0);},0))+' / '+pts:
-    'No points earmarked yet.';
+  // Split bonuses: active vs history (Received + receivedDate + 30+ days ago)
+  var activeBonuses=[]; var historyBonuses=[];
+  data.finBonuses.forEach(function(b){
+    if(b.status==='Received'&&b.receivedDate){
+      var rd=new Date(b.receivedDate); var days=Math.floor((now-rd)/(1000*60*60*24));
+      if(days>=30){historyBonuses.push(b);return;}
+    }
+    activeBonuses.push(b);
+  });
+  var hv=state.finBonHistoryVisible;
+  var historySection=historyBonuses.length?
+    '<div class="fin-bon-history-toggle-wrap">'+
+      '<button class="fin-bon-history-btn" onclick="toggleBonHistory()">'+
+        (hv?'▾ Hide History':'▸ View History')+' ('+historyBonuses.length+')'+
+      '</button>'+
+    '</div>'+
+    (hv?'<div class="fin-tbl-wrap fin-has-hdr fin-bon-history-block"><div class="fin-tbl-hdr"><span>Source</span><span>Status</span><span>Amount</span><span></span></div>'+
+      historyBonuses.map(function(b){return bRow(b,true);}).join('')+'</div>':'')
+    :'';
   el.innerHTML=
     '<div class="fin-section"><div class="fin-section-header"><h3>Income Streams</h3><button class="btn-primary" style="font-size:13px;padding:6px 13px" onclick="openAddFinInc()">+ Add</button></div>'+
       '<div class="fin-tbl-wrap fin-has-hdr"><div class="fin-tbl-hdr"><span>Source</span><span>Frequency</span><span>Amount</span><span></span></div>'+
@@ -2208,19 +2251,13 @@ function renderFinIncome() {
       :'<div class="fin-empty">No income streams yet.</div>')+'</div></div>'+
     '<div class="fin-section"><div class="fin-section-header"><h3>Bonuses &amp; Irregular Income</h3><button class="btn-primary" style="font-size:13px;padding:6px 13px" onclick="openAddFinBon()">+ Add</button></div>'+
       '<div class="fin-tbl-wrap fin-has-hdr"><div class="fin-tbl-hdr"><span>Source</span><span>Status</span><span>Amount</span><span></span></div>'+
-      (data.finBonuses.length?data.finBonuses.map(bRow).join('')+
-        '<div class="fin-total-row fin-has-hdr-total"><span class="fin-total-lbl">Total</span><span></span><span class="fin-tbl-amt inc">'+fmtAmt(data.finBonuses.reduce(function(s,i){return s+(parseFloat(i.amountLow)||0);},0),data.finBonuses.reduce(function(s,i){return s+(parseFloat(i.amountHigh)||parseFloat(i.amountLow)||0);},0))+'</span><span></span></div>'
-      :'<div class="fin-empty">No bonuses logged yet.</div>')+'</div></div>'+
-    '<div class="fin-section"><div class="fin-section-header"><h3>Amazon Points</h3></div>'+
-      '<div style="padding:16px 18px">'+
-        '<div class="fin-pts-row"><span class="fin-pts-lbl">Balance</span>'+
-          '<input type="number" id="finPointsInput" class="field fin-pts-field" value="'+pts+'" min="0" step="1">'+
-          '<span style="font-size:13px;color:#aaa;margin:0 6px">pts</span>'+
-          '<button class="btn-primary" style="font-size:12px;padding:5px 10px" onclick="saveFinPointsBalance()">Save</button>'+
-        '</div>'+
-        '<div class="fin-pts-note">'+ptsNote+'</div>'+
-      '</div></div>';
+      (activeBonuses.length?activeBonuses.map(function(b){return bRow(b,false);}).join('')+
+        '<div class="fin-total-row fin-has-hdr-total"><span class="fin-total-lbl">Total Active</span><span></span><span class="fin-tbl-amt inc">'+fmtAmt(activeBonuses.reduce(function(s,i){return s+(parseFloat(i.amountLow)||0);},0),activeBonuses.reduce(function(s,i){return s+(parseFloat(i.amountHigh)||parseFloat(i.amountLow)||0);},0))+'</span><span></span></div>'
+      :'<div class="fin-empty">No active bonuses.</div>')+'</div>'+
+      historySection+
+    '</div>';
 }
+window.toggleBonHistory=function(){state.finBonHistoryVisible=!state.finBonHistoryVisible;renderFinancial();};
 
 function renderFinWishlist() {
   var data=getData(); var el=document.getElementById('finWishlistContent'); if(!el)return;
@@ -2232,14 +2269,13 @@ function renderFinWishlist() {
     var items=data.finWishlist.filter(function(w){return w.tier===tier.key;}).sort(function(a,b){return (a.order||0)-(b.order||0);});
     var tot=items.reduce(function(s,w){return s+(parseFloat(w.cost)||0);},0);
     var rows=items.length?items.map(function(w,i){
-      var cost=parseFloat(w.cost)||0; var em=w.pointsEarmarked||0;
+      var cost=parseFloat(w.cost)||0;
       var etaStr=w.eta||(cost>0&&freeMo>0?'~'+Math.ceil(cost/freeMo)+' mo':'—');
       return '<div class="fin-wish-row">'+
         '<span class="fin-tbl-num">'+(i+1)+'</span>'+
-        '<span class="fin-tbl-name">'+escHtml(w.name)+(w.pointsEligible?'<span class="fin-pts-badge">★</span>':'')+
+        '<span class="fin-tbl-name">'+escHtml(w.name)+
           (w.notes?'<span class="fin-note-dot" title="'+escHtml(w.notes)+'"> ·</span>':'')+'</span>'+
         '<span class="fin-tbl-amt">$'+fmtDollar(cost)+'</span>'+
-        '<span class="fin-tbl-pts">'+(em>0?em+' pts':'—')+'</span>'+
         '<span class="fin-tbl-eta">'+escHtml(etaStr)+'</span>'+
         '<span class="fin-tbl-act">'+
           '<button class="btn-icon-sm" onclick="wishMoveUp(\''+w.id+'\')" title="Move up">↑</button>'+
@@ -2254,7 +2290,7 @@ function renderFinWishlist() {
         '<span class="fin-tier-total">$'+fmtDollar(tot)+'</span>'+
         '<button class="btn-primary" style="font-size:12px;padding:5px 10px" onclick="openAddFinWish(\''+tier.key+'\')">+ Add</button>'+
       '</div>'+
-      (items.length?'<div class="fin-wish-hdr"><span>#</span><span>Item</span><span>Cost</span><span>Points</span><span>ETA</span><span>Actions</span></div>':'')+
+      (items.length?'<div class="fin-wish-hdr"><span>#</span><span>Item</span><span>Cost</span><span>ETA</span><span>Actions</span></div>':'')+
       rows+'</div>';
   }).join('')+
   (freeMo>0?'<div class="fin-info-box">Free cash/month (conservative): <strong>$'+fmtDollar(freeMo)+'</strong> — used for ETA calculations</div>':'')+
@@ -3631,7 +3667,6 @@ window.openAddFinWish = function(tier) {
   document.getElementById('finWishName').value='';
   document.getElementById('finWishCost').value='';
   document.getElementById('finWishTier').value=tier||'really-want';
-  document.getElementById('finWishPointsEligible').checked=false;
   document.getElementById('finWishETA').value='';
   document.getElementById('finWishNotes').value='';
   openModal('finWishModal'); setTimeout(function(){document.getElementById('finWishName').focus();},80);
@@ -3643,7 +3678,6 @@ window.openEditFinWish = function(id) {
   document.getElementById('finWishName').value=item.name;
   document.getElementById('finWishCost').value=item.cost||'';
   document.getElementById('finWishTier').value=item.tier||'want';
-  document.getElementById('finWishPointsEligible').checked=!!item.pointsEligible;
   document.getElementById('finWishETA').value=item.eta||'';
   document.getElementById('finWishNotes').value=item.notes||'';
   openModal('finWishModal'); setTimeout(function(){document.getElementById('finWishName').focus();},80);
@@ -3736,6 +3770,8 @@ function saveCalEventModal() {
   if(state.editCalEventId){
     var data=getData();
     var ev=data.calEvents.find(function(e){return e.id===state.editCalEventId;});
+    // Guard: preserve original date if field was cleared
+    if(!d.date&&ev)d.date=ev.date||d.date;
     var isRec=ev&&ev.recurring&&ev.recurring!=='none';
     if(isRec){
       state.pendingEditCalData=d;
@@ -3762,14 +3798,24 @@ window.executeEditCalEvent = function(scope) {
   if(scope==='single'){
     if(!ev.exceptions)ev.exceptions=[];
     if(ev.exceptions.indexOf(ds)===-1)ev.exceptions.push(ds);
-    data.calEvents.push({
-      id:uid(),_overrideFor:id,_overrideDate:ds,
-      title:d.title,date:d.date||ds,time:d.time||'',location:d.location||'',
-      notes:d.notes||'',color:d.color||'',recurring:'none',
-      recurringN:null,recurringUnit:null,recurringUntil:null,
-      exceptions:[],reminders:d.reminders||[]
-    });
-    saveCE(data.calEvents);
+    var newDate=d.date||ds;
+    if(newDate!==ds){
+      // Date changed — can't use override (it's pinned to original occurrence date).
+      // Create a brand-new standalone event on the new date instead.
+      saveCE(data.calEvents); // save exceptions update first
+      addCalEvent({title:d.title,date:newDate,time:d.time||'',location:d.location||'',notes:d.notes||'',color:d.color||'',recurring:'none',recurringN:null,recurringUnit:null,recurringUntil:null,reminders:d.reminders||[]});
+      if(newDate){var nd3=fromDateStr(newDate);state.calYear=nd3.getFullYear();state.calMonth=nd3.getMonth();}
+    } else {
+      // Date unchanged — use override so title/time/notes edits apply to this occurrence only
+      data.calEvents.push({
+        id:uid(),_overrideFor:id,_overrideDate:ds,
+        title:d.title,date:ds,time:d.time||'',location:d.location||'',
+        notes:d.notes||'',color:d.color||'',recurring:'none',
+        recurringN:null,recurringUnit:null,recurringUntil:null,
+        exceptions:[],reminders:d.reminders||[]
+      });
+      saveCE(data.calEvents);
+    }
   } else {
     var prevD=fromDateStr(ds); prevD.setDate(prevD.getDate()-1);
     var prevDs=toDateStr(prevD);
@@ -4411,7 +4457,13 @@ function initListeners() {
     document.getElementById('finBonName').classList.remove('error');
     var lo=parseFloat(document.getElementById('finBonAmtLow').value)||0;
     var hi=parseFloat(document.getElementById('finBonAmtHigh').value)||lo;
-    var d={name:name,amountLow:lo,amountHigh:hi,status:document.getElementById('finBonStatus').value,notes:document.getElementById('finBonNotes').value.trim()};
+    var status=document.getElementById('finBonStatus').value;
+    var d={name:name,amountLow:lo,amountHigh:hi,status:status,notes:document.getElementById('finBonNotes').value.trim()};
+    // Stamp receivedDate when first set to Received (don't overwrite if already set)
+    if(status==='Received'){
+      if(state.editFinBonId){var existing=(getData().finBonuses.find(function(b){return b.id===state.editFinBonId;})||{});d.receivedDate=existing.receivedDate||toDateStr(new Date());}
+      else{d.receivedDate=toDateStr(new Date());}
+    }
     state.editFinBonId?updateFinBon(state.editFinBonId,d):addFinBon(d);
     state.editFinBonId=null; closeModal('finBonModal'); renderFinancial();
   });
@@ -4425,8 +4477,6 @@ function initListeners() {
     document.getElementById('finWishName').classList.remove('error');
     var d={name:name,cost:parseFloat(document.getElementById('finWishCost').value)||0,
       tier:document.getElementById('finWishTier').value,
-      pointsEligible:document.getElementById('finWishPointsEligible').checked,
-      pointsEarmarked:state.editFinWishId?(getData().finWishlist.find(function(w){return w.id===state.editFinWishId;})||{}).pointsEarmarked||0:0,
       eta:document.getElementById('finWishETA').value.trim(),
       notes:document.getElementById('finWishNotes').value.trim()};
     state.editFinWishId?updateFinWish(state.editFinWishId,d):addFinWish(d);
@@ -4625,7 +4675,6 @@ function init() {
   purgeOldDeletedNotes();
   seedRoutineIfEmpty();
   seedFinancialIfEmpty();
-  state.finWeekIdx=getAutoWeekIdx();
   updateHeaderDate();
   loadHeaderHebrewDate();
   setInterval(updateHeaderDate,60000);

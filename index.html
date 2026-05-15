@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=49">
+  <link rel="stylesheet" href="style.css?v=51">
 </head>
 <body>
 
@@ -370,21 +370,14 @@
 <!-- ===== FINANCIAL PAGE ===== -->
 <div id="page-financial" class="page">
   <div class="fin-tabs">
-    <button class="fin-tab active" data-tab="weekly">Weekly</button>
-    <button class="fin-tab" data-tab="monthly">Monthly</button>
+    <button class="fin-tab active" data-tab="monthly">Monthly</button>
     <button class="fin-tab" data-tab="income">Income &amp; Bonuses</button>
     <button class="fin-tab" data-tab="wishlist">Wishlist</button>
     <button class="fin-tab" data-tab="moneymaking">Money Making</button>
   </div>
 
-  <!-- Weekly Panel -->
-  <div id="fin-weekly" class="fin-panel active">
-    <div class="fin-week-subtabs" id="finWeekSubtabs"></div>
-    <div id="finWeekContent"></div>
-  </div>
-
   <!-- Monthly Panel -->
-  <div id="fin-monthly" class="fin-panel">
+  <div id="fin-monthly" class="fin-panel active">
     <div id="finMonthlyContent"></div>
   </div>
 
@@ -1068,10 +1061,6 @@
         <option value="want">Want</option>
         <option value="can-wait">Can Wait</option>
       </select>
-      <div class="field-check-row" style="margin-top:10px">
-        <input type="checkbox" id="finWishPointsEligible">
-        <label for="finWishPointsEligible">Amazon points eligible</label>
-      </div>
       <label class="field-label" style="margin-top:10px">ETA <span class="optional">optional — leave blank for auto-calc</span></label>
       <input type="text" id="finWishETA" class="field" placeholder="e.g. June 2026, ~3 months">
       <label class="field-label">Notes <span class="optional">optional</span></label>
@@ -1280,6 +1269,6 @@
   <button id="taskCtxDuplicate" class="ctx-menu-item">⧉ Duplicate task</button>
 </div>
 
-<script src="app.js?v=49"></script>
+<script src="app.js?v=51"></script>
 </body>
 </html>
