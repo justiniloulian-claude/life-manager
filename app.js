@@ -4540,7 +4540,10 @@ function initListeners() {
   // Note view modal (inline editable)
   function closeNoteView() { saveNoteViewModal(); closeModal('noteViewModal'); renderNotes(); }
   document.getElementById('closeNoteViewModal').addEventListener('click', closeNoteView);
-  document.getElementById('noteViewModal').addEventListener('click', function(e){ if(e.target===this) closeNoteView(); });
+  // Only close on backdrop click if the mousedown ALSO started on the backdrop (not a drag out)
+  var _noteViewMdOnBackdrop = false;
+  document.getElementById('noteViewModal').addEventListener('mousedown', function(e){ _noteViewMdOnBackdrop = (e.target === this); });
+  document.getElementById('noteViewModal').addEventListener('click', function(e){ if(e.target===this && _noteViewMdOnBackdrop) closeNoteView(); });
   document.getElementById('noteViewOptionsBtn').addEventListener('click', function(){
     saveNoteViewModal(); closeModal('noteViewModal'); openEditNote(state.viewingNoteId);
   });
@@ -4598,6 +4601,31 @@ function initListeners() {
   }
   document.getElementById('noteViewContent').addEventListener('keydown', noteEditorKeydown);
   document.getElementById('noteContent').addEventListener('keydown', noteEditorKeydown);
+  // Strip background colors from pasted HTML in note editors
+  function cleanPaste(e) {
+    e.preventDefault();
+    var html = e.clipboardData && e.clipboardData.getData('text/html');
+    if (html) {
+      var tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      tmp.querySelectorAll('*').forEach(function(el) {
+        el.style.backgroundColor = '';
+        el.style.background = '';
+        el.removeAttribute('bgcolor');
+        var s = el.getAttribute('style');
+        if (s) {
+          s = s.replace(/background(-color)?\s*:[^;]+;?\s*/gi, '');
+          if (s.trim()) el.setAttribute('style', s); else el.removeAttribute('style');
+        }
+      });
+      document.execCommand('insertHTML', false, tmp.innerHTML);
+    } else {
+      var text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
+      document.execCommand('insertText', false, text);
+    }
+  }
+  document.getElementById('noteViewContent').addEventListener('paste', cleanPaste);
+  document.getElementById('noteContent').addEventListener('paste', cleanPaste);
   document.getElementById('noteViewAddCheckItem').addEventListener('click', function(){
     state.viewNoteCheckItems.push({id:uid(),text:'',done:false}); renderNoteViewChecklist();
     var inputs=document.getElementById('noteViewCheckItems').querySelectorAll('.note-view-check-input');
@@ -4642,9 +4670,12 @@ function initListeners() {
   document.getElementById('folderName').addEventListener('keydown', function(e){ if(e.key==='Enter')saveFolderModal(); });
 
   // Close modals on backdrop (noteViewModal handled separately above so it saves first)
+  // Track mousedown origin so drag-out doesn't accidentally close the modal
   document.querySelectorAll('.modal').forEach(function(m){
     if(m.id==='noteViewModal')return;
-    m.addEventListener('click',function(e){if(e.target===m)m.classList.remove('open');});
+    var _mdOnBackdrop=false;
+    m.addEventListener('mousedown',function(e){_mdOnBackdrop=(e.target===m);});
+    m.addEventListener('click',function(e){if(e.target===m&&_mdOnBackdrop)m.classList.remove('open');});
   });
 }
 
