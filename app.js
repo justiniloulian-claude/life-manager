@@ -2205,7 +2205,6 @@ function renderFinMonthly() {
 
 function renderFinIncome() {
   var data=getData(); var el=document.getElementById('finIncomeContent'); if(!el)return;
-  var now=new Date();
   function iRow(item) {
     var lo=parseFloat(item.amountLow)||0; var hi=parseFloat(item.amountHigh)||lo;
     return '<div class="fin-tbl-row">'+
@@ -2224,14 +2223,11 @@ function renderFinIncome() {
       '<span class="fin-tbl-amt inc">'+fmtAmt(lo,hi)+'</span>'+
       '<span class="fin-tbl-act"><button class="btn-icon-sm" onclick="openEditFinBon(\''+item.id+'\')">✏️</button><button class="btn-icon-sm" onclick="delFinBon(\''+item.id+'\')">🗑</button></span></div>';
   }
-  // Split bonuses: active vs history (Received + receivedDate + 30+ days ago)
+  // Split bonuses: Received = history, everything else = active
   var activeBonuses=[]; var historyBonuses=[];
   data.finBonuses.forEach(function(b){
-    if(b.status==='Received'&&b.receivedDate){
-      var rd=new Date(b.receivedDate); var days=Math.floor((now-rd)/(1000*60*60*24));
-      if(days>=30){historyBonuses.push(b);return;}
-    }
-    activeBonuses.push(b);
+    if(b.status==='Received'){historyBonuses.push(b);}
+    else{activeBonuses.push(b);}
   });
   var hv=state.finBonHistoryVisible;
   var historySection=historyBonuses.length?
@@ -4457,13 +4453,7 @@ function initListeners() {
     document.getElementById('finBonName').classList.remove('error');
     var lo=parseFloat(document.getElementById('finBonAmtLow').value)||0;
     var hi=parseFloat(document.getElementById('finBonAmtHigh').value)||lo;
-    var status=document.getElementById('finBonStatus').value;
-    var d={name:name,amountLow:lo,amountHigh:hi,status:status,notes:document.getElementById('finBonNotes').value.trim()};
-    // Stamp receivedDate when first set to Received (don't overwrite if already set)
-    if(status==='Received'){
-      if(state.editFinBonId){var existing=(getData().finBonuses.find(function(b){return b.id===state.editFinBonId;})||{});d.receivedDate=existing.receivedDate||toDateStr(new Date());}
-      else{d.receivedDate=toDateStr(new Date());}
-    }
+    var d={name:name,amountLow:lo,amountHigh:hi,status:document.getElementById('finBonStatus').value,notes:document.getElementById('finBonNotes').value.trim()};
     state.editFinBonId?updateFinBon(state.editFinBonId,d):addFinBon(d);
     state.editFinBonId=null; closeModal('finBonModal'); renderFinancial();
   });
