@@ -27,8 +27,13 @@ localStorage.setItem = function(key, value) {
 var _syncTimer = null;
 function _scheduleFSSync() {
   clearTimeout(_syncTimer);
-  _syncTimer = setTimeout(_doFSSync, 1500);
+  _syncTimer = setTimeout(_doFSSync, 400);
 }
+
+// Force sync before the page closes / navigates away
+window.addEventListener('beforeunload', function() {
+  if(_uid) _doFSSync();
+});
 function _doFSSync() {
   if(!_uid) return;
   var batch = _db.batch();
