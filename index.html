@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Life Manager">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=62">
+  <link rel="stylesheet" href="style.css?v=68">
 </head>
 <body>
 
@@ -1318,12 +1318,39 @@
   <button id="taskCtxDuplicate" class="ctx-menu-item">⧉ Duplicate task</button>
 </div>
 
+<!-- MOBILE BOTTOM NAV -->
+<nav id="mobileBottomNav" class="mobile-bottom-nav">
+  <button class="mob-nav-btn active" data-page="dashboard">
+    <span class="mob-nav-icon">📋</span>
+    <span class="mob-nav-label">Dashboard</span>
+  </button>
+  <button class="mob-nav-btn" data-page="calendar">
+    <span class="mob-nav-icon">📅</span>
+    <span class="mob-nav-label">Calendar</span>
+  </button>
+  <button class="mob-nav-btn" data-page="notes">
+    <span class="mob-nav-icon">📝</span>
+    <span class="mob-nav-label">Notes</span>
+  </button>
+  <button class="mob-nav-btn" data-page="learning">
+    <span class="mob-nav-icon">📚</span>
+    <span class="mob-nav-label">Learning</span>
+  </button>
+  <button class="mob-nav-btn" data-page="financial">
+    <span class="mob-nav-icon">💰</span>
+    <span class="mob-nav-label">Financial</span>
+  </button>
+</nav>
+
+<!-- MOBILE FAB -->
+<button id="mobileFab" class="mobile-fab" onclick="mobileFabClick()">+</button>
+
 <div id="printArea" style="display:none"></div>
 
 <!-- Firebase SDKs (compat — no bundler needed) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="app.js?v=67"></script>
+<script src="app.js?v=68"></script>
 </body>
 </html>

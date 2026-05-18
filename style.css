@@ -2667,57 +2667,171 @@ textarea.field { resize: vertical; }
 /* ============================================================
    MOBILE RESPONSIVE — max-width: 768px
    ============================================================ */
-@media (max-width: 768px) {
-  /* Header */
-  .header { flex-direction: column; align-items: flex-start; padding: 10px 12px 8px; gap: 8px; }
-  .header-right { width: 100%; overflow-x: auto; }
-  .header-nav { gap: 4px; }
-  .header-nav-tab { font-size: 12px; padding: 5px 10px; white-space: nowrap; }
-  .header-data-btns { display: none; }
 
-  /* Dashboard subnav */
+/* Bottom nav — hidden on desktop */
+.mobile-bottom-nav { display: none; }
+.mobile-fab { display: none; }
+
+@media (max-width: 768px) {
+  /* ── Body padding for bottom nav ── */
+  body { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
+
+  /* ── Header: hide top nav tabs, keep title + dark toggle ── */
+  .header { flex-direction: row; align-items: center; padding: 10px 14px; justify-content: space-between; }
+  .header-right { width: auto; overflow: visible; }
+  .header-nav { display: none; }
+  .header-left { gap: 8px; }
+  .app-title { font-size: 17px; }
+  .header-date { font-size: 12px; }
+
+  /* ── Dashboard subnav ── */
   .dash-subnav { flex-direction: column; gap: 8px; padding: 8px 12px; }
   .dash-subnav-pills { overflow-x: auto; padding-bottom: 4px; flex-wrap: nowrap; gap: 6px; }
-  .dash-pill { white-space: nowrap; font-size: 12px; padding: 5px 10px; }
+  .dash-pill { white-space: nowrap; font-size: 12px; padding: 6px 12px; min-height: 36px; }
   .dash-subnav-right { width: 100%; }
 
-  /* 7-day grid — horizontal scroll */
+  /* ── 7-day grid ── */
   .seven-day-grid { grid-template-columns: repeat(7, 220px) !important; overflow-x: auto; gap: 8px; padding-bottom: 8px; }
   .day-card { min-height: 120px; }
 
-  /* Single day card */
+  /* ── Single day card ── */
   #singleDayView .day-card { max-width: 100%; }
 
-  /* Modals */
-  .modal-box { max-width: 95vw !important; max-height: 90vh; overflow-y: auto; margin: 20px auto; }
-  .modal-wide { max-width: 95vw !important; }
+  /* ── Bigger tap targets for tasks ── */
+  .task-item { padding: 12px 10px; min-height: 52px; }
+  .task-check { width: 22px; height: 22px; cursor: pointer; }
+  .task-title { font-size: 15px; }
+  .add-task-row { min-height: 48px; font-size: 15px; }
+  .btn-icon { width: 38px; height: 38px; font-size: 16px; }
 
-  /* Learning grid */
+  /* ── Modals: slide up full-screen from bottom ── */
+  .modal { align-items: flex-end !important; }
+  .modal-box {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 20px 20px 0 0 !important;
+    max-height: 92vh !important;
+    overflow-y: auto;
+    margin: 0 !important;
+  }
+  .modal-wide { max-width: 100% !important; }
+
+  /* ── Bigger fonts globally on mobile ── */
+  body { font-size: 15px; }
+  .btn-nav { font-size: 14px; padding: 7px 13px; }
+
+  /* ── Sticky day header in single view ── */
+  .day-card-header { position: sticky; top: 0; z-index: 10; background: inherit; }
+
+  /* ── Learning grid ── */
   .learning-grid { grid-template-columns: repeat(7, 200px) !important; overflow-x: auto; gap: 8px; }
 
-  /* Financial */
+  /* ── Financial ── */
   .fin-tabs { overflow-x: auto; flex-wrap: nowrap; gap: 6px; }
-  .fin-tab { white-space: nowrap; }
+  .fin-tab { white-space: nowrap; min-height: 40px; }
   .fin-metric-grid { grid-template-columns: repeat(2, 1fr) !important; }
   .fin-tbl-wrap { overflow-x: auto; }
   .fin-monthly-cards { grid-template-columns: 1fr !important; }
 
-  /* Notes */
+  /* ── Notes ── */
   .notes-layout { flex-direction: column; }
   .notes-sidebar { width: 100%; max-height: 200px; overflow-y: auto; border-right: none; border-bottom: 1px solid #e8e8e4; }
 
-  /* Calendar */
+  /* ── Calendar ── */
   .cal-toolbar { flex-wrap: wrap; gap: 8px; }
   .cal-grid { font-size: 12px; }
   .cal-cell { min-height: 60px; }
   .cal-event-chip { font-size: 10px; padding: 1px 4px; }
 
-  /* Nav bars */
+  /* ── Nav bars ── */
   .nav-bar { flex-wrap: wrap; gap: 6px; }
 
-  /* Print buttons */
+  /* ── Hide desktop-only elements ── */
   .btn-print-dash { display: none; }
+
+  /* ── Bottom nav ── */
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border-top: 1.5px solid #e8e8e4;
+    z-index: 500;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.07);
+  }
+  .mob-nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 2px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #aaa;
+    gap: 2px;
+    min-height: 56px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mob-nav-btn.active { color: #7c3aed; }
+  .mob-nav-btn.active .mob-nav-icon { transform: scale(1.1); }
+  .mob-nav-icon { font-size: 22px; line-height: 1; transition: transform 0.15s; }
+  .mob-nav-label { font-size: 10px; font-weight: 600; }
+
+  /* ── FAB (floating add button) ── */
+  .mobile-fab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+    right: 18px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #7c3aed;
+    color: #fff;
+    font-size: 30px;
+    font-weight: 300;
+    border: none;
+    box-shadow: 0 4px 18px rgba(124,58,237,0.45);
+    cursor: pointer;
+    z-index: 490;
+    -webkit-tap-highlight-color: transparent;
+    line-height: 1;
+  }
+  .mobile-fab:active { transform: scale(0.93); }
+
+  /* ── Swipe task reveal layers ── */
+  .task-swipe-wrap {
+    position: relative;
+    overflow: hidden;
+    border-radius: 10px;
+    margin-bottom: 2px;
+  }
+  .task-swipe-bg {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    font-size: 20px;
+    pointer-events: none;
+    border-radius: 10px;
+  }
+  .task-swipe-bg.right { background: #22c55e; justify-content: flex-start; }
+  .task-swipe-bg.left  { background: #ef4444; justify-content: flex-end; }
 }
+
+/* Dark mode bottom nav */
+body.dark-mode .mobile-bottom-nav { background: #1c1c1c; border-top-color: #2e2e2e; }
+body.dark-mode .mob-nav-btn { color: #555; }
+body.dark-mode .mob-nav-btn.active { color: #9b6dff; }
+body.dark-mode .mobile-fab { background: #7c3aed; }
 
 /* ============================================================
    Dark Mode Toggle Button

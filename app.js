@@ -1029,7 +1029,7 @@ function taskHTML(task, ds, noActions) {
     ? '<span class="task-drag-handle" onclick="event.stopPropagation()" title="Drag to reorder">⠿</span>'
     : '';
   var ctxMenu=!isR?' oncontextmenu="taskContextMenu(event,\''+ds+'\',\''+task.id+'\')"':'';
-  return '<div class="task-item '+itemCls+(task.done?' is-done':'')+(noActions?' task-compact-click':' task-clickable')+'" id="ti-'+task.id+'"'+itemClick+dragAttrs+ctxMenu+'>' +
+  return '<div class="task-item '+itemCls+(task.done?' is-done':'')+(noActions?' task-compact-click':' task-clickable')+'" id="ti-'+task.id+'" data-ds="'+ds+'" data-tid="'+task.id+'" data-isroutine="'+isR+'"'+itemClick+dragAttrs+ctxMenu+'>' +
     dragHandle+
     '<input type="checkbox" class="task-check"'+(task.done?' checked':'')+' onclick="event.stopPropagation()" onchange="checkTask(\''+ds+'\',\''+task.id+'\','+isR+')">' +
     '<div class="task-body"><div class="task-title '+priorityCls+'">'+escHtml(task.title)+notesDot+'</div>' +
@@ -2818,14 +2818,23 @@ function setDashView(viewName) {
 // ============================================================
 // PAGE NAVIGATION
 // ============================================================
+function isMobile() { return window.innerWidth <= 768; }
+
 function showPage(pageId) {
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
   document.querySelectorAll('.header-nav-tab').forEach(function(t){t.classList.remove('active');});
+  document.querySelectorAll('.mob-nav-btn').forEach(function(b){b.classList.remove('active');});
   document.getElementById('page-'+pageId).classList.add('active');
   var activeTab=document.querySelector('.header-nav-tab[data-page="'+pageId+'"]');
   if (activeTab) activeTab.classList.add('active');
+  var activeMob=document.querySelector('.mob-nav-btn[data-page="'+pageId+'"]');
+  if (activeMob) activeMob.classList.add('active');
   state.currentPage=pageId;
-  if (pageId==='dashboard') { setDashView('seven'); checkMissedTasks(); }
+  if (pageId==='dashboard') {
+    if(isMobile()) setDashView('single');
+    else setDashView('seven');
+    checkMissedTasks();
+  }
   if (pageId==='calendar')  renderCalendar();
   if (pageId==='notes')     renderNotes();
   if (pageId==='learning')  renderLearning();
@@ -4144,10 +4153,125 @@ function saveFolderModal() {
 // SWIPE (iPhone)
 // ============================================================
 function initSwipe() {
-  var startX=0; var el=document.getElementById('singleDayView');
-  el.addEventListener('touchstart',function(e){startX=e.touches[0].clientX;},{passive:true});
-  el.addEventListener('touchend',function(e){ var diff=startX-e.changedTouches[0].clientX; if(Math.abs(diff)>60){state.dayOffset+=diff>0?1:-1;renderSingle();} },{passive:true});
+  // Day swipe — works on single day view
+  var startX=0, startY=0;
+  var el=document.getElementById('singleDayView');
+  el.addEventListener('touchstart',function(e){startX=e.touches[0].clientX; startY=e.touches[0].clientY;},{passive:true});
+  el.addEventListener('touchend',function(e){
+    var dx=startX-e.changedTouches[0].clientX;
+    var dy=startY-e.changedTouches[0].clientY;
+    if(Math.abs(dx)>60 && Math.abs(dx)>Math.abs(dy)*1.5){
+      state.dayOffset+=dx>0?1:-1;
+      setDashView('single');
+    }
+  },{passive:true});
 }
+
+// ============================================================
+// MOBILE — bottom nav, FAB, swipe-to-action, keyboard fix
+// ============================================================
+function initMobile() {
+  if(!isMobile()) return;
+
+  // Bottom nav page switching
+  document.querySelectorAll('.mob-nav-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      showPage(btn.dataset.page);
+    });
+  });
+
+  // FAB
+  // (handled by inline onclick="mobileFabClick()")
+
+  // Keyboard: scroll focused input into view after keyboard opens
+  document.addEventListener('focusin', function(e) {
+    var tag = e.target.tagName;
+    if(tag==='INPUT'||tag==='TEXTAREA') {
+      setTimeout(function(){
+        e.target.scrollIntoView({behavior:'smooth', block:'center'});
+      }, 350);
+    }
+  });
+
+  // Swipe-to-complete / swipe-to-delete on task items
+  var SWIPE_THRESHOLD = 80;
+  document.addEventListener('touchstart', function(e) {
+    var item = e.target.closest('.task-item');
+    if(!item || item.classList.contains('task-compact-click')) return;
+    var tx0 = e.touches[0].clientX;
+    var ty0 = e.touches[0].clientY;
+    var swipeDir = null;
+    var moved = false;
+
+    function onMove(ev) {
+      var dx = ev.touches[0].clientX - tx0;
+      var dy = ev.touches[0].clientY - ty0;
+      if(!moved && Math.abs(dx) > 8) {
+        if(Math.abs(dx) > Math.abs(dy)) { moved = true; }
+        else { cleanup(); return; }
+      }
+      if(!moved) return;
+      if(Math.abs(dx) < Math.abs(dy)*1.5) return;
+      ev.preventDefault();
+      item.style.transform = 'translateX('+dx+'px)';
+      item.style.transition = 'none';
+      if(!swipeDir) {
+        swipeDir = dx > 0 ? 'right' : 'left';
+        item.style.background = dx > 0 ? '#dcfce7' : '#fee2e2';
+      }
+    }
+
+    function onEnd(ev) {
+      cleanup();
+      var dx = ev.changedTouches[0].clientX - tx0;
+      item.style.transform = '';
+      item.style.transition = 'transform 0.25s ease, background 0.25s ease';
+      item.style.background = '';
+      setTimeout(function(){ item.style.transition = ''; }, 260);
+
+      if(!moved) return;
+      if(dx > SWIPE_THRESHOLD) {
+        // Swipe right = complete
+        var ds = item.dataset.ds;
+        var id = item.dataset.tid;
+        var isR = item.dataset.isroutine === 'true';
+        if(ds && id) { window.checkTask(ds, id, isR); }
+      } else if(dx < -SWIPE_THRESHOLD) {
+        // Swipe left = delete
+        var ds2 = item.dataset.ds;
+        var id2 = item.dataset.tid;
+        var isR2 = item.dataset.isroutine === 'true';
+        if(ds2 && id2) {
+          if(isR2) { window.skipRoutineDay && window.skipRoutineDay(ds2, id2); }
+          else { window.removeTask(ds2, id2); }
+        }
+      }
+    }
+
+    function cleanup() {
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onEnd);
+    }
+    document.addEventListener('touchmove', onMove, {passive:false});
+    document.addEventListener('touchend', onEnd);
+  }, {passive:true});
+}
+
+window.mobileFabClick = function() {
+  var page = state.currentPage || 'dashboard';
+  if(page==='dashboard') {
+    var ds = toDateStr(dateFromOffset(state.dayOffset));
+    openAddTask(ds);
+  } else if(page==='notes') {
+    openNoteModal();
+  } else if(page==='calendar') {
+    openAddCalEvent(toDateStr(new Date()));
+  } else if(page==='learning') {
+    var dow = new Date().getDay();
+    var td = LEARNING_DAYS.find(function(d){return LRN_DAY_DOW[d]===dow;})||LEARNING_DAYS[0];
+    openAddLearningItem(td);
+  }
+};
 
 // ============================================================
 // WEIGHT TRACKER WINDOW FUNCTIONS
@@ -5151,7 +5275,8 @@ function init() {
   setInterval(updateHeaderDate,60000);
   initListeners();
   initSwipe();
-  setDashView('seven');
+  initMobile();
+  setDashView(isMobile() ? 'single' : 'seven');
   checkMissedTasks();
   if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(function(){});
   // Dark mode — restore saved preference
