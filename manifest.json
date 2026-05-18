@@ -1,0 +1,17 @@
+{
+  "name": "Life Manager",
+  "short_name": "Life Manager",
+  "description": "Personal dashboard for tasks, notes, learning, and finances",
+  "start_url": "/life-manager/",
+  "scope": "/life-manager/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#7c3aed",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%237c3aed'/><text x='50%' y='55%' font-size='110' text-anchor='middle' dominant-baseline='middle' fill='white'>📋</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
+}

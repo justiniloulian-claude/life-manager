@@ -2626,3 +2626,142 @@ textarea.field { resize: vertical; }
 #sevenCarryOver .co-banner {
   margin: 0 0 12px 0;
 }
+
+/* ============================================================
+   Task Subtasks
+   ============================================================ */
+.task-sub-badge {
+  display: inline-block;
+  font-size: 11px;
+  color: #7c3aed;
+  background: #ede9fe;
+  border-radius: 8px;
+  padding: 1px 7px;
+  margin-left: 6px;
+  cursor: pointer;
+  vertical-align: middle;
+  font-weight: 500;
+}
+.task-sub-badge:hover { background: #ddd6fe; }
+.task-subtasks-wrap {
+  margin: 6px 0 2px 2px;
+  border-left: 2px solid #ede9fe;
+  padding-left: 10px;
+}
+.task-sub-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 13px;
+}
+.task-sub-check { width: 14px; height: 14px; flex-shrink: 0; }
+.task-sub-title { flex: 1; color: #444; }
+.task-sub-title.is-done { text-decoration: line-through; opacity: 0.5; }
+.task-sub-del { padding: 0 2px !important; }
+.task-sub-add-row { margin-top: 4px; }
+.task-sub-input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px dashed #ccc;
+  background: transparent;
+  font-size: 12px;
+  padding: 2px 0;
+  outline: none;
+  font-family: inherit;
+  color: #555;
+}
+.task-sub-input:focus { border-color: #7c3aed; }
+.task-sub-btn { opacity: 0.5; }
+.task-sub-btn:hover { opacity: 1; }
+
+/* ============================================================
+   Financial Chart
+   ============================================================ */
+.fin-chart-section {
+  background: #fafaf8;
+  border-radius: 12px;
+  padding: 16px 20px 20px;
+  margin-bottom: 20px;
+  border: 1px solid #ece9e0;
+}
+.fin-chart-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 12px;
+}
+#finBudgetChart {
+  width: 100%;
+  display: block;
+}
+
+/* ============================================================
+   Day Task Count Badge (7-day)
+   ============================================================ */
+.day-task-count {
+  display: inline-block;
+  font-size: 11px;
+  background: #7c3aed;
+  color: #fff;
+  border-radius: 10px;
+  padding: 1px 7px;
+  margin-left: 5px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+/* ============================================================
+   MOBILE RESPONSIVE — max-width: 768px
+   ============================================================ */
+@media (max-width: 768px) {
+  /* Header */
+  .header { flex-direction: column; align-items: flex-start; padding: 10px 12px 8px; gap: 8px; }
+  .header-right { width: 100%; overflow-x: auto; }
+  .header-nav { gap: 4px; }
+  .header-nav-tab { font-size: 12px; padding: 5px 10px; white-space: nowrap; }
+  .header-data-btns { display: none; }
+
+  /* Dashboard subnav */
+  .dash-subnav { flex-direction: column; gap: 8px; padding: 8px 12px; }
+  .dash-subnav-pills { overflow-x: auto; padding-bottom: 4px; flex-wrap: nowrap; gap: 6px; }
+  .dash-pill { white-space: nowrap; font-size: 12px; padding: 5px 10px; }
+  .dash-subnav-right { width: 100%; }
+
+  /* 7-day grid — horizontal scroll */
+  .seven-day-grid { grid-template-columns: repeat(7, 220px) !important; overflow-x: auto; gap: 8px; padding-bottom: 8px; }
+  .day-card { min-height: 120px; }
+
+  /* Single day card */
+  #singleDayView .day-card { max-width: 100%; }
+
+  /* Modals */
+  .modal-box { max-width: 95vw !important; max-height: 90vh; overflow-y: auto; margin: 20px auto; }
+  .modal-wide { max-width: 95vw !important; }
+
+  /* Learning grid */
+  .learning-grid { grid-template-columns: repeat(7, 200px) !important; overflow-x: auto; gap: 8px; }
+
+  /* Financial */
+  .fin-tabs { overflow-x: auto; flex-wrap: nowrap; gap: 6px; }
+  .fin-tab { white-space: nowrap; }
+  .fin-metric-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .fin-tbl-wrap { overflow-x: auto; }
+  .fin-monthly-cards { grid-template-columns: 1fr !important; }
+
+  /* Notes */
+  .notes-layout { flex-direction: column; }
+  .notes-sidebar { width: 100%; max-height: 200px; overflow-y: auto; border-right: none; border-bottom: 1px solid #e8e8e4; }
+
+  /* Calendar */
+  .cal-toolbar { flex-wrap: wrap; gap: 8px; }
+  .cal-grid { font-size: 12px; }
+  .cal-cell { min-height: 60px; }
+  .cal-event-chip { font-size: 10px; padding: 1px 4px; }
+
+  /* Nav bars */
+  .nav-bar { flex-wrap: wrap; gap: 6px; }
+
+  /* Print buttons */
+  .btn-print-dash { display: none; }
+}

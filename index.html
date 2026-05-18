@@ -3,8 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#7c3aed">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Life Manager">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=57">
+  <link rel="stylesheet" href="style.css?v=58">
 </head>
 <body>
 
@@ -25,6 +30,10 @@
       <button class="header-nav-tab" data-page="learning">Learning</button>
       <button class="header-nav-tab" data-page="financial">Financial</button>
     </nav>
+    <div class="header-data-btns">
+      <button id="exportDataBtn" class="btn-nav" style="font-size:12px;padding:5px 10px" title="Export all data">⬇ Export</button>
+      <label class="btn-nav" style="font-size:12px;padding:5px 10px;cursor:pointer" title="Import data">⬆ Import<input type="file" id="importDataInput" accept=".json" style="display:none"></label>
+    </div>
   </div>
 </header>
 
@@ -325,6 +334,7 @@
       <button id="calPrevBtn" class="btn-nav">&#8592;</button>
       <h2 id="calMonthLabel" class="cal-month-label cal-month-label-btn"></h2>
       <button id="calNextBtn" class="btn-nav">&#8594;</button>
+      <button id="calTodayBtn" class="btn-today" style="margin-left:6px">Today</button>
     </div>
     <div style="display:flex;gap:8px;align-items:center;position:relative">
       <button id="addCalEventBtn" class="btn-primary">+ Add Event</button>
@@ -1298,6 +1308,6 @@
 </div>
 
 <div id="printArea" style="display:none"></div>
-<script src="app.js?v=57"></script>
+<script src="app.js?v=58"></script>
 </body>
 </html>
