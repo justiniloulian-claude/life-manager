@@ -2856,7 +2856,30 @@ textarea.field { resize: vertical; }
     height: 100dvh;
     margin: 0 !important;
     overflow-y: auto;
-    padding-top: max(env(safe-area-inset-top, 0px), 48px) !important;
+    padding-top: max(env(safe-area-inset-top, 0px), 12px) !important;
+  }
+
+  /* ── Note view header: stack buttons then title ── */
+  #noteViewModal .note-view-header {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 8px 14px 10px;
+    gap: 6px;
+  }
+  #noteViewModal .note-view-header > div {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    justify-content: flex-end;
+  }
+  #noteViewModal #closeNoteViewModal {
+    margin-right: auto; /* push close/back to left side */
+    font-size: 22px;
+  }
+  #noteViewModal .note-view-title-input {
+    font-size: 20px;
+    width: 100%;
+    padding: 4px 0;
   }
 
   /* ── Calendar ── */

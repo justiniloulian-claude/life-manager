@@ -2783,20 +2783,33 @@ function renderMobFolderDrawer() {
   body.innerHTML=html;
 }
 function renderMobFolderTree(folders, parentId, depth, active) {
+  if(!state.mobExpandedFolders) state.mobExpandedFolders = {};
   return folders
     .filter(function(f){ return (f.parentId||null)===(parentId||null); })
     .map(function(f){
-      var dot=f.color
+      var hasChildren = folders.some(function(c){ return c.parentId===f.id; });
+      var expanded = state.mobExpandedFolders[f.id]===true;
+      var dot = f.color
         ? '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+f.color+';margin-right:6px;vertical-align:middle"></span>'
         : '📁 ';
       var indent = depth * 16;
+      var toggleBtn = hasChildren
+        ? '<span onclick="event.stopPropagation();toggleMobFolder(\''+f.id+'\')" style="margin-right:6px;font-size:12px;color:#aaa">'+( expanded ? '▾' : '▸' )+'</span>'
+        : '<span style="display:inline-block;width:18px"></span>';
       var row='<div class="mob-folder-item'+(active===f.id?' active':'')+'" '+
-        'style="padding-left:'+(20+indent)+'px" '+
-        'onclick="closeMobFolderDrawer();setNoteFolder(\''+f.id+'\')">'+dot+escHtml(f.name)+'</div>';
-      var children=renderMobFolderTree(folders, f.id, depth+1, active);
+        'style="padding-left:'+(12+indent)+'px" '+
+        'onclick="closeMobFolderDrawer();setNoteFolder(\''+f.id+'\')">'+
+        toggleBtn+dot+escHtml(f.name)+'</div>';
+      var children = (hasChildren && expanded) ? renderMobFolderTree(folders, f.id, depth+1, active) : '';
       return row+children;
     }).join('');
 }
+
+window.toggleMobFolder = function(id) {
+  if(!state.mobExpandedFolders) state.mobExpandedFolders = {};
+  state.mobExpandedFolders[id] = !state.mobExpandedFolders[id];
+  renderMobFolderDrawer();
+};
 
 window.openMobFolderDrawer = function() {
   renderMobFolderDrawer();
