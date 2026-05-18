@@ -905,30 +905,10 @@ function taskHTML(task, ds, noActions) {
     var moveBtn = '<button class="btn-icon task-move-btn" onclick="openMoveTaskModal(\''+ds+'\',\''+task.id+'\','+isR+')" title="Move to another day">→</button>';
     var nb = hasTaskNotes ? '<button class="btn-icon task-notes-btn" onclick="toggleTaskNotes(this)" title="View notes">📋</button>' : '';
     var linkBtn = !isR ? '<button class="btn-icon task-link-btn'+(linkedCount?' has-links':'')+'" onclick="openTaskNotesLink(\''+ds+'\',\''+task.id+'\')" title="'+(linkedCount?linkedCount+' linked note'+(linkedCount>1?'s':''):'Link notes')+'">📎'+(linkedCount?'<span class="link-count">'+linkedCount+'</span>':'')+'</button>' : '';
-    var subBtn = !isR ? '<button class="btn-icon task-sub-btn" onclick="event.stopPropagation();toggleSubtasks(\''+task.id+'\')" title="Subtasks">⊕</button>' : '';
-    actionsHTML = '<div class="task-actions">'+linkBtn+subBtn+nb+eb+db+moveBtn+'</div>';
+    actionsHTML = '<div class="task-actions">'+linkBtn+nb+eb+db+moveBtn+'</div>';
   }
   var notesPanel = (!noActions && hasTaskNotes)
     ? '<div class="task-notes-panel" style="display:none">'+escHtml(task.notes)+'</div>' : '';
-  var subs = (!isR && task.subtasks && task.subtasks.length) ? task.subtasks : [];
-  var subsDone = subs.filter(function(s){return s.done;}).length;
-  var subsHTML = '';
-  if(subs.length && !noActions){
-    subsHTML = '<div class="task-subtasks-wrap" id="subs-'+task.id+'" style="display:none">'+
-      subs.map(function(s,si){
-        return '<div class="task-sub-item">'
-          +'<input type="checkbox" class="task-sub-check"'+(s.done?' checked':'')
-          +' onclick="event.stopPropagation()" onchange="toggleSubtask(\''+ds+'\',\''+task.id+'\',\''+s.id+'\')">'
-          +'<span class="task-sub-title'+(s.done?' is-done':'')+'">'+escHtml(s.title)+'</span>'
-          +'<button class="btn-icon task-sub-del" onclick="event.stopPropagation();removeSubtask(\''+ds+'\',\''+task.id+'\',\''+s.id+'\')" style="font-size:11px;opacity:0.4">✕</button>'
-          +'</div>';
-      }).join('')
-      +'<div class="task-sub-add-row"><input type="text" class="task-sub-input" placeholder="Add subtask…" onkeydown="subtaskInputKey(event,\''+ds+'\',\''+task.id+'\')" onclick="event.stopPropagation()"></div>'
-      +'</div>';
-  }
-  var subBadge = (!noActions && subs.length)
-    ? '<span class="task-sub-badge" onclick="event.stopPropagation();toggleSubtasks(\''+task.id+'\')" title="Subtasks">▶ '+subsDone+'/'+subs.length+'</span>'
-    : '';
   var itemClick = noActions
     ? ' onclick="openDashDayPopup(\''+ds+'\')"'
     : ' onclick="taskClick(\''+ds+'\',\''+task.id+'\','+isR+',event)"';
@@ -945,8 +925,8 @@ function taskHTML(task, ds, noActions) {
   return '<div class="task-item '+itemCls+(task.done?' is-done':'')+(noActions?' task-compact-click':' task-clickable')+'" id="ti-'+task.id+'"'+itemClick+dragAttrs+ctxMenu+'>' +
     dragHandle+
     '<input type="checkbox" class="task-check"'+(task.done?' checked':'')+' onclick="event.stopPropagation()" onchange="checkTask(\''+ds+'\',\''+task.id+'\','+isR+')">' +
-    '<div class="task-body"><div class="task-title '+priorityCls+'">'+escHtml(task.title)+notesDot+subBadge+'</div>' +
-    '<div class="task-meta">'+tb+lb+'</div>'+notesPanel+subsHTML+'</div>' +
+    '<div class="task-body"><div class="task-title '+priorityCls+'">'+escHtml(task.title)+notesDot+'</div>' +
+    '<div class="task-meta">'+tb+lb+'</div>'+notesPanel+'</div>' +
     actionsHTML+'</div>';
 }
 
@@ -2842,35 +2822,6 @@ function renderCarryOverBanner() {
 window.checkTask = function(ds,id,isR){ toggleDone(ds,id,isR); refresh(); refreshDashDayModal(); };
 window.removeTask = function(ds,id){ if(confirm('Delete this task?')){ deleteTask(ds,id); refresh(); refreshDashDayModal(); } };
 window.markCarryOverDone = function(ds,id){ toggleDone(ds,id,false); refresh(); };
-window.toggleSubtasks = function(taskId){
-  var el=document.getElementById('subs-'+taskId);
-  if(el) el.style.display=el.style.display==='none'?'block':'none';
-};
-window.toggleSubtask = function(ds,taskId,subId){
-  var data=getData();
-  var task=(data.tasks[ds]||[]).find(function(t){return t.id===taskId;});
-  if(!task||!task.subtasks)return;
-  var sub=task.subtasks.find(function(s){return s.id===subId;});
-  if(sub)sub.done=!sub.done;
-  saveT(data.tasks); refresh(); refreshDashDayModal();
-};
-window.removeSubtask = function(ds,taskId,subId){
-  var data=getData();
-  var task=(data.tasks[ds]||[]).find(function(t){return t.id===taskId;});
-  if(!task)return;
-  task.subtasks=(task.subtasks||[]).filter(function(s){return s.id!==subId;});
-  saveT(data.tasks); refresh(); refreshDashDayModal();
-};
-window.subtaskInputKey = function(e,ds,taskId){
-  if(e.key!=='Enter')return;
-  var title=e.target.value.trim(); if(!title)return;
-  var data=getData();
-  var task=(data.tasks[ds]||[]).find(function(t){return t.id===taskId;});
-  if(!task)return;
-  if(!task.subtasks)task.subtasks=[];
-  task.subtasks.push({id:uid(),title:title,done:false});
-  saveT(data.tasks); e.target.value=''; refresh(); refreshDashDayModal();
-};
 window.skipRoutineDay = function(ds, routineId) {
   var data=getData(); var key=ds+'_'+routineId;
   data.routineOverrides[key]=data.routineOverrides[key]||{};
@@ -5076,8 +5027,9 @@ function initKeyboardShortcuts() {
     if(e.key==='ArrowLeft'){
       e.preventDefault();
       if(page==='dashboard'){
-        if(state.dashView==='single'){state.dayOffset--;renderSingle();}
-        else if(state.dashView==='seven'){state.weekStart--;renderSeven();}
+        // Always switch to single-day view so dayOffset tracks which day N targets
+        state.dayOffset--;
+        setDashView('single');
       } else if(page==='calendar'){
         state.calMonth--; if(state.calMonth<0){state.calMonth=11;state.calYear--;} renderCalendar();
       }
@@ -5086,8 +5038,8 @@ function initKeyboardShortcuts() {
     if(e.key==='ArrowRight'){
       e.preventDefault();
       if(page==='dashboard'){
-        if(state.dashView==='single'){state.dayOffset++;renderSingle();}
-        else if(state.dashView==='seven'){state.weekStart++;renderSeven();}
+        state.dayOffset++;
+        setDashView('single');
       } else if(page==='calendar'){
         state.calMonth++; if(state.calMonth>11){state.calMonth=0;state.calYear++;} renderCalendar();
       }
@@ -5096,7 +5048,7 @@ function initKeyboardShortcuts() {
 
     if(e.key==='t'||e.key==='T'){
       e.preventDefault();
-      if(page==='dashboard'){ state.dayOffset=0; state.weekStart=0; refresh(); }
+      if(page==='dashboard'){ state.dayOffset=0; state.weekStart=0; setDashView('single'); }
       else if(page==='calendar'){ var now2=new Date(); state.calYear=now2.getFullYear(); state.calMonth=now2.getMonth(); renderCalendar(); }
       return;
     }
@@ -5128,6 +5080,19 @@ function init() {
   setDashView('seven');
   checkMissedTasks();
   if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(function(){});
+  // Dark mode — restore saved preference
+  if(localStorage.getItem('dm_darkMode')==='1') document.body.classList.add('dark-mode');
+  updateDarkToggleIcon();
+  document.getElementById('darkModeToggle').addEventListener('click', function(){
+    document.body.classList.toggle('dark-mode');
+    var isDark=document.body.classList.contains('dark-mode');
+    localStorage.setItem('dm_darkMode', isDark?'1':'0');
+    updateDarkToggleIcon();
+  });
+}
+function updateDarkToggleIcon(){
+  var btn=document.getElementById('darkModeToggle');
+  if(btn) btn.textContent=document.body.classList.contains('dark-mode')?'☀️':'🌙';
 }
 
 document.addEventListener('DOMContentLoaded', init);

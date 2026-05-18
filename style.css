@@ -2627,53 +2627,6 @@ textarea.field { resize: vertical; }
   margin: 0 0 12px 0;
 }
 
-/* ============================================================
-   Task Subtasks
-   ============================================================ */
-.task-sub-badge {
-  display: inline-block;
-  font-size: 11px;
-  color: #7c3aed;
-  background: #ede9fe;
-  border-radius: 8px;
-  padding: 1px 7px;
-  margin-left: 6px;
-  cursor: pointer;
-  vertical-align: middle;
-  font-weight: 500;
-}
-.task-sub-badge:hover { background: #ddd6fe; }
-.task-subtasks-wrap {
-  margin: 6px 0 2px 2px;
-  border-left: 2px solid #ede9fe;
-  padding-left: 10px;
-}
-.task-sub-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 0;
-  font-size: 13px;
-}
-.task-sub-check { width: 14px; height: 14px; flex-shrink: 0; }
-.task-sub-title { flex: 1; color: #444; }
-.task-sub-title.is-done { text-decoration: line-through; opacity: 0.5; }
-.task-sub-del { padding: 0 2px !important; }
-.task-sub-add-row { margin-top: 4px; }
-.task-sub-input {
-  width: 100%;
-  border: none;
-  border-bottom: 1px dashed #ccc;
-  background: transparent;
-  font-size: 12px;
-  padding: 2px 0;
-  outline: none;
-  font-family: inherit;
-  color: #555;
-}
-.task-sub-input:focus { border-color: #7c3aed; }
-.task-sub-btn { opacity: 0.5; }
-.task-sub-btn:hover { opacity: 1; }
 
 /* ============================================================
    Financial Chart
@@ -2765,3 +2718,153 @@ textarea.field { resize: vertical; }
   /* Print buttons */
   .btn-print-dash { display: none; }
 }
+
+/* ============================================================
+   Dark Mode Toggle Button
+   ============================================================ */
+.header-dark-toggle {
+  font-size: 16px;
+  padding: 5px 9px;
+  line-height: 1;
+}
+
+/* ============================================================
+   DARK MODE
+   ============================================================ */
+body.dark-mode {
+  background: #141414;
+  color: #e0e0e0;
+}
+
+/* Header */
+body.dark-mode .header { background: #1c1c1c; border-bottom-color: #2e2e2e; }
+body.dark-mode .app-title { color: #e0e0e0; }
+body.dark-mode .header-date, body.dark-mode .header-hdate { color: #888; }
+body.dark-mode .header-nav-tab { color: #aaa; }
+body.dark-mode .header-nav-tab:hover { background: #2a2a2a; color: #e0e0e0; }
+body.dark-mode .header-nav-tab.active { background: #7c3aed; color: #fff; }
+
+/* Subnav */
+body.dark-mode .dash-subnav { background: #1c1c1c; border-bottom-color: #2e2e2e; }
+body.dark-mode .dash-pill { background: #2a2a2a; color: #aaa; border-color: #3a3a3a; }
+body.dark-mode .dash-pill:hover { background: #333; color: #e0e0e0; }
+body.dark-mode .dash-pill.active { background: #7c3aed; color: #fff; border-color: #7c3aed; }
+
+/* Day cards */
+body.dark-mode .day-card { background: #1e1e1e; border-color: #2e2e2e; }
+body.dark-mode .day-card.is-today { border-left-color: #7c3aed; background: #1e1a2e; }
+body.dark-mode .day-card-name { color: #e0e0e0; }
+body.dark-mode .day-card-label { color: #888; }
+body.dark-mode .day-card-hdate { color: #666; }
+body.dark-mode .day-card-head { border-bottom-color: #2e2e2e; }
+body.dark-mode .add-task-row { color: #666; border-top-color: #2a2a2a; }
+body.dark-mode .add-task-row:hover { background: #252525; color: #9d7aed; }
+
+/* Tasks */
+body.dark-mode .task-item { border-bottom-color: #2a2a2a; }
+body.dark-mode .task-item:hover { background: #252525; }
+body.dark-mode .task-title { color: #e0e0e0; }
+body.dark-mode .task-item.is-done .task-title { color: #555; }
+body.dark-mode .task-item.is-routine .task-title { color: #9d7aed; }
+body.dark-mode .badge-time { background: #2a2050; color: #c4b5fd; }
+body.dark-mode .badge-loc { background: #1a2a2a; color: #6ee7b7; }
+body.dark-mode .task-notes-panel { background: #252525; color: #aaa; border-left-color: #444; }
+body.dark-mode .empty-tasks { color: #555; }
+body.dark-mode .task-drag-handle { color: #444; }
+
+/* Carry-over banner */
+body.dark-mode .co-banner { background: #1e1a2e; border-color: #3a2e5e; }
+body.dark-mode .co-banner-hdr { color: #c4b5fd; }
+body.dark-mode .co-item { border-bottom-color: #2e2e2e; }
+body.dark-mode .co-item-title { color: #ccc; }
+
+/* Nav buttons */
+body.dark-mode .btn-nav { background: #2a2a2a; color: #aaa; border-color: #3a3a3a; }
+body.dark-mode .btn-nav:hover { background: #333; color: #e0e0e0; }
+body.dark-mode .btn-today { background: #2a2050; color: #c4b5fd; }
+
+/* Modals */
+body.dark-mode .modal { background: rgba(0,0,0,0.7); }
+body.dark-mode .modal-box { background: #1e1e1e; border-color: #2e2e2e; }
+body.dark-mode .modal-header { border-bottom-color: #2e2e2e; }
+body.dark-mode .modal-header h2 { color: #e0e0e0; }
+body.dark-mode .modal-footer { border-top-color: #2e2e2e; background: #1a1a1a; }
+body.dark-mode .modal-close { color: #666; }
+body.dark-mode .modal-close:hover { color: #e0e0e0; background: #333; }
+
+/* Form fields */
+body.dark-mode .field { background: #252525; border-color: #3a3a3a; color: #e0e0e0; }
+body.dark-mode .field:focus { border-color: #7c3aed; background: #2a2a2a; }
+body.dark-mode .field-label { color: #aaa; }
+body.dark-mode .optional { color: #555; }
+body.dark-mode select.field option { background: #252525; color: #e0e0e0; }
+
+/* Buttons */
+body.dark-mode .btn-primary { background: #7c3aed; color: #fff; }
+body.dark-mode .btn-primary:hover { background: #6d28d9; }
+body.dark-mode .btn-secondary { background: #2a2a2a; color: #aaa; border-color: #3a3a3a; }
+body.dark-mode .btn-cancel { background: #252525; color: #aaa; border-color: #3a3a3a; }
+body.dark-mode .btn-icon { color: #666; }
+body.dark-mode .btn-icon:hover { color: #c4b5fd; background: #2a2050; }
+
+/* Calendar */
+body.dark-mode .cal-toolbar { background: #1c1c1c; border-bottom-color: #2e2e2e; }
+body.dark-mode .cal-month-label { color: #e0e0e0; }
+body.dark-mode .cal-month-label-btn:hover { background: #2a2a2a; }
+body.dark-mode .cal-day-headers { background: #1c1c1c; color: #777; border-bottom-color: #2e2e2e; }
+body.dark-mode .cal-cell { border-color: #2a2a2a; }
+body.dark-mode .cal-cell:hover { background: #1e1e1e; }
+body.dark-mode .cal-cell-num { color: #777; }
+body.dark-mode .cal-cell.is-today .cal-cell-num { background: #7c3aed; color: #fff; }
+body.dark-mode .cal-cell.other-month { background: #161616; }
+body.dark-mode .cal-cell.other-month .cal-cell-num { color: #444; }
+body.dark-mode .cal-event-chip { background: #2a2050; color: #c4b5fd; }
+body.dark-mode .cc-us-hol { background: #2a1a1a; color: #fca5a5; }
+body.dark-mode .cc-jewish-hol { background: #2a2210; color: #fcd34d; }
+
+/* Notes */
+body.dark-mode .notes-sidebar { background: #1a1a1a; border-right-color: #2e2e2e; }
+body.dark-mode .note-card { background: #1e1e1e; border-color: #2e2e2e; }
+body.dark-mode .note-card:hover { background: #232323; }
+body.dark-mode .note-card-title { color: #e0e0e0; }
+body.dark-mode .note-card-preview { color: #777; }
+body.dark-mode .notes-toolbar { background: #1c1c1c; border-bottom-color: #2e2e2e; }
+body.dark-mode .notes-search { background: #252525; border-color: #3a3a3a; color: #e0e0e0; }
+body.dark-mode .folder-item { color: #aaa; }
+body.dark-mode .folder-item.active, body.dark-mode .folder-item:hover { background: #2a2050; color: #c4b5fd; }
+body.dark-mode .note-view-box { background: #1e1e1e; }
+body.dark-mode .note-view-editor { color: #e0e0e0; }
+body.dark-mode [data-placeholder]:empty:before { color: #555; }
+
+/* Learning */
+body.dark-mode .learning-day-col { background: #1e1e1e; border-color: #2e2e2e; }
+body.dark-mode .learning-day-col.lrn-today-col { background: #1e1a2e; border-left-color: #7c3aed; }
+body.dark-mode .learning-day-header { color: #e0e0e0; border-bottom-color: #2e2e2e; }
+body.dark-mode .learning-item { border-bottom-color: #2a2a2a; }
+body.dark-mode .learning-item-subject { color: #e0e0e0; }
+body.dark-mode .learning-item-source { color: #777; }
+body.dark-mode .learning-section-header { color: #888; background: #161616; }
+body.dark-mode .learning-add-row { color: #555; border-top-color: #2a2a2a; }
+
+/* Financial */
+body.dark-mode .fin-tabs { background: #1c1c1c; border-bottom-color: #2e2e2e; }
+body.dark-mode .fin-tab { color: #aaa; }
+body.dark-mode .fin-tab.active { color: #7c3aed; border-bottom-color: #7c3aed; }
+body.dark-mode .fin-section { background: #1e1e1e; border-color: #2e2e2e; }
+body.dark-mode .fin-metric-card { background: #1e1e1e; border-color: #2e2e2e; }
+body.dark-mode .fin-metric-lbl { color: #888; }
+body.dark-mode .fin-tbl-hdr { color: #777; border-bottom-color: #2e2e2e; }
+body.dark-mode .fin-tbl-row { border-bottom-color: #2a2a2a; }
+body.dark-mode .fin-tbl-row:hover { background: #252525; }
+body.dark-mode .fin-tbl-name { color: #e0e0e0; }
+body.dark-mode .fin-total-row { background: #1a1a1a; border-top-color: #2e2e2e; }
+body.dark-mode .fin-chart-section { background: #1a1a1a; border-color: #2e2e2e; }
+body.dark-mode .fin-chart-title { color: #888; }
+body.dark-mode .mm-row { background: #1e1e1e; border-bottom-color: #2a2a2a; }
+body.dark-mode .mm-row:hover { background: #252525; }
+body.dark-mode .mm-idea { color: #e0e0e0; }
+body.dark-mode .mm-notes { color: #777; }
+
+/* Page background */
+body.dark-mode .page { background: #141414; }
+body.dark-mode .view { background: #141414; }
