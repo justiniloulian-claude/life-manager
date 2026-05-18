@@ -5213,6 +5213,9 @@ function initKeyboardShortcuts() {
 
     if(e.key==='a'||e.key==='A'){
       e.preventDefault();
+      // Close any open modal/popup first
+      var openModal=document.querySelector('.modal.open');
+      if(openModal) openModal.classList.remove('open');
       if(page==='dashboard'){
         var ds;
         if(state.dashView==='seven'){
