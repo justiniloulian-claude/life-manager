@@ -391,11 +391,30 @@ function escHtml(s) {
 // ============================================================
 async function getUserLoc() {
   if (state.location) return state.location;
+  // Use saved location immediately so zmanim load fast without waiting for prompt
+  var saved = localStorage.getItem('dm_userLocation');
+  if (saved) { try { state.location=JSON.parse(saved); } catch(e){} }
+  if (state.location) {
+    // Refresh in background silently — no prompt if already allowed
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(function(p){
+        var fresh={lat:p.coords.latitude,lng:p.coords.longitude,tz:Intl.DateTimeFormat().resolvedOptions().timeZone};
+        state.location=fresh;
+        localStorage.setItem('dm_userLocation',JSON.stringify(fresh));
+      }, function(){}, {timeout:7000});
+    }
+    return state.location;
+  }
   var fallback = { lat:40.7128, lng:-74.0060, tz:'America/New_York' };
   return new Promise(function(resolve){
     if (!navigator.geolocation) { state.location=fallback; resolve(fallback); return; }
     navigator.geolocation.getCurrentPosition(
-      function(p){ state.location={lat:p.coords.latitude,lng:p.coords.longitude,tz:Intl.DateTimeFormat().resolvedOptions().timeZone}; resolve(state.location); },
+      function(p){
+        var loc={lat:p.coords.latitude,lng:p.coords.longitude,tz:Intl.DateTimeFormat().resolvedOptions().timeZone};
+        state.location=loc;
+        localStorage.setItem('dm_userLocation',JSON.stringify(loc));
+        resolve(loc);
+      },
       function(){ state.location=fallback; resolve(fallback); },
       {timeout:7000}
     );
