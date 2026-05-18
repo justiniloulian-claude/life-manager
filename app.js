@@ -2619,7 +2619,7 @@ function renderFolderSubtree(folders, parentId, depth) {
   var active=state.activeFolderId;
   return folders.filter(function(f){return (f.parentId||null)===(parentId||null);}).map(function(f){
     var hasChildren=folders.some(function(c){return c.parentId===f.id;});
-    var expanded=state.expandedFolders[f.id]!==false; // default expanded
+    var expanded=state.expandedFolders[f.id]===true; // default collapsed
     var dot=f.color?'<span class="folder-color-dot" style="background:'+f.color+'"></span>':'📁 ';
     var lockIcon=f.password?'<span class="folder-lock-icon">🔒</span>':'';
     var toggle=hasChildren?'<span class="folder-toggle-btn" onclick="event.stopPropagation();toggleFolderExpand(\''+f.id+'\')">'+(expanded?'▾':'▸')+'</span>':'<span class="folder-toggle-placeholder"></span>';
@@ -2779,11 +2779,23 @@ function renderMobFolderDrawer() {
   html+='<div class="mob-folder-item'+(active==='pinned'?' active':'')+'" onclick="closeMobFolderDrawer();setNoteFolder(\'pinned\')">📌 Pinned</div>';
   html+='<div class="mob-folder-item'+(active==='trash'?' active':'')+'" onclick="closeMobFolderDrawer();setNoteFolder(\'trash\')">🗑 Recently Deleted</div>';
   html+='<hr style="margin:8px 0;border-color:#eee">';
-  data.folders.forEach(function(f){
-    var dot=f.color?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+f.color+';margin-right:6px;vertical-align:middle"></span>':'📁 ';
-    html+='<div class="mob-folder-item'+(active===f.id?' active':'')+'" onclick="closeMobFolderDrawer();setNoteFolder(\''+f.id+'\')">'+dot+escHtml(f.name)+'</div>';
-  });
+  html+=renderMobFolderTree(data.folders, null, 0, active);
   body.innerHTML=html;
+}
+function renderMobFolderTree(folders, parentId, depth, active) {
+  return folders
+    .filter(function(f){ return (f.parentId||null)===(parentId||null); })
+    .map(function(f){
+      var dot=f.color
+        ? '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+f.color+';margin-right:6px;vertical-align:middle"></span>'
+        : '📁 ';
+      var indent = depth * 16;
+      var row='<div class="mob-folder-item'+(active===f.id?' active':'')+'" '+
+        'style="padding-left:'+(20+indent)+'px" '+
+        'onclick="closeMobFolderDrawer();setNoteFolder(\''+f.id+'\')">'+dot+escHtml(f.name)+'</div>';
+      var children=renderMobFolderTree(folders, f.id, depth+1, active);
+      return row+children;
+    }).join('');
 }
 
 window.openMobFolderDrawer = function() {
@@ -3385,7 +3397,7 @@ window.openEditRoutineItem = function(id) {
   openModal('routineItemModal');
 };
 window.removeRoutineItem = function(id){ if(confirm('Remove this routine task?')){ deleteRoutineItem(id); renderRoutineList(); refresh(); } };
-window.toggleFolderExpand = function(id){ state.expandedFolders[id]=state.expandedFolders[id]===false?true:false; renderNotesSidebar(); };
+window.toggleFolderExpand = function(id){ state.expandedFolders[id]=state.expandedFolders[id]===true?false:true; renderNotesSidebar(); };
 window.setNoteFolder = function(id){
   state.unlockedFolders={};
   var data=getData();

@@ -2846,11 +2846,17 @@ textarea.field { resize: vertical; }
   .notes-grid { columns: 2; column-gap: 10px; display: block !important; }
   .note-card { break-inside: avoid; margin-bottom: 10px; display: block; }
   /* Full-screen note view modal on mobile */
+  #noteViewModal {
+    align-items: stretch !important;
+    padding: 0 !important;
+  }
   #noteViewModal .modal-box {
     border-radius: 0 !important;
-    max-height: 100vh !important;
-    height: 100vh;
-    padding-top: env(safe-area-inset-top, 12px) !important;
+    max-height: 100dvh !important;
+    height: 100dvh;
+    margin: 0 !important;
+    overflow-y: auto;
+    padding-top: max(env(safe-area-inset-top, 0px), 48px) !important;
   }
 
   /* ── Calendar ── */
