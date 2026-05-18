@@ -17,11 +17,16 @@ var _auth = firebase.auth();
 var _uid  = null;   // set after login
 var _appInited = false;
 
-// Patch localStorage.setItem so every dm_ write auto-syncs to Firestore
+// Patch localStorage so every dm_ write stamps a local timestamp + schedules sync
 var _origSetItem = localStorage.setItem.bind(localStorage);
+var _origGetItem = localStorage.getItem.bind(localStorage);
 localStorage.setItem = function(key, value) {
   _origSetItem(key, value);
-  if(_uid && key && key.startsWith('dm_')) _scheduleFSSync();
+  if(_uid && key && key.startsWith('dm_') && key !== 'dm_localTS') {
+    // Stamp local modification time immediately so refresh knows local is newest
+    _origSetItem('dm_localTS', String(Date.now()));
+    _scheduleFSSync();
+  }
 };
 
 var _syncTimer = null;
@@ -30,22 +35,21 @@ function _scheduleFSSync() {
   _syncTimer = setTimeout(_doFSSync, 400);
 }
 
-// Force sync before the page closes / navigates away
-window.addEventListener('beforeunload', function() {
-  if(_uid) _doFSSync();
-});
 function _doFSSync() {
   if(!_uid) return;
+  var now = String(Date.now());
+  _origSetItem('dm_localTS', now);          // keep local TS in sync with what we upload
   var batch = _db.batch();
   var ref = _db.collection('users').doc(_uid).collection('appdata');
   for(var i = 0; i < localStorage.length; i++) {
     var k = localStorage.key(i);
     if(k && k.startsWith('dm_')) {
-      // Firestore doc ids can't have certain chars — encode slashes
       var docId = k.replace(/\//g,'__');
-      batch.set(ref.doc(docId), { key: k, val: localStorage.getItem(k) });
+      batch.set(ref.doc(docId), { key: k, val: _origGetItem(k) });
     }
   }
+  // Write a cloud timestamp so other devices know when Firestore was last updated
+  batch.set(ref.doc('_cloudTS'), { key: '_cloudTS', val: now });
   batch.commit().catch(function(err){ console.warn('FS sync error:', err); });
 }
 
@@ -53,21 +57,37 @@ function _loadFromFS(uid, cb) {
   _db.collection('users').doc(uid).collection('appdata').get()
     .then(function(snap) {
       if(snap.empty) {
-        // Firestore is empty — first login on this device.
-        // Upload all existing localStorage data so it's backed up immediately.
+        // First ever login — upload everything that's in localStorage
         _doFSSync();
+        cb();
+        return;
+      }
+
+      // Read Firestore's cloud timestamp
+      var cloudTS = 0;
+      var docs = [];
+      snap.forEach(function(doc) {
+        var d = doc.data();
+        if(d.key === '_cloudTS') { cloudTS = parseInt(d.val) || 0; }
+        else if(d.key && d.val !== undefined) docs.push(d);
+      });
+
+      // Read this device's local timestamp
+      var localTS = parseInt(_origGetItem('dm_localTS')) || 0;
+
+      if(cloudTS > localTS) {
+        // Another device made changes more recently — load from Firestore
+        docs.forEach(function(d) { _origSetItem(d.key, d.val); });
+        _origSetItem('dm_localTS', String(cloudTS)); // align local TS
       } else {
-        // Firestore has data — load it into localStorage (cloud is the source of truth)
-        snap.forEach(function(doc) {
-          var d = doc.data();
-          if(d.key && d.val !== undefined) _origSetItem(d.key, d.val);
-        });
+        // This device is up to date or ahead — push local data up to Firestore
+        _doFSSync();
       }
       cb();
     })
     .catch(function(err) {
       console.warn('FS load error:', err);
-      cb(); // still boot the app even if cloud load fails
+      cb();
     });
 }
 
