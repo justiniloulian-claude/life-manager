@@ -462,7 +462,11 @@ async function loadHebrewDate(ds) {
 async function loadCalHdate(ds) {
   var hdate=await fetchHebrewDate(ds);
   var el=document.getElementById('chd-'+ds);
-  if (el&&hdate){ var hp=hdate.split(' '); el.textContent=hp[0]+' '+(hp[1]||''); }
+  if (el&&hdate){
+    var hp=hdate.split(' ');
+    // Show month name only on the 1st of the Hebrew month
+    el.textContent = hp[0]==='1' ? hp[0]+' '+hp[1] : hp[0];
+  }
 }
 
 // ============================================================
@@ -2557,21 +2561,41 @@ function renderCalendar() {
     var holidays=getHolidaysForDate(ds);
     var events=getEventsForDate(ds);
     if(holidays.length||events.length){
-      var evDiv=document.createElement('div'); evDiv.className='cal-events';
-      holidays.forEach(function(h){
-        var chip=document.createElement('div');
-        chip.className='cal-event-chip '+(h._holType==='jewish'?'cc-jewish-hol':'cc-us-hol');
-        chip.textContent=(h._holType==='jewish'?'✡️ ':'🇺🇸 ')+h.title;
-        chip.onclick=(function(d){return function(e){e.stopPropagation();openDayDetail(d);};})(ds);
-        evDiv.appendChild(chip);
-      });
-      events.forEach(function(ev){
-        var c=colorByValue(ev.color); var chip=document.createElement('div');
-        chip.className='cal-event-chip '+(c.chipCls||'');
-        chip.textContent=(ev.time?fmt12(ev.time)+' ':'')+ev.title;
-        chip.onclick=(function(d){return function(e){e.stopPropagation();openDayDetail(d);};})(ds);
-        evDiv.appendChild(chip);
-      });
+      var evDiv=document.createElement('div');
+      if(isMobile()){
+        // Mobile: show colored dots only
+        evDiv.className='cal-dots';
+        holidays.forEach(function(h){
+          var dot=document.createElement('span');
+          dot.className='cal-dot '+(h._holType==='jewish'?'cal-dot-jewish':'cal-dot-us');
+          dot.title=h.title;
+          evDiv.appendChild(dot);
+        });
+        events.forEach(function(ev){
+          var c=colorByValue(ev.color);
+          var dot=document.createElement('span');
+          dot.className='cal-dot '+(c.chipCls||'cal-dot-default');
+          dot.title=ev.title;
+          evDiv.appendChild(dot);
+        });
+      } else {
+        // Desktop: full text chips
+        evDiv.className='cal-events';
+        holidays.forEach(function(h){
+          var chip=document.createElement('div');
+          chip.className='cal-event-chip '+(h._holType==='jewish'?'cc-jewish-hol':'cc-us-hol');
+          chip.textContent=(h._holType==='jewish'?'✡️ ':'🇺🇸 ')+h.title;
+          chip.onclick=(function(d){return function(e){e.stopPropagation();openDayDetail(d);};})(ds);
+          evDiv.appendChild(chip);
+        });
+        events.forEach(function(ev){
+          var c=colorByValue(ev.color); var chip=document.createElement('div');
+          chip.className='cal-event-chip '+(c.chipCls||'');
+          chip.textContent=(ev.time?fmt12(ev.time)+' ':'')+ev.title;
+          chip.onclick=(function(d){return function(e){e.stopPropagation();openDayDetail(d);};})(ds);
+          evDiv.appendChild(chip);
+        });
+      }
       cell.appendChild(evDiv);
     }
     var reminders=getRemindersForDate(ds);
@@ -2744,7 +2768,33 @@ function noteCardHTML(note) {
     '<button class="btn-icon" onclick="event.stopPropagation();pinNote(\''+note.id+'\')" title="Pin">'+(note.pinned?'📌':'📍')+'</button>'+
     '<button class="btn-icon" onclick="event.stopPropagation();removeNote(\''+note.id+'\')" title="Delete">🗑</button></div></div>';
 }
-function renderNotes(){ renderNotesSidebar(); renderNotesMain(); }
+function renderNotes(){ renderNotesSidebar(); renderNotesMain(); renderMobFolderDrawer(); }
+
+function renderMobFolderDrawer() {
+  var body = document.getElementById('mobFolderDrawerBody');
+  if(!body) return;
+  var data=getData(); var active=state.activeFolderId;
+  var html='';
+  html+='<div class="mob-folder-item'+(active==='all'?' active':'')+'" onclick="closeMobFolderDrawer();setNoteFolder(\'all\')">📝 All Notes</div>';
+  html+='<div class="mob-folder-item'+(active==='pinned'?' active':'')+'" onclick="closeMobFolderDrawer();setNoteFolder(\'pinned\')">📌 Pinned</div>';
+  html+='<div class="mob-folder-item'+(active==='trash'?' active':'')+'" onclick="closeMobFolderDrawer();setNoteFolder(\'trash\')">🗑 Recently Deleted</div>';
+  html+='<hr style="margin:8px 0;border-color:#eee">';
+  data.folders.forEach(function(f){
+    var dot=f.color?'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+f.color+';margin-right:6px;vertical-align:middle"></span>':'📁 ';
+    html+='<div class="mob-folder-item'+(active===f.id?' active':'')+'" onclick="closeMobFolderDrawer();setNoteFolder(\''+f.id+'\')">'+dot+escHtml(f.name)+'</div>';
+  });
+  body.innerHTML=html;
+}
+
+window.openMobFolderDrawer = function() {
+  renderMobFolderDrawer();
+  document.getElementById('mobFolderDrawer').classList.add('open');
+  document.getElementById('mobFolderOverlay').classList.add('open');
+};
+window.closeMobFolderDrawer = function() {
+  document.getElementById('mobFolderDrawer').classList.remove('open');
+  document.getElementById('mobFolderOverlay').classList.remove('open');
+};
 
 // ============================================================
 // DASHBOARD DAY POPUP (7-day card click)
@@ -4193,68 +4243,6 @@ function initMobile() {
     }
   });
 
-  // Swipe-to-complete / swipe-to-delete on task items
-  var SWIPE_THRESHOLD = 80;
-  document.addEventListener('touchstart', function(e) {
-    var item = e.target.closest('.task-item');
-    if(!item || item.classList.contains('task-compact-click')) return;
-    var tx0 = e.touches[0].clientX;
-    var ty0 = e.touches[0].clientY;
-    var swipeDir = null;
-    var moved = false;
-
-    function onMove(ev) {
-      var dx = ev.touches[0].clientX - tx0;
-      var dy = ev.touches[0].clientY - ty0;
-      if(!moved && Math.abs(dx) > 8) {
-        if(Math.abs(dx) > Math.abs(dy)) { moved = true; }
-        else { cleanup(); return; }
-      }
-      if(!moved) return;
-      if(Math.abs(dx) < Math.abs(dy)*1.5) return;
-      ev.preventDefault();
-      item.style.transform = 'translateX('+dx+'px)';
-      item.style.transition = 'none';
-      if(!swipeDir) {
-        swipeDir = dx > 0 ? 'right' : 'left';
-        item.style.background = dx > 0 ? '#dcfce7' : '#fee2e2';
-      }
-    }
-
-    function onEnd(ev) {
-      cleanup();
-      var dx = ev.changedTouches[0].clientX - tx0;
-      item.style.transform = '';
-      item.style.transition = 'transform 0.25s ease, background 0.25s ease';
-      item.style.background = '';
-      setTimeout(function(){ item.style.transition = ''; }, 260);
-
-      if(!moved) return;
-      if(dx > SWIPE_THRESHOLD) {
-        // Swipe right = complete
-        var ds = item.dataset.ds;
-        var id = item.dataset.tid;
-        var isR = item.dataset.isroutine === 'true';
-        if(ds && id) { window.checkTask(ds, id, isR); }
-      } else if(dx < -SWIPE_THRESHOLD) {
-        // Swipe left = delete
-        var ds2 = item.dataset.ds;
-        var id2 = item.dataset.tid;
-        var isR2 = item.dataset.isroutine === 'true';
-        if(ds2 && id2) {
-          if(isR2) { window.skipRoutineDay && window.skipRoutineDay(ds2, id2); }
-          else { window.removeTask(ds2, id2); }
-        }
-      }
-    }
-
-    function cleanup() {
-      document.removeEventListener('touchmove', onMove);
-      document.removeEventListener('touchend', onEnd);
-    }
-    document.addEventListener('touchmove', onMove, {passive:false});
-    document.addEventListener('touchend', onEnd);
-  }, {passive:true});
 }
 
 window.mobileFabClick = function() {
@@ -5011,6 +4999,11 @@ function initListeners() {
     if (inputs.length) inputs[inputs.length-1].focus();
   });
   document.getElementById('notesSearch').addEventListener('input', function(e){ state.notesSearchQuery=e.target.value; renderNotesMain(); });
+  document.getElementById('notesSearchMobile').addEventListener('input', function(){
+    state.notesSearchQuery=this.value;
+    document.getElementById('notesSearch').value=this.value;
+    renderNotesMain();
+  });
 
   // Folder
   document.getElementById('closeFolderModal').addEventListener('click', function(){ closeModal('folderModal'); });

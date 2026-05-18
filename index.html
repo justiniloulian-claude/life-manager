@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Life Manager">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=68">
+  <link rel="stylesheet" href="style.css?v=69">
 </head>
 <body>
 
@@ -54,14 +54,17 @@
   <!-- Dashboard Sub-Nav -->
   <div class="dash-subnav">
     <div class="dash-subnav-pills">
-      <button class="dash-pill active" id="pillDay">Today View</button>
-      <button class="dash-pill" id="pillSeven">7-Day</button>
-      <button class="dash-pill" id="pillRoutine">My Routine</button>
-      <span class="dash-divider"></span>
-      <button class="dash-pill" id="pillFuture">Future</button>
-      <button class="dash-pill" id="pillCheshbon">Cheshbon</button>
-      <button class="dash-pill" id="pillHealth">Physical Health</button>
-      <button class="dash-pill" id="pillReminders">Reminders</button>
+      <div class="dash-pills-row dash-pills-row1">
+        <button class="dash-pill active" id="pillDay">Today View</button>
+        <button class="dash-pill" id="pillSeven">7-Day</button>
+        <button class="dash-pill" id="pillRoutine">My Routine</button>
+      </div>
+      <div class="dash-pills-row dash-pills-row2">
+        <button class="dash-pill" id="pillFuture">Future</button>
+        <button class="dash-pill" id="pillCheshbon">Cheshbon</button>
+        <button class="dash-pill" id="pillHealth">Physical Health</button>
+        <button class="dash-pill" id="pillReminders">Reminders</button>
+      </div>
     </div>
     <div class="dash-subnav-right">
       <label class="date-jump-label">Jump to:</label>
@@ -375,10 +378,28 @@
 
 <!-- ===== NOTES PAGE ===== -->
 <div id="page-notes" class="page">
-  <div class="notes-toolbar">
+  <!-- Desktop toolbar -->
+  <div class="notes-toolbar notes-toolbar-desktop">
     <input type="text" id="notesSearch" class="notes-search" placeholder="Search notes...">
     <button id="addNoteBtn" class="btn-primary">+ New Note</button>
   </div>
+  <!-- Mobile toolbar -->
+  <div class="notes-toolbar-mobile">
+    <input type="text" id="notesSearchMobile" class="notes-search-mobile" placeholder="🔍  Search notes...">
+    <button class="mob-folder-btn" id="mobFolderBtn" onclick="openMobFolderDrawer()">☰</button>
+  </div>
+  <!-- Mobile folder drawer -->
+  <div id="mobFolderDrawer" class="mob-folder-drawer">
+    <div class="mob-folder-drawer-header">
+      <span class="mob-folder-drawer-title">Folders</span>
+      <button class="mob-folder-drawer-close" onclick="closeMobFolderDrawer()">✕</button>
+    </div>
+    <div id="mobFolderDrawerBody" class="mob-folder-drawer-body"></div>
+    <div class="mob-folder-drawer-footer">
+      <button class="mob-folder-add-btn" onclick="closeMobFolderDrawer();openFolderModal()">+ New Folder</button>
+    </div>
+  </div>
+  <div id="mobFolderOverlay" class="mob-folder-overlay" onclick="closeMobFolderDrawer()"></div>
   <div class="notes-layout">
     <aside id="notesSidebar" class="notes-sidebar"></aside>
     <main  id="notesMain"    class="notes-main"></main>
@@ -1351,6 +1372,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="app.js?v=68"></script>
+<script src="app.js?v=69"></script>
 </body>
 </html>
