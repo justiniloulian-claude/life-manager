@@ -2569,3 +2569,60 @@ textarea.field { resize: vertical; }
 }
 .fin-bon-history-btn:hover { color:#5b21b6; }
 .fin-bon-history-block { margin-top:8px; opacity:0.8; }
+
+/* ============================================================
+   Print Picker Buttons
+   ============================================================ */
+.btn-print-dash {
+  font-size: 12px;
+  padding: 5px 10px;
+}
+.lrn-print-opt {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 13px;
+  color: #1a1a1a;
+  cursor: pointer;
+  border-radius: 6px;
+  font-family: inherit;
+}
+.lrn-print-opt:hover {
+  background: #f4f4f0;
+}
+
+/* ============================================================
+   Money Making — drag + income
+   ============================================================ */
+.mm-drag-handle {
+  font-size: 16px;
+  color: #ccc;
+  cursor: grab;
+  padding: 0 6px 0 0;
+  flex-shrink: 0;
+  user-select: none;
+}
+.mm-drag-handle:active { cursor: grabbing; }
+.mm-dragging { opacity: 0.4; }
+.mm-drag-over { border-top: 2px solid #7c3aed !important; }
+.mm-income {
+  display: inline-block;
+  font-size: 11px;
+  background: #d1fae5;
+  color: #065f46;
+  border-radius: 8px;
+  padding: 1px 7px;
+  margin-left: 7px;
+  font-weight: 500;
+  vertical-align: middle;
+}
+
+/* ============================================================
+   Seven-day carry-over banner positioning
+   ============================================================ */
+#sevenCarryOver .co-banner {
+  margin: 0 0 12px 0;
+}

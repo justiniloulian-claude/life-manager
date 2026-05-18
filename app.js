@@ -733,8 +733,8 @@ function normalizeWishOrders(list) {
 function addFinWish(d)       { var data=getData(); normalizeWishOrders(data.finWishlist); var tier=data.finWishlist.filter(function(x){return x.tier===d.tier;}); d.order=tier.length; data.finWishlist.push(Object.assign({id:uid()},d)); saveFinWish(data.finWishlist); }
 function updateFinWish(id,d) { var data=getData(); var i=data.finWishlist.findIndex(function(x){return x.id===id;}); if(i>-1)data.finWishlist[i]=Object.assign({},data.finWishlist[i],d,{id:id}); saveFinWish(data.finWishlist); }
 function deleteFinWish(id)   { var data=getData(); saveFinWish(data.finWishlist.filter(function(x){return x.id!==id;})); }
-function addMoneyIdea(d){ var data=getData(); data.moneymaking.push({id:uid(),idea:d.idea,status:d.status||'idea',notes:d.notes||'',createdAt:new Date().toISOString()}); saveMM(data.moneymaking); }
-function updateMoneyIdea(id,d){ var data=getData(); var item=data.moneymaking.find(function(i){return i.id===id;}); if(item){item.idea=d.idea;item.status=d.status||'idea';item.notes=d.notes||'';} saveMM(data.moneymaking); }
+function addMoneyIdea(d){ var data=getData(); var order=data.moneymaking.length; data.moneymaking.push({id:uid(),idea:d.idea,status:d.status||'idea',notes:d.notes||'',incAmountLow:d.incAmountLow||'',incAmountHigh:d.incAmountHigh||'',incFrequency:d.incFrequency||'monthly',order:order,createdAt:new Date().toISOString()}); saveMM(data.moneymaking); }
+function updateMoneyIdea(id,d){ var data=getData(); var item=data.moneymaking.find(function(i){return i.id===id;}); if(item){item.idea=d.idea;item.status=d.status||'idea';item.notes=d.notes||'';item.incAmountLow=d.incAmountLow||'';item.incAmountHigh=d.incAmountHigh||'';item.incFrequency=d.incFrequency||'monthly';} saveMM(data.moneymaking); }
 function deleteMoneyIdea(id){ var data=getData(); saveMM(data.moneymaking.filter(function(i){return i.id!==id;})); }
 
 // ============================================================
@@ -987,6 +987,8 @@ function renderSeven() {
     var d=dateFromOffset(i); dates.push(d); html+=dayCardHTML(d,true);
   }
   document.getElementById('sevenDayGrid').innerHTML=html;
+  var coEl=document.getElementById('sevenCarryOver');
+  if(coEl) coEl.innerHTML=renderCarryOverBanner();
   dates.forEach(function(d){ loadHebrewDate(toDateStr(d)); }); // No zmanim in 7-day
 }
 function refresh() {
@@ -2050,13 +2052,26 @@ function renderFinancial() {
   var mmEl=document.getElementById('moneyMakingList');
   if(mmEl) {
     var data=getData();
+    var sorted=data.moneymaking.slice().sort(function(a,b){return (a.order||0)-(b.order||0);});
     var statusLabel={idea:'💡 Idea',exploring:'🔍 Exploring',inprogress:'⚡ In Progress',earning:'💰 Earning',paused:'⏸ Paused'};
-    mmEl.innerHTML=!data.moneymaking.length?'<div class="fin-empty">No ideas yet.</div>':
-      data.moneymaking.map(function(item){
-        return '<div class="mm-row">'+
-          '<div class="mm-row-body"><div class="mm-idea">'+escHtml(item.idea)+'</div>'+(item.notes?'<div class="mm-notes">'+escHtml(item.notes)+'</div>':'')+'</div>'+
+    var FREQ_SHORT={weekly:'wk',biweekly:'2wk',monthly:'mo',yearly:'yr',oneoff:'once'};
+    mmEl.innerHTML=!sorted.length?'<div class="fin-empty">No ideas yet.</div>':
+      sorted.map(function(item,idx){
+        var incStr='';
+        if(item.incAmountLow||item.incAmountHigh){
+          var lo=parseFloat(item.incAmountLow)||0; var hi=parseFloat(item.incAmountHigh)||lo;
+          incStr='<span class="mm-income">'+(lo===hi?'$'+fmtDollar(lo):'$'+fmtDollar(lo)+'–$'+fmtDollar(hi))+(item.incFrequency?'/'+FREQ_SHORT[item.incFrequency]:'')+'</span>';
+        }
+        return '<div class="mm-row" draggable="true" data-mm-id="'+item.id+'" ondragstart="mmDragStart(event,\''+item.id+'\')" ondragover="mmDragOver(event,\''+item.id+'\')" ondrop="mmDrop(event,\''+item.id+'\')" ondragend="mmDragEnd(event)" ondragleave="mmDragLeave(event)">'+
+          '<div class="mm-drag-handle" title="Drag to reorder">⠿</div>'+
+          '<div class="mm-row-body"><div class="mm-idea">'+escHtml(item.idea)+incStr+'</div>'+(item.notes?'<div class="mm-notes">'+escHtml(item.notes)+'</div>':'')+'</div>'+
           '<span class="mm-status '+item.status+'">'+(statusLabel[item.status]||item.status)+'</span>'+
-          '<div class="mm-row-actions"><button class="btn-icon" onclick="openEditMoneyIdea(\''+item.id+'\')">✏️</button><button class="btn-icon" onclick="delMM(\''+item.id+'\')">🗑</button></div></div>';
+          '<div class="mm-row-actions">'+
+            '<button class="btn-icon-sm" onclick="mmMoveUp(\''+item.id+'\')" title="Move up">↑</button>'+
+            '<button class="btn-icon-sm" onclick="mmMoveDown(\''+item.id+'\')" title="Move down">↓</button>'+
+            '<button class="btn-icon" onclick="openEditMoneyIdea(\''+item.id+'\')">✏️</button>'+
+            '<button class="btn-icon" onclick="delMM(\''+item.id+'\')">🗑</button>'+
+          '</div></div>';
       }).join('');
   }
 }
@@ -3211,7 +3226,7 @@ function renderNoteViewChecklist() {
   el.innerHTML=state.viewNoteCheckItems.map(function(item,i){
     return '<div class="note-view-check-row'+(item.done?' is-done':'')+'">' +
       '<input type="checkbox"'+(item.done?' checked':'')+' onchange="nvToggle('+i+')">' +
-      '<input type="text" class="note-view-check-input" value="'+escHtml(item.text)+'" placeholder="List item..." oninput="nvUpdate('+i+',this.value)">' +
+      '<input type="text" class="note-view-check-input" value="'+escHtml(item.text)+'" placeholder="List item..." oninput="nvUpdate('+i+',this.value)" onkeydown="nvCheckEnter(event,'+i+')">' +
       '<button class="btn-icon" style="font-size:12px;opacity:0.4" onclick="nvRemove('+i+')">✕</button>' +
       '</div>';
   }).join('');
@@ -3219,6 +3234,19 @@ function renderNoteViewChecklist() {
 window.nvToggle = function(i){ state.viewNoteCheckItems[i].done=!state.viewNoteCheckItems[i].done; renderNoteViewChecklist(); };
 window.nvUpdate = function(i,v){ state.viewNoteCheckItems[i].text=v; };
 window.nvRemove = function(i){ state.viewNoteCheckItems.splice(i,1); renderNoteViewChecklist(); };
+window.nvCheckEnter = function(e, i) {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  // Commit the current item's text from the input value
+  var input = e.target;
+  state.viewNoteCheckItems[i].text = input.value;
+  // Insert a new blank item after index i
+  state.viewNoteCheckItems.splice(i + 1, 0, {id: uid(), text: '', done: false});
+  renderNoteViewChecklist();
+  // Focus the new item
+  var inputs = document.getElementById('noteViewCheckItems').querySelectorAll('.note-view-check-input');
+  if (inputs[i + 1]) inputs[i + 1].focus();
+};
 
 window.openNoteView = function(id) {
   var data=getData(); var n=data.notes.find(function(n){return n.id===id;}); if(!n)return;
@@ -3680,13 +3708,49 @@ window.openEditFinWish = function(id) {
 };
 
 window.delMM   = function(id){ if(confirm('Delete this idea?')){ deleteMoneyIdea(id); renderFinancial(); } };
+window.mmMoveUp = function(id){
+  var data=getData(); var items=data.moneymaking.slice().sort(function(a,b){return (a.order||0)-(b.order||0);});
+  var idx=items.findIndex(function(i){return i.id===id;}); if(idx<=0)return;
+  var tmp=items[idx].order; items[idx].order=items[idx-1].order; items[idx-1].order=tmp;
+  saveMM(data.moneymaking); renderFinancial();
+};
+window.mmMoveDown = function(id){
+  var data=getData(); var items=data.moneymaking.slice().sort(function(a,b){return (a.order||0)-(b.order||0);});
+  var idx=items.findIndex(function(i){return i.id===id;}); if(idx<0||idx>=items.length-1)return;
+  var tmp=items[idx].order; items[idx].order=items[idx+1].order; items[idx+1].order=tmp;
+  saveMM(data.moneymaking); renderFinancial();
+};
+var _mmDragId=null;
+window.mmDragStart=function(e,id){_mmDragId=id;e.currentTarget.classList.add('mm-dragging');e.dataTransfer.effectAllowed='move';};
+window.mmDragEnd=function(e){_mmDragId=null;document.querySelectorAll('.mm-row').forEach(function(r){r.classList.remove('mm-dragging','mm-drag-over');});};
+window.mmDragOver=function(e,id){e.preventDefault();if(_mmDragId===id)return;document.querySelectorAll('.mm-row').forEach(function(r){r.classList.remove('mm-drag-over');});e.currentTarget.classList.add('mm-drag-over');};
+window.mmDragLeave=function(e){e.currentTarget.classList.remove('mm-drag-over');};
+window.mmDrop=function(e,targetId){
+  e.preventDefault(); e.currentTarget.classList.remove('mm-drag-over');
+  if(!_mmDragId||_mmDragId===targetId)return;
+  var data=getData();
+  var items=data.moneymaking.slice().sort(function(a,b){return (a.order||0)-(b.order||0);});
+  var fromIdx=items.findIndex(function(i){return i.id===_mmDragId;});
+  var toIdx=items.findIndex(function(i){return i.id===targetId;});
+  if(fromIdx<0||toIdx<0)return;
+  var moved=items.splice(fromIdx,1)[0];
+  items.splice(toIdx,0,moved);
+  items.forEach(function(item,i){
+    var real=data.moneymaking.find(function(x){return x.id===item.id;});
+    if(real)real.order=i;
+  });
+  saveMM(data.moneymaking); renderFinancial();
+};
 window.openEditMoneyIdea = function(id) {
   var data=getData(); var item=data.moneymaking.find(function(i){return i.id===id;}); if(!item)return;
   state.editMoneyIdeaId=id;
   document.getElementById('moneyIdeaModalTitle').textContent='Edit Idea';
-  document.getElementById('moneyIdeaName').value=item.idea;
-  document.getElementById('moneyIdeaStatus').value=item.status;
+  document.getElementById('moneyIdeaName').value=item.idea||'';
+  document.getElementById('moneyIdeaStatus').value=item.status||'idea';
   document.getElementById('moneyIdeaNotes').value=item.notes||'';
+  document.getElementById('moneyIdeaIncLow').value=item.incAmountLow||'';
+  document.getElementById('moneyIdeaIncHigh').value=item.incAmountHigh||'';
+  document.getElementById('moneyIdeaIncFreq').value=item.incFrequency||'monthly';
   openModal('moneyIdeaModal');
 };
 
@@ -4060,6 +4124,8 @@ function initListeners() {
   document.getElementById('backToTodayWeekBtn').addEventListener('click', function(){ state.weekStart=0;  renderSeven(); });
   document.getElementById('nextDayBtn7').addEventListener('click',        function(){ state.weekStart++;  renderSeven(); });
   document.getElementById('nextWeekBtn').addEventListener('click',        function(){ state.weekStart+=7; renderSeven(); });
+  document.getElementById('printDayBtn').addEventListener('click', printDashboardSingle);
+  document.getElementById('printWeekBtn').addEventListener('click', printDashboardSeven);
 
   // Dash day modal
   document.getElementById('closeDashDayModal').addEventListener('click', function(){ state.dashDayModalDs=null; closeModal('dashDayModal'); });
@@ -4474,14 +4540,14 @@ function initListeners() {
   });
 
   // Money Making
-  document.getElementById('addMoneyIdeaBtn').addEventListener('click', function(){ state.editMoneyIdeaId=null; document.getElementById('moneyIdeaModalTitle').textContent='Add Idea'; document.getElementById('moneyIdeaName').value=''; document.getElementById('moneyIdeaStatus').value='idea'; document.getElementById('moneyIdeaNotes').value=''; openModal('moneyIdeaModal'); setTimeout(function(){document.getElementById('moneyIdeaName').focus();},80); });
+  document.getElementById('addMoneyIdeaBtn').addEventListener('click', function(){ state.editMoneyIdeaId=null; document.getElementById('moneyIdeaModalTitle').textContent='Add Idea'; document.getElementById('moneyIdeaName').value=''; document.getElementById('moneyIdeaStatus').value='idea'; document.getElementById('moneyIdeaNotes').value=''; document.getElementById('moneyIdeaIncLow').value=''; document.getElementById('moneyIdeaIncHigh').value=''; document.getElementById('moneyIdeaIncFreq').value='monthly'; openModal('moneyIdeaModal'); setTimeout(function(){document.getElementById('moneyIdeaName').focus();},80); });
   document.getElementById('closeMoneyIdeaModal').addEventListener('click', function(){ closeModal('moneyIdeaModal'); });
   document.getElementById('cancelMoneyIdea').addEventListener('click',     function(){ closeModal('moneyIdeaModal'); });
   document.getElementById('saveMoneyIdea').addEventListener('click', function(){
     var idea=document.getElementById('moneyIdeaName').value.trim();
     if (!idea){ document.getElementById('moneyIdeaName').classList.add('error'); return; }
     document.getElementById('moneyIdeaName').classList.remove('error');
-    var d={idea:idea,status:document.getElementById('moneyIdeaStatus').value,notes:document.getElementById('moneyIdeaNotes').value.trim()};
+    var d={idea:idea,status:document.getElementById('moneyIdeaStatus').value,notes:document.getElementById('moneyIdeaNotes').value.trim(),incAmountLow:document.getElementById('moneyIdeaIncLow').value,incAmountHigh:document.getElementById('moneyIdeaIncHigh').value,incFrequency:document.getElementById('moneyIdeaIncFreq').value};
     state.editMoneyIdeaId?updateMoneyIdea(state.editMoneyIdeaId,d):addMoneyIdea(d);
     state.editMoneyIdeaId=null; closeModal('moneyIdeaModal'); renderFinancial();
   });
@@ -4510,6 +4576,12 @@ function initListeners() {
     if(document.getElementById('taskContextMenu').style.display==='block'&&!document.getElementById('taskContextMenu').contains(e.target)){
       document.getElementById('taskContextMenu').style.display='none';
     }
+    var lrnPicker=document.getElementById('lrnPrintPicker');
+    if(lrnPicker&&lrnPicker.style.display==='block'&&!lrnPicker.contains(e.target)&&e.target.id!=='printLearningBtn')
+      lrnPicker.style.display='none';
+    var calPicker=document.getElementById('calPrintPicker');
+    if(calPicker&&calPicker.style.display==='block'&&!calPicker.contains(e.target)&&e.target.id!=='printCalBtn')
+      calPicker.style.display='none';
   });
   document.getElementById('taskCtxDuplicate').addEventListener('click',function(){
     if(!_ctxTask)return;
@@ -4526,6 +4598,16 @@ function initListeners() {
   document.getElementById('calPrevBtn').addEventListener('click', function(){ state.calMonth--; if(state.calMonth<0){state.calMonth=11;state.calYear--;} renderCalendar(); });
   document.getElementById('calNextBtn').addEventListener('click', function(){ state.calMonth++; if(state.calMonth>11){state.calMonth=0;state.calYear++;} renderCalendar(); });
   document.getElementById('addCalEventBtn').addEventListener('click', function(){ openAddCalEvent(null); });
+  document.getElementById('printCalBtn').addEventListener('click', function(e){
+    e.stopPropagation();
+    var p=document.getElementById('calPrintPicker');
+    p.style.display=p.style.display==='none'?'block':'none';
+  });
+  document.getElementById('printLearningBtn').addEventListener('click', function(e){
+    e.stopPropagation();
+    var p=document.getElementById('lrnPrintPicker');
+    p.style.display=p.style.display==='none'?'block':'none';
+  });
   document.getElementById('closeCalEventModal').addEventListener('click', function(){ closeModal('calEventModal'); });
   document.getElementById('cancelCalEvent').addEventListener('click',     function(){ closeModal('calEventModal'); });
   document.getElementById('saveCalEvent').addEventListener('click', saveCalEventModal);
@@ -4677,6 +4759,131 @@ function initListeners() {
     m.addEventListener('mousedown',function(e){_mdOnBackdrop=(e.target===m);});
     m.addEventListener('click',function(e){if(e.target===m&&_mdOnBackdrop)m.classList.remove('open');});
   });
+}
+
+// ============================================================
+// PRINT HELPERS
+// ============================================================
+function buildPrintHTML(title, bodyHTML) {
+  return '<html><head><title>'+title+'</title><style>'+
+    'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:20px;color:#1a1a1a}'+
+    'h1{font-size:18px;margin-bottom:16px;border-bottom:2px solid #e0e0e0;padding-bottom:8px}'+
+    'h3{font-size:14px;margin:12px 0 6px;color:#555}'+
+    '.task{padding:5px 0;border-bottom:1px solid #f0f0f0;font-size:13px}'+
+    '.task.done{opacity:0.45;text-decoration:line-through}'+
+    '.task-time{font-size:11px;color:#888;margin-right:6px}'+
+    '.task-note{font-size:11px;color:#aaa;margin-left:8px}'+
+    '.day-block{margin-bottom:20px;break-inside:avoid}'+
+    '.day-title{font-weight:700;font-size:15px;border-bottom:1px solid #ddd;padding-bottom:4px;margin-bottom:8px}'+
+    '.routine-label{font-size:10px;background:#e0e7ff;color:#3730a3;border-radius:4px;padding:1px 5px;margin-left:5px}'+
+    '.empty{color:#ccc;font-size:12px;font-style:italic}'+
+    '@media print{@page{size:landscape;margin:15mm}}'+
+  '</style></head><body>'+bodyHTML+'</body></html>';
+}
+
+function printDashboardSingle() {
+  var date=dateFromOffset(state.dayOffset);
+  var ds=toDateStr(date);
+  var tasks=getTasksForDate(ds);
+  var html='<h1>'+date.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})+'</h1>';
+  if(!tasks.length){html+='<div class="empty">No tasks.</div>';}
+  else{
+    html+=tasks.map(function(t){
+      var timeStr=t.time?'<span class="task-time">'+fmt12(t.time)+'</span>':'';
+      var noteStr=t.notes?'<span class="task-note">'+escHtml(t.notes)+'</span>':'';
+      var rcLabel=t._rc?'<span class="routine-label">Routine</span>':'';
+      return '<div class="task'+(t.done?' done':'')+'">'+(t.done?'☑ ':'☐ ')+timeStr+escHtml(t.title)+rcLabel+noteStr+'</div>';
+    }).join('');
+  }
+  var w=window.open('','_blank'); w.document.write(buildPrintHTML('Dashboard — '+ds,html)); w.document.close(); w.print();
+}
+
+function printDashboardSeven() {
+  var s=state.weekStart; var html='<h1>7-Day View</h1><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:12px">';
+  for(var i=s;i<s+7;i++){
+    var date=dateFromOffset(i); var ds=toDateStr(date);
+    var tasks=getTasksForDate(ds);
+    var dayHtml='<div class="day-block"><div class="day-title">'+date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+'</div>';
+    if(!tasks.length){dayHtml+='<div class="empty">—</div>';}
+    else{dayHtml+=tasks.map(function(t){
+      var timeStr=t.time?'<span class="task-time">'+fmt12(t.time)+'</span>':'';
+      var rcLabel=t._rc?'<span class="routine-label">R</span>':'';
+      return '<div class="task'+(t.done?' done':'')+'">'+(t.done?'☑ ':'☐ ')+timeStr+escHtml(t.title)+rcLabel+'</div>';
+    }).join('');}
+    dayHtml+='</div>'; html+=dayHtml;
+  }
+  html+='</div>';
+  var w=window.open('','_blank'); w.document.write(buildPrintHTML('Dashboard — 7-Day',html)); w.document.close(); w.print();
+}
+
+function printLearning(scope) {
+  document.getElementById('lrnPrintPicker').style.display='none';
+  var data=getData();
+  var todayDow=new Date().getDay();
+  var days=scope==='today'
+    ? LEARNING_DAYS.filter(function(d){return LRN_DAY_DOW[d]===todayDow;})
+    : LEARNING_DAYS;
+  if(!days.length) days=LEARNING_DAYS; // fallback if today not in seder
+  var mainSecs=[{key:'morning',label:'Morning Seder'},{key:'afternoon',label:'Afternoon Seder'},{key:'night',label:'Night Seder'},{key:'unscheduled',label:'Unscheduled'}];
+  var html='<h1>Learning Seder'+(scope==='today'?' — Today':'')+'</h1>';
+  html+='<div style="display:grid;grid-template-columns:repeat('+Math.min(days.length,7)+',1fr);gap:16px">';
+  days.forEach(function(day){
+    var items=data.learning[day]||[];
+    var sections={morning:[],afternoon:[],night:[],unscheduled:[]};
+    items.forEach(function(item){sections[getLearningSection(item)].push(item);});
+    html+='<div class="day-block"><div class="day-title">'+LEARNING_DAY_LABELS[day]+'</div>';
+    mainSecs.forEach(function(sec){
+      if(!sections[sec.key].length)return;
+      html+='<h3>'+sec.label+'</h3>';
+      sections[sec.key].forEach(function(item){
+        var timeStr=item.time?'<span class="task-time">'+fmt12(item.time)+'</span> ':'';
+        html+='<div class="task">'+timeStr+escHtml(item.subject)+(item.source?'<span class="task-note"> — '+escHtml(item.source)+'</span>':'')+'</div>';
+      });
+    });
+    if(!items.length)html+='<div class="empty">—</div>';
+    html+='</div>';
+  });
+  html+='</div>';
+  var w=window.open('','_blank'); w.document.write(buildPrintHTML('Learning Seder',html)); w.document.close(); w.print();
+}
+
+function printCalendar(mode) {
+  document.getElementById('calPrintPicker').style.display='none';
+  var year=state.calYear; var month=state.calMonth;
+  var monthName=new Date(year,month,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  var html='<h1>Calendar — '+monthName+'</h1>';
+  if(mode==='list'){
+    // Build list of all events this month
+    var firstDay=new Date(year,month,1); var lastDay=new Date(year,month+1,0);
+    var allEvents=[];
+    for(var d=new Date(firstDay);d<=lastDay;d.setDate(d.getDate()+1)){
+      var ds=toDateStr(d); var evs=getEventsForDate(ds);
+      evs.forEach(function(ev){allEvents.push({ds:ds,ev:ev});});
+    }
+    if(!allEvents.length){html+='<div class="empty">No events this month.</div>';}
+    else{
+      allEvents.forEach(function(e){
+        var d=fromDateStr(e.ds);
+        html+='<div class="task"><strong>'+d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+'</strong> — '+(e.ev.time?fmt12(e.ev.time)+' ':'')+''+escHtml(e.ev.title)+'</div>';
+      });
+    }
+  } else {
+    // Grid mode
+    var firstDay2=new Date(year,month,1); var startDow=firstDay2.getDay();
+    var daysInMonth=new Date(year,month+1,0).getDate();
+    html+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;font-size:12px">';
+    ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(function(d){html+='<div style="font-weight:700;text-align:center;padding:4px;border-bottom:1px solid #ddd">'+d+'</div>';});
+    for(var blank=0;blank<startDow;blank++) html+='<div></div>';
+    for(var day=1;day<=daysInMonth;day++){
+      var ds2=toDateStr(new Date(year,month,day));
+      var evs2=getEventsForDate(ds2);
+      html+='<div style="min-height:60px;border:1px solid #eee;padding:4px;vertical-align:top"><div style="font-weight:600">'+day+'</div>';
+      evs2.forEach(function(ev){html+='<div style="font-size:10px;background:#e0e7ff;border-radius:3px;padding:1px 3px;margin-top:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">'+escHtml(ev.title)+'</div>';});
+      html+='</div>';
+    }
+    html+='</div>';
+  }
+  var w=window.open('','_blank'); w.document.write(buildPrintHTML('Calendar — '+monthName,html)); w.document.close(); w.print();
 }
 
 // ============================================================

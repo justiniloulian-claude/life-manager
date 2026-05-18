@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=52">
+  <link rel="stylesheet" href="style.css?v=54">
 </head>
 <body>
 
@@ -55,6 +55,7 @@
       <button id="prevDayBtn" class="btn-nav">&#8592; Prev</button>
       <button id="backToTodayBtn" class="btn-today" style="display:none">Today</button>
       <button id="nextDayBtn" class="btn-nav">Next &#8594;</button>
+      <button id="printDayBtn" class="btn-nav btn-print-dash" title="Print">🖨 Print</button>
     </div>
     <div id="singleDayContainer"></div>
   </div>
@@ -67,7 +68,9 @@
       <button id="backToTodayWeekBtn" class="btn-today">Today</button>
       <button id="nextDayBtn7" class="btn-nav">Next Day &#8594;</button>
       <button id="nextWeekBtn" class="btn-nav">Next Week &#8594;</button>
+      <button id="printWeekBtn" class="btn-nav btn-print-dash" title="Print">🖨 Print</button>
     </div>
+    <div id="sevenCarryOver"></div>
     <div id="sevenDayGrid" class="seven-day-grid"></div>
   </div>
 
@@ -323,8 +326,13 @@
       <h2 id="calMonthLabel" class="cal-month-label cal-month-label-btn"></h2>
       <button id="calNextBtn" class="btn-nav">&#8594;</button>
     </div>
-    <div style="display:flex;gap:8px;align-items:center">
+    <div style="display:flex;gap:8px;align-items:center;position:relative">
       <button id="addCalEventBtn" class="btn-primary">+ Add Event</button>
+      <button id="printCalBtn" class="btn-nav btn-print-dash" title="Print Calendar">🖨 Print</button>
+      <div id="calPrintPicker" style="display:none;position:absolute;right:0;top:36px;background:#fff;border:1px solid #e0e0e0;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.10);z-index:200;padding:8px;min-width:170px">
+        <button class="lrn-print-opt" onclick="printCalendar('grid')">Month Grid</button>
+        <button class="lrn-print-opt" onclick="printCalendar('list')">Event List</button>
+      </div>
     </div>
   </div>
   <!-- Month/Year Picker -->
@@ -362,6 +370,13 @@
     <div>
       <h2 class="learning-title">Learning Seder</h2>
       <p class="learning-subtitle">Your weekly learning schedule — Mon through Sun</p>
+    </div>
+    <div style="position:relative">
+      <button id="printLearningBtn" class="btn-nav btn-print-dash" title="Print Learning">🖨 Print</button>
+      <div id="lrnPrintPicker" style="display:none;position:absolute;right:0;top:36px;background:#fff;border:1px solid #e0e0e0;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.10);z-index:200;padding:8px;min-width:160px">
+        <button class="lrn-print-opt" onclick="printLearning('today')">Today's Seder</button>
+        <button class="lrn-print-opt" onclick="printLearning('all')">All 7 Days</button>
+      </div>
     </div>
   </div>
   <div class="learning-grid" id="learningGrid"></div>
@@ -1091,6 +1106,19 @@
         <option value="earning">💰 Earning</option>
         <option value="paused">⏸ Paused</option>
       </select>
+      <label class="field-label">Income <span class="optional">optional</span></label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="number" id="moneyIdeaIncLow" class="field" placeholder="Low $" min="0" step="0.01" style="flex:1">
+        <span style="color:#aaa;font-size:13px">–</span>
+        <input type="number" id="moneyIdeaIncHigh" class="field" placeholder="High $" min="0" step="0.01" style="flex:1">
+        <select id="moneyIdeaIncFreq" class="field" style="flex:1">
+          <option value="weekly">Weekly</option>
+          <option value="biweekly">Biweekly</option>
+          <option value="monthly">Monthly</option>
+          <option value="yearly">Yearly</option>
+          <option value="oneoff">One-off</option>
+        </select>
+      </div>
       <label class="field-label">Notes <span class="optional">optional</span></label>
       <textarea id="moneyIdeaNotes" class="field" rows="3" placeholder="Details, next steps, potential..."></textarea>
     </div>
@@ -1269,6 +1297,7 @@
   <button id="taskCtxDuplicate" class="ctx-menu-item">⧉ Duplicate task</button>
 </div>
 
-<script src="app.js?v=53"></script>
+<div id="printArea" style="display:none"></div>
+<script src="app.js?v=54"></script>
 </body>
 </html>
