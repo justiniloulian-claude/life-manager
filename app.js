@@ -5011,6 +5011,15 @@ function initKeyboardShortcuts() {
       else if(page==='calendar'){ var now2=new Date(); state.calYear=now2.getFullYear(); state.calMonth=now2.getMonth(); renderCalendar(); }
       return;
     }
+
+    if(e.key==='d'||e.key==='D'){
+      e.preventDefault();
+      // Always go to Dashboard 7-day view
+      switchPage('dashboard');
+      state.dayOffset=0; state.weekStart=0;
+      setDashView('seven');
+      return;
+    }
   });
 }
 
