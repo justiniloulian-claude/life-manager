@@ -4815,10 +4815,6 @@ function initListeners() {
     m.addEventListener('click',function(e){if(e.target===m&&_mdOnBackdrop)m.classList.remove('open');});
   });
 
-  // Export / Import
-  document.getElementById('exportDataBtn').addEventListener('click', exportAllData);
-  document.getElementById('importDataInput').addEventListener('change', function(){ importAllData(this.files[0]); this.value=''; });
-
   initKeyboardShortcuts();
 }
 
@@ -4959,43 +4955,6 @@ function printCalendar(mode) {
     html+='</div>';
   }
   var w=window.open('','_blank'); w.document.write(buildPrintHTML('Calendar — '+monthName,html)); w.document.close(); w.print();
-}
-
-// ============================================================
-// DATA EXPORT / IMPORT
-// ============================================================
-function exportAllData() {
-  var keys=['dm_tasks','dm_routine','dm_routineOverrides','dm_calEvents','dm_notes','dm_noteFolders',
-    'dm_shortterm','dm_longterm','dm_learning','dm_finIncome','dm_finExpenses','dm_finBonuses',
-    'dm_finWishlist','dm_moneymaking','dm_cheshbon','dm_reflections','dm_freeRefl',
-    'dm_reminders','dm_health','dm_finPoints','dm_task_order'];
-  var out={_exported:new Date().toISOString()};
-  keys.forEach(function(k){var v=localStorage.getItem(k);if(v)out[k]=JSON.parse(v);});
-  for(var i=0;i<localStorage.length;i++){
-    var k2=localStorage.key(i);
-    if(k2&&k2.startsWith('dm_jewish_hol_'))out[k2]=JSON.parse(localStorage.getItem(k2));
-  }
-  var blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
-  var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download='life-manager-backup-'+new Date().toISOString().slice(0,10)+'.json';
-  a.click(); URL.revokeObjectURL(a.href);
-}
-function importAllData(file) {
-  if(!file)return;
-  var reader=new FileReader();
-  reader.onload=function(e){
-    try{
-      var d=JSON.parse(e.target.result);
-      if(!confirm('This will replace ALL your current data with the backup. Continue?'))return;
-      Object.keys(d).forEach(function(k){
-        if(k==='_exported')return;
-        localStorage.setItem(k,JSON.stringify(d[k]));
-      });
-      alert('Data restored! The page will now reload.');
-      location.reload();
-    }catch(err){alert('Invalid backup file.');}
-  };
-  reader.readAsText(file);
 }
 
 // ============================================================
