@@ -1,6 +1,65 @@
 'use strict';
 
 // ============================================================
+// FIREBASE — init, auth, sync
+// ============================================================
+var _fbConfig = {
+  apiKey: "AIzaSyC1kbQL6IuXPoz-ITVdWM7aeHEcw650QiQ",
+  authDomain: "justin-dashboard-b2746.firebaseapp.com",
+  projectId: "justin-dashboard-b2746",
+  storageBucket: "justin-dashboard-b2746.firebasestorage.app",
+  messagingSenderId: "233340003395",
+  appId: "1:233340003395:web:e1697b61e9edc3899e20f6"
+};
+firebase.initializeApp(_fbConfig);
+var _db   = firebase.firestore();
+var _auth = firebase.auth();
+var _uid  = null;   // set after login
+var _appInited = false;
+
+// Patch localStorage.setItem so every dm_ write auto-syncs to Firestore
+var _origSetItem = localStorage.setItem.bind(localStorage);
+localStorage.setItem = function(key, value) {
+  _origSetItem(key, value);
+  if(_uid && key && key.startsWith('dm_')) _scheduleFSSync();
+};
+
+var _syncTimer = null;
+function _scheduleFSSync() {
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(_doFSSync, 1500);
+}
+function _doFSSync() {
+  if(!_uid) return;
+  var batch = _db.batch();
+  var ref = _db.collection('users').doc(_uid).collection('appdata');
+  for(var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if(k && k.startsWith('dm_')) {
+      // Firestore doc ids can't have certain chars — encode slashes
+      var docId = k.replace(/\//g,'__');
+      batch.set(ref.doc(docId), { key: k, val: localStorage.getItem(k) });
+    }
+  }
+  batch.commit().catch(function(err){ console.warn('FS sync error:', err); });
+}
+
+function _loadFromFS(uid, cb) {
+  _db.collection('users').doc(uid).collection('appdata').get()
+    .then(function(snap) {
+      snap.forEach(function(doc) {
+        var d = doc.data();
+        if(d.key && d.val !== undefined) _origSetItem(d.key, d.val);
+      });
+      cb();
+    })
+    .catch(function(err) {
+      console.warn('FS load error:', err);
+      cb(); // still boot the app even if cloud load fails
+    });
+}
+
+// ============================================================
 // COLOR OPTIONS
 // ============================================================
 const COLORS = [
@@ -5063,4 +5122,44 @@ function updateDarkToggleIcon(){
   if(btn) btn.textContent=document.body.classList.contains('dark-mode')?'☀️':'🌙';
 }
 
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', function() {
+  // Login button
+  document.getElementById('loginBtn').addEventListener('click', _doLogin);
+  document.getElementById('loginPassword').addEventListener('keydown', function(e){
+    if(e.key==='Enter') _doLogin();
+  });
+
+  // Auth state — fires on page load
+  _auth.onAuthStateChanged(function(user) {
+    if(user) {
+      _uid = user.uid;
+      if(!_appInited) {
+        // Show loading, pull cloud data, then boot
+        document.getElementById('loginLoading').style.display = 'block';
+        document.getElementById('loginBtn').style.display = 'none';
+        _loadFromFS(user.uid, function() {
+          _appInited = true;
+          document.getElementById('loginOverlay').style.display = 'none';
+          init();
+        });
+      }
+    } else {
+      _uid = null;
+      document.getElementById('loginOverlay').style.display = 'flex';
+    }
+  });
+});
+
+function _doLogin() {
+  var email = document.getElementById('loginEmail').value.trim();
+  var pw    = document.getElementById('loginPassword').value;
+  var errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+  if(!email || !pw){ errEl.textContent = 'Please enter email and password.'; return; }
+  document.getElementById('loginBtn').disabled = true;
+  _auth.signInWithEmailAndPassword(email, pw)
+    .catch(function(e) {
+      document.getElementById('loginBtn').disabled = false;
+      errEl.textContent = 'Incorrect email or password. Try again.';
+    });
+}
