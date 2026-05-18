@@ -2813,6 +2813,7 @@ window.closeMobFolderDrawer = function() {
 // ============================================================
 window.compactCardClick = function(ds, e) {
   if (e.target.closest('button,input,a')) return;
+  state.sevenSelectedDs = ds; // track which day was last clicked in 7-day view
   openDashDayPopup(ds);
 };
 window.taskClick = function(ds, id, isR, e) {
@@ -5210,9 +5211,18 @@ function initKeyboardShortcuts() {
 
     var page=state.currentPage||'dashboard';
 
-    if(e.key==='n'||e.key==='N'){
+    if(e.key==='a'||e.key==='A'){
       e.preventDefault();
-      if(page==='dashboard'){ var ds=toDateStr(dateFromOffset(state.dayOffset)); openAddTask(ds); }
+      if(page==='dashboard'){
+        var ds;
+        if(state.dashView==='seven'){
+          // Use last-clicked day card, or fall back to today
+          ds = state.sevenSelectedDs || toDateStr(new Date());
+        } else {
+          ds = toDateStr(dateFromOffset(state.dayOffset));
+        }
+        openAddTask(ds);
+      }
       else if(page==='notes'){ openNoteModal(); }
       else if(page==='calendar'){ openAddCalEvent(toDateStr(new Date())); }
       else if(page==='learning'){ var todayDow=new Date().getDay(); var td=LEARNING_DAYS.find(function(d){return LRN_DAY_DOW[d]===todayDow;})||LEARNING_DAYS[0]; openAddLearningItem(td); }
@@ -5222,7 +5232,7 @@ function initKeyboardShortcuts() {
     if(e.key==='ArrowLeft'){
       e.preventDefault();
       if(page==='dashboard'){
-        // Always switch to single-day view so dayOffset tracks which day N targets
+        // Always switch to single-day view so dayOffset tracks which day A targets
         state.dayOffset--;
         setDashView('single');
       } else if(page==='calendar'){
