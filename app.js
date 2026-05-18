@@ -47,10 +47,17 @@ function _doFSSync() {
 function _loadFromFS(uid, cb) {
   _db.collection('users').doc(uid).collection('appdata').get()
     .then(function(snap) {
-      snap.forEach(function(doc) {
-        var d = doc.data();
-        if(d.key && d.val !== undefined) _origSetItem(d.key, d.val);
-      });
+      if(snap.empty) {
+        // Firestore is empty — first login on this device.
+        // Upload all existing localStorage data so it's backed up immediately.
+        _doFSSync();
+      } else {
+        // Firestore has data — load it into localStorage (cloud is the source of truth)
+        snap.forEach(function(doc) {
+          var d = doc.data();
+          if(d.key && d.val !== undefined) _origSetItem(d.key, d.val);
+        });
+      }
       cb();
     })
     .catch(function(err) {
