@@ -3905,12 +3905,21 @@ function setNoteType(type) {
 }
 function renderCheckItems() {
   document.getElementById('noteCheckItems').innerHTML=state.noteCheckItems.map(function(item,i){
-    return '<div class="check-input-row">'+'<input type="checkbox"'+(item.done?' checked':'')+' onchange="toggleCheckItem('+i+')">'+'<input type="text" value="'+escHtml(item.text)+'" placeholder="List item..." oninput="updateCheckItem('+i+', this.value)">'+'<button class="btn-icon" onclick="removeCheckItem('+i+')">✕</button></div>';
+    return '<div class="check-input-row">'+'<input type="checkbox"'+(item.done?' checked':'')+' onchange="toggleCheckItem('+i+')">'+'<input type="text" value="'+escHtml(item.text)+'" placeholder="List item..." oninput="updateCheckItem('+i+', this.value)" onkeydown="createCheckEnter(event,'+i+')">'+'<button class="btn-icon" onclick="removeCheckItem('+i+')">✕</button></div>';
   }).join('');
 }
 window.toggleCheckItem = function(i){ state.noteCheckItems[i].done=!state.noteCheckItems[i].done; renderCheckItems(); };
 window.updateCheckItem = function(i,v){ state.noteCheckItems[i].text=v; };
 window.removeCheckItem = function(i){ state.noteCheckItems.splice(i,1); renderCheckItems(); };
+window.createCheckEnter = function(e,i){
+  if(e.key!=='Enter')return;
+  e.preventDefault();
+  state.noteCheckItems[i].text=e.target.value;
+  state.noteCheckItems.splice(i+1,0,{id:uid(),text:'',done:false});
+  renderCheckItems();
+  var inputs=document.getElementById('noteCheckItems').querySelectorAll('input[type="text"]');
+  if(inputs[i+1])inputs[i+1].focus();
+};
 
 function populateFolderSelect(selectedIds) {
   var ids=Array.isArray(selectedIds)?selectedIds:(selectedIds?[selectedIds]:[]);
