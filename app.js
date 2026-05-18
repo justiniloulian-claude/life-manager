@@ -5081,9 +5081,8 @@ function initKeyboardShortcuts() {
     if(e.key==='d'||e.key==='D'){
       e.preventDefault();
       // Always go to Dashboard 7-day view
-      switchPage('dashboard');
       state.dayOffset=0; state.weekStart=0;
-      setDashView('seven');
+      showPage('dashboard');
       return;
     }
   });
