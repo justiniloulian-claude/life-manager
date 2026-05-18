@@ -53,17 +53,25 @@ function _doFSSync() {
   batch.commit().catch(function(err){ console.warn('FS sync error:', err); });
 }
 
+function _hasLocalData() {
+  for(var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if(k && k.startsWith('dm_') && k !== 'dm_darkMode' && k !== 'dm_localTS') return true;
+  }
+  return false;
+}
+
 function _loadFromFS(uid, cb) {
   _db.collection('users').doc(uid).collection('appdata').get()
     .then(function(snap) {
       if(snap.empty) {
-        // First ever login — upload everything that's in localStorage
+        // Firestore empty — first ever login, upload what's here
         _doFSSync();
         cb();
         return;
       }
 
-      // Read Firestore's cloud timestamp
+      // Read Firestore's cloud timestamp and all docs
       var cloudTS = 0;
       var docs = [];
       snap.forEach(function(doc) {
@@ -72,15 +80,23 @@ function _loadFromFS(uid, cb) {
         else if(d.key && d.val !== undefined) docs.push(d);
       });
 
-      // Read this device's local timestamp
-      var localTS = parseInt(_origGetItem('dm_localTS')) || 0;
+      var localTS  = parseInt(_origGetItem('dm_localTS')) || 0;
+      var hasLocal = _hasLocalData();
 
-      if(cloudTS > localTS) {
-        // Another device made changes more recently — load from Firestore
+      if(hasLocal && localTS === 0) {
+        // Device has data but hasn't run the new timestamp system yet.
+        // Trust local — it was just modified this session. Upload it.
+        _doFSSync();
+        cb();
+        return;
+      }
+
+      if(!hasLocal || cloudTS > localTS) {
+        // No local data (new device) OR cloud is provably newer — load from Firestore
         docs.forEach(function(d) { _origSetItem(d.key, d.val); });
-        _origSetItem('dm_localTS', String(cloudTS)); // align local TS
+        _origSetItem('dm_localTS', String(cloudTS));
       } else {
-        // This device is up to date or ahead — push local data up to Firestore
+        // Local is same age or newer — use it, push up to Firestore
         _doFSSync();
       }
       cb();
