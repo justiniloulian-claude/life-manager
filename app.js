@@ -4853,22 +4853,30 @@ function printCalendar(mode) {
   var monthName=new Date(year,month,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});
   var html='<h1>Calendar — '+monthName+'</h1>';
   if(mode==='list'){
-    // Build list of all events this month
+    // Build list of all events + holidays this month
     var firstDay=new Date(year,month,1); var lastDay=new Date(year,month+1,0);
     var allEvents=[];
     for(var d=new Date(firstDay);d<=lastDay;d.setDate(d.getDate()+1)){
-      var ds=toDateStr(d); var evs=getEventsForDate(ds);
-      evs.forEach(function(ev){allEvents.push({ds:ds,ev:ev});});
+      var ds=toDateStr(d);
+      var evs=getEventsForDate(ds);
+      var hols=getHolidaysForDate(ds);
+      evs.forEach(function(ev){allEvents.push({ds:ds,item:ev,isHol:false});});
+      hols.forEach(function(h){allEvents.push({ds:ds,item:h,isHol:true});});
     }
     if(!allEvents.length){html+='<div class="empty">No events this month.</div>';}
     else{
       allEvents.forEach(function(e){
         var d=fromDateStr(e.ds);
-        html+='<div class="task"><strong>'+d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+'</strong> — '+(e.ev.time?fmt12(e.ev.time)+' ':'')+''+escHtml(e.ev.title)+'</div>';
+        var prefix=e.isHol?(e.item._holType==='jewish'?'✡️ ':'🇺🇸 '):'';
+        var timeStr=(!e.isHol&&e.item.time)?fmt12(e.item.time)+' ':'';
+        var color=e.isHol?(e.item._holType==='jewish'?'#fef3c7':'#fee2e2'):'transparent';
+        html+='<div class="task" style="background:'+color+';padding:4px 6px;border-radius:4px;margin-bottom:3px">'+
+          '<strong>'+d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+'</strong> — '+
+          timeStr+prefix+escHtml(e.item.title)+'</div>';
       });
     }
   } else {
-    // Grid mode
+    // Grid mode — include holidays
     var firstDay2=new Date(year,month,1); var startDow=firstDay2.getDay();
     var daysInMonth=new Date(year,month+1,0).getDate();
     html+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;font-size:12px">';
@@ -4877,7 +4885,13 @@ function printCalendar(mode) {
     for(var day=1;day<=daysInMonth;day++){
       var ds2=toDateStr(new Date(year,month,day));
       var evs2=getEventsForDate(ds2);
+      var hols2=getHolidaysForDate(ds2);
       html+='<div style="min-height:60px;border:1px solid #eee;padding:4px;vertical-align:top"><div style="font-weight:600">'+day+'</div>';
+      hols2.forEach(function(h){
+        var bg=h._holType==='jewish'?'#fef3c7':'#fee2e2';
+        var icon=h._holType==='jewish'?'✡️ ':'🇺🇸 ';
+        html+='<div style="font-size:10px;background:'+bg+';border-radius:3px;padding:1px 3px;margin-top:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">'+icon+escHtml(h.title)+'</div>';
+      });
       evs2.forEach(function(ev){html+='<div style="font-size:10px;background:#e0e7ff;border-radius:3px;padding:1px 3px;margin-top:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">'+escHtml(ev.title)+'</div>';});
       html+='</div>';
     }
