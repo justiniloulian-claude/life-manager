@@ -2356,6 +2356,11 @@ textarea.field { resize: vertical; }
 .btn-record-stop  { padding:8px 16px; background:#666; color:#fff; border:none; border-radius:8px; cursor:pointer; font-family:inherit; font-size:13px; }
 .btn-record-pause { padding:8px 16px; background:#f59e0b; color:#fff; border:none; border-radius:8px; cursor:pointer; font-family:inherit; font-size:13px; font-weight:500; }
 .btn-record-pause:hover { background:#d97706; }
+.audio-player-wrap { margin-top: 8px; }
+.audio-speed-row { display:flex; align-items:center; gap:8px; margin-top:6px; }
+.audio-speed-label { font-size:12px; color:#888; }
+.audio-speed-select { font-size:13px; padding:3px 8px; border:1.5px solid #e0e0e0; border-radius:6px; background:#fff; cursor:pointer; font-family:inherit; }
+.audio-speed-select:focus { outline:none; border-color:#7c3aed; }
 .record-timer { font-size:14px; font-weight:600; color:#666; font-variant-numeric:tabular-nums; }
 .jewish-hist-entry { padding:10px 14px; border:1px solid #f0f0f0; border-radius:8px; margin-bottom:6px; }
 .jewish-hist-month { font-weight:500; font-size:13px; }

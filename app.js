@@ -1589,7 +1589,7 @@ window.startRecording = function() {
       _currentAudioBlob = new Blob(_audioChunks, {type: mime});
       var url = URL.createObjectURL(_currentAudioBlob);
       var ap = document.getElementById('audioPlayback');
-      if (ap) ap.innerHTML = '<audio controls src="'+url+'" style="width:100%;margin-top:4px"></audio>';
+      if (ap) ap.innerHTML = buildAudioPlayerHTML(url, 'preview-player');
       stream.getTracks().forEach(function(t){t.stop();});
     });
     _mediaRecorder.start(250); // collect chunks every 250ms for reliability
@@ -1689,7 +1689,7 @@ function renderJewishHist() {
           '<button class="btn-icon" style="color:#e53e3e;font-size:14px" title="Delete entry" onclick="deleteJewishEntry(\''+e.id+'\',\''+e.audioKey+'\')">🗑</button>'+
         '</span>'+
       '</div>'+
-      (e.audioKey ? '<button class="btn-secondary" style="font-size:12px;padding:4px 10px;margin-top:6px" onclick="playJewishAudio(\''+e.audioKey+'\')">▶ Play</button>' : '')+
+      (e.audioKey ? '<button class="btn-secondary" style="font-size:12px;padding:4px 10px;margin-top:6px" onclick="playJewishAudio(\''+e.audioKey+'\',this)">▶ Play</button>' : '')+
     '</div>';
   }).join('');
 }
@@ -1726,12 +1726,42 @@ function renderSecularHist() {
   }).join('');
 }
 
-window.playJewishAudio = function(key) {
+function buildAudioPlayerHTML(url, playerId) {
+  var speeds = [0.5,0.6,0.7,0.8,0.9,1.0,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0];
+  var opts = speeds.map(function(s){
+    return '<option value="'+s+'"'+(s===1.0?' selected':'')+'>'+s.toFixed(1)+'×</option>';
+  }).join('');
+  return '<div class="audio-player-wrap" id="'+playerId+'">'+
+    '<audio id="'+playerId+'-el" controls src="'+url+'" style="width:100%;display:block"></audio>'+
+    '<div class="audio-speed-row">'+
+      '<span class="audio-speed-label">Speed:</span>'+
+      '<select class="audio-speed-select" onchange="setAudioSpeed(\''+playerId+'\',this.value)">'+opts+'</select>'+
+    '</div>'+
+  '</div>';
+}
+
+window.setAudioSpeed = function(playerId, speed) {
+  var el = document.getElementById(playerId+'-el');
+  if (el) el.playbackRate = parseFloat(speed);
+};
+
+window.playJewishAudio = function(key, btnEl) {
+  // Toggle inline player in the entry row
+  var entry = btnEl ? btnEl.closest('.jewish-hist-entry') : null;
+  var existingPlayer = entry ? entry.querySelector('.audio-player-wrap') : null;
+  if (existingPlayer) { existingPlayer.remove(); btnEl.textContent='▶ Play'; return; }
+
   loadAudioBlob(key).then(function(blob) {
     if (!blob) { alert('Audio not found.'); return; }
     var url = URL.createObjectURL(blob);
-    var audio = new Audio(url);
-    audio.play();
+    var playerId = 'jp-'+key.slice(0,8);
+    var html = buildAudioPlayerHTML(url, playerId);
+    if (entry) {
+      entry.insertAdjacentHTML('beforeend', html);
+      if (btnEl) btnEl.textContent = '⏹ Close';
+      // Auto-play
+      setTimeout(function(){ var el=document.getElementById(playerId+'-el'); if(el) el.play(); }, 50);
+    }
   });
 };
 
