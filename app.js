@@ -295,7 +295,7 @@ function saveMSD(v)  { localStorage.setItem('dm_monthly_secular_draft',     JSON
 function uid()      { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 
 // Module-level media recorder state
-var _mediaRecorder=null, _audioChunks=[], _recordTimerInt=null, _recordSecs=0, _currentAudioBlob=null;
+var _mediaRecorder=null, _audioChunks=[], _recordTimerInt=null, _recordSecs=0, _currentAudioBlob=null, _recordMime='';
 
 // Note editor undo/redo (contenteditable — use browser execCommand)
 var _noteUndoTimer=null;
@@ -341,6 +341,15 @@ function loadAudioBlob(key) {
       var req = tx.objectStore('recordings').get(key);
       req.onsuccess = function(e) { resolve(e.target.result || null); };
       req.onerror   = reject;
+    });
+  });
+}
+function deleteAudioBlob(key) {
+  return openAudioDB().then(function(db) {
+    return new Promise(function(resolve) {
+      var tx = db.transaction('recordings', 'readwrite');
+      tx.objectStore('recordings').delete(key);
+      tx.oncomplete = resolve; tx.onerror = resolve;
     });
   });
 }
@@ -1543,40 +1552,82 @@ window.saveSecularDraft = function() {
   saveMSD({month: m, text: t});
 };
 
+function _getSupportedMime() {
+  var types = ['audio/mp4','audio/mpeg','audio/webm;codecs=opus','audio/webm','audio/ogg'];
+  for (var i = 0; i < types.length; i++) {
+    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(types[i])) return types[i];
+  }
+  return '';
+}
+
+function _startRecordTimer() {
+  clearInterval(_recordTimerInt);
+  _recordTimerInt = setInterval(function() {
+    _recordSecs++;
+    var m = Math.floor(_recordSecs/60), s = _recordSecs%60;
+    var el = document.getElementById('recordTimer');
+    if (el) el.textContent = m+':'+(s<10?'0':'')+s;
+  }, 1000);
+}
+
 window.startRecording = function() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     alert('Microphone access is not available in this browser.'); return;
   }
   navigator.mediaDevices.getUserMedia({audio: true}).then(function(stream) {
     _audioChunks = []; _recordSecs = 0; _currentAudioBlob = null;
-    _mediaRecorder = new MediaRecorder(stream);
-    _mediaRecorder.addEventListener('dataavailable', function(e) { _audioChunks.push(e.data); });
+    _recordMime = _getSupportedMime();
+    try {
+      _mediaRecorder = _recordMime ? new MediaRecorder(stream, {mimeType: _recordMime}) : new MediaRecorder(stream);
+    } catch(e) {
+      _mediaRecorder = new MediaRecorder(stream);
+      _recordMime = '';
+    }
+    _mediaRecorder.addEventListener('dataavailable', function(e) { if (e.data && e.data.size > 0) _audioChunks.push(e.data); });
     _mediaRecorder.addEventListener('stop', function() {
-      _currentAudioBlob = new Blob(_audioChunks, {type: 'audio/webm'});
+      var mime = _recordMime || 'audio/webm';
+      _currentAudioBlob = new Blob(_audioChunks, {type: mime});
       var url = URL.createObjectURL(_currentAudioBlob);
       var ap = document.getElementById('audioPlayback');
       if (ap) ap.innerHTML = '<audio controls src="'+url+'" style="width:100%;margin-top:4px"></audio>';
       stream.getTracks().forEach(function(t){t.stop();});
     });
-    _mediaRecorder.start();
-    document.getElementById('btnStartRecord').style.display = 'none';
-    document.getElementById('btnStopRecord').style.display  = '';
-    document.getElementById('recordTimer').style.display    = '';
-    _recordTimerInt = setInterval(function() {
-      _recordSecs++;
-      var m = Math.floor(_recordSecs/60), s = _recordSecs%60;
-      var el = document.getElementById('recordTimer');
-      if (el) el.textContent = m+':'+(s<10?'0':'')+s;
-    }, 1000);
+    _mediaRecorder.start(250); // collect chunks every 250ms for reliability
+    document.getElementById('btnStartRecord').style.display  = 'none';
+    document.getElementById('btnStopRecord').style.display   = '';
+    document.getElementById('btnPauseRecord').style.display  = '';
+    document.getElementById('btnPauseRecord').textContent    = '⏸ Pause';
+    document.getElementById('recordTimer').style.display     = '';
+    _startRecordTimer();
   }).catch(function(err) { alert('Could not access microphone: '+err.message); });
+};
+
+window.pauseRecording = function() {
+  if (!_mediaRecorder) return;
+  var btn = document.getElementById('btnPauseRecord');
+  var timerEl = document.getElementById('recordTimer');
+  if (_mediaRecorder.state === 'recording') {
+    _mediaRecorder.pause();
+    clearInterval(_recordTimerInt);
+    if (btn) btn.textContent = '▶ Resume';
+    if (timerEl) timerEl.style.opacity = '0.4';
+  } else if (_mediaRecorder.state === 'paused') {
+    _mediaRecorder.resume();
+    _startRecordTimer();
+    if (btn) btn.textContent = '⏸ Pause';
+    if (timerEl) timerEl.style.opacity = '1';
+  }
 };
 
 window.stopRecording = function() {
   if (_mediaRecorder && _mediaRecorder.state !== 'inactive') _mediaRecorder.stop();
   clearInterval(_recordTimerInt);
-  document.getElementById('btnStartRecord').style.display = '';
-  document.getElementById('btnStopRecord').style.display  = 'none';
-  document.getElementById('recordTimer').style.display    = 'none';
+  document.getElementById('btnStartRecord').style.display  = '';
+  document.getElementById('btnStopRecord').style.display   = 'none';
+  document.getElementById('btnPauseRecord').style.display  = 'none';
+  document.getElementById('recordTimer').style.display     = 'none';
+  var timerEl = document.getElementById('recordTimer');
+  if (timerEl) timerEl.style.opacity = '1';
 };
 
 window.storeJewishMonth = function() {
@@ -1631,14 +1682,26 @@ function renderJewishHist() {
   list.innerHTML = entries.map(function(e) {
     var dt = new Date(e.storedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
     return '<div class="jewish-hist-entry">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'+
         '<span class="jewish-hist-month">'+escHtml(e.month)+'</span>'+
-        '<span class="jewish-hist-date">'+escHtml(dt)+'</span>'+
+        '<span style="display:flex;align-items:center;gap:6px;flex-shrink:0">'+
+          '<span class="jewish-hist-date">'+escHtml(dt)+'</span>'+
+          '<button class="btn-icon" style="color:#e53e3e;font-size:14px" title="Delete entry" onclick="deleteJewishEntry(\''+e.id+'\',\''+e.audioKey+'\')">🗑</button>'+
+        '</span>'+
       '</div>'+
       (e.audioKey ? '<button class="btn-secondary" style="font-size:12px;padding:4px 10px;margin-top:6px" onclick="playJewishAudio(\''+e.audioKey+'\')">▶ Play</button>' : '')+
     '</div>';
   }).join('');
 }
+
+window.deleteJewishEntry = function(id, audioKey) {
+  if (!confirm('Delete this entry?')) return;
+  var data = getData();
+  data.monthlyJewishHistory = data.monthlyJewishHistory.filter(function(e){ return e.id !== id; });
+  saveMJH(data.monthlyJewishHistory);
+  if (audioKey) deleteAudioBlob(audioKey);
+  renderJewishHist();
+};
 
 function renderSecularHist() {
   var data = getData();

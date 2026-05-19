@@ -1,4 +1,4 @@
-const CACHE = 'life-manager-v74';
+const CACHE = 'life-manager-v75';
 const ASSETS = ['./', './index.html', './app.js', './style.css'];
 
 self.addEventListener('install', e => {

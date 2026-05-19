@@ -2353,7 +2353,9 @@ textarea.field { resize: vertical; }
 .record-controls { display:flex; align-items:center; gap:10px; margin:12px 0; flex-wrap:wrap; }
 .btn-record { padding:8px 16px; background:#ef4444; color:#fff; border:none; border-radius:8px; cursor:pointer; font-family:inherit; font-size:13px; font-weight:500; }
 .btn-record:hover { background:#dc2626; }
-.btn-record-stop { padding:8px 16px; background:#666; color:#fff; border:none; border-radius:8px; cursor:pointer; font-family:inherit; font-size:13px; }
+.btn-record-stop  { padding:8px 16px; background:#666; color:#fff; border:none; border-radius:8px; cursor:pointer; font-family:inherit; font-size:13px; }
+.btn-record-pause { padding:8px 16px; background:#f59e0b; color:#fff; border:none; border-radius:8px; cursor:pointer; font-family:inherit; font-size:13px; font-weight:500; }
+.btn-record-pause:hover { background:#d97706; }
 .record-timer { font-size:14px; font-weight:600; color:#666; font-variant-numeric:tabular-nums; }
 .jewish-hist-entry { padding:10px 14px; border:1px solid #f0f0f0; border-radius:8px; margin-bottom:6px; }
 .jewish-hist-month { font-weight:500; font-size:13px; }
