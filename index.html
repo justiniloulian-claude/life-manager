@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Life Manager">
   <title>Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=76">
+  <link rel="stylesheet" href="style.css?v=77">
 </head>
 <body>
 
@@ -231,7 +231,8 @@
             <button id="btnStopRecord" class="btn-record-stop" onclick="stopRecording()" style="display:none">⏹ Stop</button>
             <span id="recordTimer" class="record-timer" style="display:none">0:00</span>
           </div>
-          <div id="audioPlayback" style="margin-bottom:10px"></div>
+          <div id="audioPlayback" style="margin-bottom:6px"></div>
+          <button id="btnDiscardRecording" class="btn-record-discard" onclick="discardRecording()" style="display:none">✕ Discard Recording</button>
           <button class="btn-primary" style="font-size:13px;padding:7px 16px" onclick="storeJewishMonth()">Store Entry</button>
           <div class="hist-section">
             <div class="hist-section-hdr">
@@ -1373,6 +1374,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="app.js?v=76"></script>
+<script src="app.js?v=77"></script>
 </body>
 </html>

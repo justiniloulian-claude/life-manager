@@ -1590,6 +1590,8 @@ window.startRecording = function() {
       var url = URL.createObjectURL(_currentAudioBlob);
       var ap = document.getElementById('audioPlayback');
       if (ap) ap.innerHTML = buildAudioPlayerHTML(url, 'preview-player');
+      var db = document.getElementById('btnDiscardRecording');
+      if (db) db.style.display = '';
       stream.getTracks().forEach(function(t){t.stop();});
     });
     _mediaRecorder.start(250); // collect chunks every 250ms for reliability
@@ -1630,6 +1632,13 @@ window.stopRecording = function() {
   if (timerEl) timerEl.style.opacity = '1';
 };
 
+window.discardRecording = function() {
+  _currentAudioBlob = null;
+  _audioChunks = [];
+  var ap = document.getElementById('audioPlayback'); if (ap) ap.innerHTML = '';
+  var db = document.getElementById('btnDiscardRecording'); if (db) db.style.display = 'none';
+};
+
 window.storeJewishMonth = function() {
   var month = (document.getElementById('jewishMonthInput')||{}).value.trim();
   if (!month) { alert('Please enter a Jewish month name.'); return; }
@@ -1643,6 +1652,7 @@ window.storeJewishMonth = function() {
     saveMJD({month: ''});
     var ji = document.getElementById('jewishMonthInput'); if (ji) ji.value = '';
     var ap = document.getElementById('audioPlayback'); if (ap) ap.innerHTML = '';
+    var db = document.getElementById('btnDiscardRecording'); if (db) db.style.display = 'none';
     _currentAudioBlob = null;
     renderJewishHist();
   };
