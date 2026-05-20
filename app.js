@@ -81,16 +81,11 @@ function _loadFromFS(uid, cb) {
   }
 
   if(hasLocal) {
+    // Boot instantly from localStorage — edits survive refresh without touching Firestore.
     cb();
     _startRealtimeListener(uid);
-    // One-time migration: push all local data to Firestore tagged with our deviceId.
-    // This converts any legacy untagged Firestore data so the listener can tell
-    // own-writes from cross-device writes going forward.
-    if(!_origGetItem('dm_v88synced')) {
-      _origSetItem('dm_v88synced', '1');
-      setTimeout(_doFSFullSync, 1500); // slight delay so app renders first
-    }
   } else {
+    // No local data (new device / cleared storage) — pull from Firestore first.
     _db.collection('users').doc(uid).collection('appdata').get()
       .then(function(snap) {
         snap.forEach(function(doc) {
@@ -100,11 +95,6 @@ function _loadFromFS(uid, cb) {
         if(snap.empty) _doFSFullSync();
         cb();
         _startRealtimeListener(uid);
-        // Tag newly-loaded data in Firestore as ours
-        if(!_origGetItem('dm_v88synced')) {
-          _origSetItem('dm_v88synced', '1');
-          setTimeout(_doFSFullSync, 1500);
-        }
       })
       .catch(function() { cb(); _startRealtimeListener(uid); });
   }
