@@ -16,23 +16,24 @@ var _db   = firebase.firestore();
 var _auth = firebase.auth();
 var _uid  = null;
 var _appInited = false;
-var _fsUnsubscribe = null;  // real-time listener handle
-var _ownSyncTS = 0;         // timestamp of our last write — used to ignore our own snapshots
+var _fsUnsubscribe = null;
+var _ownSyncTS = 0;
+
+// Enable offline persistence — writes go to IndexedDB immediately so a refresh
+// before the server confirms will still return the updated data on next .get()
+_db.enablePersistence({ synchronizeTabs: true }).catch(function(err) {
+  console.warn('Firestore persistence unavailable:', err.code);
+});
 
 // Patch localStorage so every dm_ write auto-syncs to Firestore IMMEDIATELY
 var _origSetItem = localStorage.setItem.bind(localStorage);
 var _origGetItem = localStorage.getItem.bind(localStorage);
 localStorage.setItem = function(key, value) {
   _origSetItem(key, value);
-  if(key && key.startsWith('dm_') && key !== 'dm_pendingSync') {
-    // Mark that we have a local write not yet confirmed by Firestore
-    _origSetItem('dm_pendingSync', '1');
-    if(_uid) _fsSaveKey(key, value);
-  }
+  if(_uid && key && key.startsWith('dm_')) _fsSaveKey(key, value);
 };
 
 // Write a single changed key to Firestore right now — no delay
-// Clears dm_pendingSync only after the write is confirmed
 function _fsSaveKey(key, value) {
   if(!_uid) return;
   var now = Date.now();
@@ -41,13 +42,10 @@ function _fsSaveKey(key, value) {
   var ref = _db.collection('users').doc(_uid).collection('appdata');
   batch.set(ref.doc(key.replace(/\//g,'__')), { key: key, val: value });
   batch.set(ref.doc('_syncTS'), { val: String(now) });
-  batch.commit()
-    .then(function() { _origSetItem('dm_pendingSync', '0'); })
-    .catch(function(err){ console.warn('FS write err:', err); });
+  batch.commit().catch(function(err){ console.warn('FS write err:', err); });
 }
 
-// Full sync — writes every dm_ key to Firestore
-// Clears dm_pendingSync only after confirmed
+// Full sync — writes every dm_ key to Firestore (used on first login)
 function _doFSFullSync() {
   if(!_uid) return;
   var now = Date.now();
@@ -56,44 +54,34 @@ function _doFSFullSync() {
   var ref = _db.collection('users').doc(_uid).collection('appdata');
   for(var i = 0; i < localStorage.length; i++) {
     var k = localStorage.key(i);
-    if(k && k.startsWith('dm_') && k !== 'dm_pendingSync') {
+    if(k && k.startsWith('dm_')) {
       batch.set(ref.doc(k.replace(/\//g,'__')), { key: k, val: _origGetItem(k) });
     }
   }
   batch.set(ref.doc('_syncTS'), { val: String(now) });
-  batch.commit()
-    .then(function() { _origSetItem('dm_pendingSync', '0'); })
-    .catch(function(err){ console.warn('FS full sync err:', err); });
+  batch.commit().catch(function(err){ console.warn('FS full sync err:', err); });
 }
 
-// Load all data from Firestore into localStorage, then boot the app
+// Load all data from Firestore into localStorage, then boot the app.
+// With offline persistence enabled, .get() returns IndexedDB cache data which
+// includes any writes made this session even if not yet confirmed by the server.
 function _loadFromFS(uid, cb) {
   _db.collection('users').doc(uid).collection('appdata').get()
     .then(function(snap) {
       if(snap.empty) {
-        // First ever login — upload existing localStorage data
         _doFSFullSync();
       } else {
-        // If dm_pendingSync is '1', this device had a write that may not have
-        // reached Firestore before the last reload — keep local data and push it up.
-        // Otherwise Firestore is the source of truth.
-        var hasPending = _origGetItem('dm_pendingSync') === '1';
-        if(hasPending) {
-          _doFSFullSync();
-        } else {
-          snap.forEach(function(doc) {
-            var d = doc.data();
-            if(d.key && d.val !== undefined && d.key !== 'dm_pendingSync') _origSetItem(d.key, d.val);
-          });
-        }
+        snap.forEach(function(doc) {
+          var d = doc.data();
+          if(d.key && d.val !== undefined) _origSetItem(d.key, d.val);
+        });
       }
       cb();
-      // Start real-time listener so changes from other devices appear automatically
       _startRealtimeListener(uid);
     })
     .catch(function(err) {
       console.warn('FS load error:', err);
-      cb(); // still boot even if offline
+      cb();
     });
 }
 
