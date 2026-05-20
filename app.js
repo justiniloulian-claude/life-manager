@@ -24,14 +24,15 @@ var _origSetItem = localStorage.setItem.bind(localStorage);
 var _origGetItem = localStorage.getItem.bind(localStorage);
 localStorage.setItem = function(key, value) {
   _origSetItem(key, value);
-  if(key && key.startsWith('dm_')) {
-    // Always stamp local write time so startup can compare vs Firestore
-    _origSetItem('dm_localTS', String(Date.now()));
+  if(key && key.startsWith('dm_') && key !== 'dm_pendingSync') {
+    // Mark that we have a local write not yet confirmed by Firestore
+    _origSetItem('dm_pendingSync', '1');
     if(_uid) _fsSaveKey(key, value);
   }
 };
 
 // Write a single changed key to Firestore right now — no delay
+// Clears dm_pendingSync only after the write is confirmed
 function _fsSaveKey(key, value) {
   if(!_uid) return;
   var now = Date.now();
@@ -40,15 +41,17 @@ function _fsSaveKey(key, value) {
   var ref = _db.collection('users').doc(_uid).collection('appdata');
   batch.set(ref.doc(key.replace(/\//g,'__')), { key: key, val: value });
   batch.set(ref.doc('_syncTS'), { val: String(now) });
-  batch.commit().catch(function(err){ console.warn('FS write err:', err); });
+  batch.commit()
+    .then(function() { _origSetItem('dm_pendingSync', '0'); })
+    .catch(function(err){ console.warn('FS write err:', err); });
 }
 
-// Full sync — writes every dm_ key to Firestore (used on first login & new device)
+// Full sync — writes every dm_ key to Firestore
+// Clears dm_pendingSync only after confirmed
 function _doFSFullSync() {
   if(!_uid) return;
   var now = Date.now();
   _ownSyncTS = now;
-  _origSetItem('dm_localTS', String(now));
   var batch = _db.batch();
   var ref = _db.collection('users').doc(_uid).collection('appdata');
   for(var i = 0; i < localStorage.length; i++) {
@@ -58,7 +61,9 @@ function _doFSFullSync() {
     }
   }
   batch.set(ref.doc('_syncTS'), { val: String(now) });
-  batch.commit().catch(function(err){ console.warn('FS full sync err:', err); });
+  batch.commit()
+    .then(function() { _origSetItem('dm_pendingSync', '0'); })
+    .catch(function(err){ console.warn('FS full sync err:', err); });
 }
 
 // Load all data from Firestore into localStorage, then boot the app
@@ -69,21 +74,13 @@ function _loadFromFS(uid, cb) {
         // First ever login — upload existing localStorage data
         _doFSFullSync();
       } else {
-        // Compare local write timestamp vs Firestore write timestamp
-        // If local is newer, this device made a change that hasn't reached Firestore yet —
-        // keep local data and push it up. Otherwise trust Firestore.
-        var localTS = parseInt(_origGetItem('dm_localTS') || '0');
-        var fsTS = 0;
-        snap.forEach(function(doc) {
-          if(doc.id === '_syncTS') fsTS = parseInt(doc.data().val) || 0;
-        });
-
-        if(localTS > fsTS) {
-          // Local is ahead — push local to Firestore (catches refresh-before-write-completes)
-          console.log('Local data is newer than Firestore — pushing local up');
+        // If dm_pendingSync is '1', this device had a write that may not have
+        // reached Firestore before the last reload — keep local data and push it up.
+        // Otherwise Firestore is the source of truth.
+        var hasPending = _origGetItem('dm_pendingSync') === '1';
+        if(hasPending) {
           _doFSFullSync();
         } else {
-          // Firestore is current or newer — load it
           snap.forEach(function(doc) {
             var d = doc.data();
             if(d.key && d.val !== undefined) _origSetItem(d.key, d.val);
