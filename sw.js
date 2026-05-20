@@ -1,25 +1,27 @@
-const CACHE = 'life-manager-v86';
-const ASSETS = ['./', './index.html', './app.js', './style.css'];
-
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+// v87: unregister service worker and stop caching entirely.
+// Caching was causing stale code to persist. App loads fresh from network every time.
+self.addEventListener('install', function() {
   self.skipWaiting();
 });
 
-self.addEventListener('activate', e => {
+self.addEventListener('activate', function(e) {
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    )
+    caches.keys()
+      .then(function(keys) {
+        return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+      })
+      .then(function() {
+        return self.registration.unregister();
+      })
+      .then(function() {
+        return self.clients.matchAll({ includeUncontrolled: true });
+      })
+      .then(function(clients) {
+        clients.forEach(function(c) { c.navigate(c.url); });
+      })
   );
-  self.clients.claim();
 });
 
-self.addEventListener('fetch', e => {
-  e.respondWith(
-    caches.open(CACHE).then(c =>
-      fetch(e.request).then(r => { c.put(e.request, r.clone()); return r; })
-        .catch(() => caches.match(e.request))
-    )
-  );
+self.addEventListener('fetch', function(e) {
+  e.respondWith(fetch(e.request));
 });

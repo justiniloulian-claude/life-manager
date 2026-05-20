@@ -17,15 +17,23 @@ var _auth = firebase.auth();
 var _uid  = null;
 var _appInited = false;
 var _fsUnsubscribe = null;
-var _ownSyncTS = 0;
-
-// SKIP_FS: keys that live only in localStorage, never touch Firestore
-var SKIP_FS = { 'dm_localTS': true };
 
 var _origSetItem = localStorage.setItem.bind(localStorage);
 var _origGetItem = localStorage.getItem.bind(localStorage);
 
-// Every local write: stamp dm_localTS and sync key to Firestore immediately
+// Each device gets a permanent unique ID stored in localStorage.
+// We tag every Firestore write with this ID so the listener can tell
+// "did I write this?" without any timestamp comparisons.
+var _deviceId = _origGetItem('dm_deviceId');
+if(!_deviceId) {
+  _deviceId = 'dev_' + Date.now() + '_' + Math.random().toString(36).slice(2,9);
+  _origSetItem('dm_deviceId', _deviceId);
+}
+
+// Keys that are device-local and must never be synced to/from Firestore
+var SKIP_FS = { 'dm_deviceId': true, 'dm_localTS': true };
+
+// Every local write: stamp dm_localTS and push key to Firestore immediately
 localStorage.setItem = function(key, value) {
   _origSetItem(key, value);
   if(key && key.startsWith('dm_') && !SKIP_FS[key]) {
@@ -34,23 +42,21 @@ localStorage.setItem = function(key, value) {
   }
 };
 
-// Immediately write one changed key to Firestore
+// Write one changed key to Firestore immediately, tagged with our device ID
 function _fsSaveKey(key, value) {
   if(!_uid) return;
   var now = Date.now();
-  _ownSyncTS = now;
   var batch = _db.batch();
   var ref = _db.collection('users').doc(_uid).collection('appdata');
   batch.set(ref.doc(key.replace(/\//g,'__')), { key: key, val: value });
-  batch.set(ref.doc('_syncTS'), { val: String(now) });
+  batch.set(ref.doc('_syncTS'), { val: String(now), src: _deviceId });
   batch.commit().catch(function(err){ console.warn('FS write err:', err); });
 }
 
-// Write ALL local keys to Firestore (used on first login / new device)
+// Write ALL local keys to Firestore (first login / new device)
 function _doFSFullSync() {
   if(!_uid) return;
   var now = Date.now();
-  _ownSyncTS = now;
   var batch = _db.batch();
   var ref = _db.collection('users').doc(_uid).collection('appdata');
   for(var i = 0; i < localStorage.length; i++) {
@@ -59,17 +65,15 @@ function _doFSFullSync() {
       batch.set(ref.doc(k.replace(/\//g,'__')), { key: k, val: _origGetItem(k) });
     }
   }
-  batch.set(ref.doc('_syncTS'), { val: String(now) });
+  batch.set(ref.doc('_syncTS'), { val: String(now), src: _deviceId });
   batch.commit().catch(function(err){ console.warn('FS full sync err:', err); });
 }
 
 // Boot the app.
-// CORE RULE: if this device already has local data, boot from localStorage immediately.
-// Never let a Firestore read overwrite local data that might include an in-flight write.
-// The realtime listener handles receiving newer data from other devices.
-// Only read from Firestore when localStorage has no data (new device / first login).
+// If this device has local data: boot from localStorage immediately — refresh is safe.
+// If no local data (new device / first login): load from Firestore first.
+// Cross-device updates arrive via onSnapshot after boot.
 function _loadFromFS(uid, cb) {
-  // Check for existing local data
   var hasLocal = false;
   for(var i = 0; i < localStorage.length; i++) {
     var k = localStorage.key(i);
@@ -77,21 +81,16 @@ function _loadFromFS(uid, cb) {
   }
 
   if(hasLocal) {
-    // ✅ Has local data — boot immediately, listener will sync newer remote changes
     cb();
     _startRealtimeListener(uid);
   } else {
-    // 🆕 New device or first login — must pull from Firestore first
     _db.collection('users').doc(uid).collection('appdata').get()
       .then(function(snap) {
-        if(snap.empty) {
-          _doFSFullSync();
-        } else {
-          snap.forEach(function(doc) {
-            var d = doc.data();
-            if(d.key && d.val !== undefined && !SKIP_FS[d.key]) _origSetItem(d.key, d.val);
-          });
-        }
+        snap.forEach(function(doc) {
+          var d = doc.data();
+          if(d.key && d.val !== undefined && !SKIP_FS[d.key]) _origSetItem(d.key, d.val);
+        });
+        if(snap.empty) _doFSFullSync();
         cb();
         _startRealtimeListener(uid);
       })
@@ -99,23 +98,22 @@ function _loadFromFS(uid, cb) {
   }
 }
 
-// Realtime listener — applies changes that arrived from another device
+// Realtime listener — receives updates from the other device and applies them.
+// Ignores writes that came from THIS device (tagged with _deviceId).
 function _startRealtimeListener(uid) {
   if(_fsUnsubscribe) _fsUnsubscribe();
   var ref = _db.collection('users').doc(uid).collection('appdata');
   _fsUnsubscribe = ref.onSnapshot(function(snap) {
     if(!_appInited) return;
-    var snapTS = 0;
+    // Read who wrote this snapshot
+    var snapSrc = '';
     snap.forEach(function(doc) {
-      if(doc.id === '_syncTS') snapTS = parseInt(doc.data().val) || 0;
+      if(doc.id === '_syncTS') snapSrc = doc.data().src || '';
     });
-    // Skip our own writes (snapTS matches the value we put in Firestore)
-    if(snapTS && snapTS === _ownSyncTS) return;
-    // Skip if local data is newer (we have a write that hasn't reached Firestore yet)
-    var localTS = parseInt(_origGetItem('dm_localTS') || '0');
-    if(snapTS && localTS > snapTS) return;
+    // If we wrote it, ignore — we already have this data in localStorage
+    if(snapSrc === _deviceId) return;
 
-    // Apply — this is a genuine update from another device
+    // From another device — apply it
     snap.forEach(function(doc) {
       var d = doc.data();
       if(d.key && d.val !== undefined && !SKIP_FS[d.key]) _origSetItem(d.key, d.val);
