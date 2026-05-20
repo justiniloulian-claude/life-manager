@@ -24,7 +24,11 @@ var _origSetItem = localStorage.setItem.bind(localStorage);
 var _origGetItem = localStorage.getItem.bind(localStorage);
 localStorage.setItem = function(key, value) {
   _origSetItem(key, value);
-  if(_uid && key && key.startsWith('dm_')) _fsSaveKey(key, value);
+  if(key && key.startsWith('dm_')) {
+    // Always stamp local write time so startup can compare vs Firestore
+    _origSetItem('dm_localTS', String(Date.now()));
+    if(_uid) _fsSaveKey(key, value);
+  }
 };
 
 // Write a single changed key to Firestore right now — no delay
@@ -39,11 +43,12 @@ function _fsSaveKey(key, value) {
   batch.commit().catch(function(err){ console.warn('FS write err:', err); });
 }
 
-// Full sync — writes every dm_ key to Firestore (used on first login & tab hide)
+// Full sync — writes every dm_ key to Firestore (used on first login & new device)
 function _doFSFullSync() {
   if(!_uid) return;
   var now = Date.now();
   _ownSyncTS = now;
+  _origSetItem('dm_localTS', String(now));
   var batch = _db.batch();
   var ref = _db.collection('users').doc(_uid).collection('appdata');
   for(var i = 0; i < localStorage.length; i++) {
@@ -56,11 +61,6 @@ function _doFSFullSync() {
   batch.commit().catch(function(err){ console.warn('FS full sync err:', err); });
 }
 
-// Backup: full sync whenever tab loses focus or is closed
-document.addEventListener('visibilitychange', function() {
-  if(document.visibilityState === 'hidden' && _uid) _doFSFullSync();
-});
-
 // Load all data from Firestore into localStorage, then boot the app
 function _loadFromFS(uid, cb) {
   _db.collection('users').doc(uid).collection('appdata').get()
@@ -69,11 +69,26 @@ function _loadFromFS(uid, cb) {
         // First ever login — upload existing localStorage data
         _doFSFullSync();
       } else {
-        // Always trust Firestore on startup — it's the source of truth
+        // Compare local write timestamp vs Firestore write timestamp
+        // If local is newer, this device made a change that hasn't reached Firestore yet —
+        // keep local data and push it up. Otherwise trust Firestore.
+        var localTS = parseInt(_origGetItem('dm_localTS') || '0');
+        var fsTS = 0;
         snap.forEach(function(doc) {
-          var d = doc.data();
-          if(d.key && d.val !== undefined) _origSetItem(d.key, d.val);
+          if(doc.id === '_syncTS') fsTS = parseInt(doc.data().val) || 0;
         });
+
+        if(localTS > fsTS) {
+          // Local is ahead — push local to Firestore (catches refresh-before-write-completes)
+          console.log('Local data is newer than Firestore — pushing local up');
+          _doFSFullSync();
+        } else {
+          // Firestore is current or newer — load it
+          snap.forEach(function(doc) {
+            var d = doc.data();
+            if(d.key && d.val !== undefined) _origSetItem(d.key, d.val);
+          });
+        }
       }
       cb();
       // Start real-time listener so changes from other devices appear automatically
