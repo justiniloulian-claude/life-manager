@@ -33,14 +33,54 @@ if(!_deviceId) {
 // Keys that are device-local and must never be synced to/from Firestore
 var SKIP_FS = { 'dm_deviceId': true, 'dm_localTS': true, 'dm_v88synced': true };
 
-// Every local write: stamp dm_localTS and push key to Firestore immediately
+// _syncReady gates all Firestore writes.
+// FALSE during boot: init() may write dm_ keys to localStorage as part of
+// startup (e.g. checkMissedTasks). We must NOT push those to Firestore yet —
+// doing so would overwrite the other device's newer data with our stale state.
+// Any writes that arrive before _syncReady are queued in _fsPendingWrites.
+// TRUE after boot sync resolves: user-initiated writes go to Firestore immediately.
+var _syncReady = false;
+var _fsPendingWrites = {}; // key -> latest value, queued before sync is ready
+
+// Stamp dm_localTS and write to Firestore (or queue if not ready yet)
 localStorage.setItem = function(key, value) {
   _origSetItem(key, value);
   if(key && key.startsWith('dm_') && !SKIP_FS[key]) {
     _origSetItem('dm_localTS', String(Date.now()));
-    if(_uid) _fsSaveKey(key, value);
+    if(_uid) {
+      if(_syncReady) {
+        _fsSaveKey(key, value);
+      } else {
+        _fsPendingWrites[key] = value; // hold until sync decision is made
+      }
+    }
   }
 };
+
+// Flush queued writes to Firestore (called when local data wins)
+function _flushPendingWrites() {
+  var keys = Object.keys(_fsPendingWrites);
+  if(!keys.length) return;
+  var now = Date.now();
+  var batch = _db.batch();
+  var ref = _db.collection('users').doc(_uid).collection('appdata');
+  keys.forEach(function(k) {
+    batch.set(ref.doc(k.replace(/\//g,'__')), { key: k, val: _fsPendingWrites[k] });
+  });
+  batch.set(ref.doc('_syncTS'), { val: String(now), src: _deviceId });
+  batch.commit().catch(function(err){ console.warn('FS flush err:', err); });
+  _fsPendingWrites = {};
+}
+
+// Open the Firestore write gate after boot sync is resolved.
+// flush=true  → local won: push any queued init writes to Firestore.
+// flush=false → Firestore won: discard queue (cloud data is authoritative).
+function _setSyncReady(flush) {
+  if(_syncReady) return;
+  _syncReady = true;
+  if(flush) _flushPendingWrites();
+  else _fsPendingWrites = {};
+}
 
 // Write one changed key to Firestore immediately, tagged with our device ID
 function _fsSaveKey(key, value) {
@@ -53,7 +93,7 @@ function _fsSaveKey(key, value) {
   batch.commit().catch(function(err){ console.warn('FS write err:', err); });
 }
 
-// Write ALL local keys to Firestore (first login / new device)
+// Write ALL local keys to Firestore (new device with no prior Firestore data)
 function _doFSFullSync() {
   if(!_uid) return;
   var now = Date.now();
@@ -69,10 +109,26 @@ function _doFSFullSync() {
   batch.commit().catch(function(err){ console.warn('FS full sync err:', err); });
 }
 
+function _applyFirestoreSnap(snap, fsTS) {
+  snap.forEach(function(d) {
+    var dd = d.data();
+    if(dd.key && dd.val !== undefined && !SKIP_FS[dd.key]) _origSetItem(dd.key, dd.val);
+  });
+  // Stamp dm_localTS to match Firestore so next boot won't re-pull unnecessarily
+  _origSetItem('dm_localTS', String(fsTS));
+  try { refresh(); } catch(e){}
+  try {
+    if(state.currentPage==='notes')     renderNotes();
+    if(state.currentPage==='calendar')  renderCalendar();
+    if(state.currentPage==='financial') renderFinancial();
+    if(state.currentPage==='learning')  renderLearning();
+  } catch(e){}
+}
+
 // Boot the app.
-// If this device has local data: boot from localStorage immediately — refresh is safe.
-// If no local data (new device / first login): load from Firestore first.
-// Cross-device updates arrive via onSnapshot after boot.
+// If this device has local data: boot from localStorage immediately (edit-safe),
+// then in background check whether another device wrote to Firestore more recently.
+// If no local data (new device): pull from Firestore first, then boot.
 function _loadFromFS(uid, cb) {
   var hasLocal = false;
   for(var i = 0; i < localStorage.length; i++) {
@@ -80,98 +136,101 @@ function _loadFromFS(uid, cb) {
     if(k && k.startsWith('dm_') && !SKIP_FS[k]) { hasLocal = true; break; }
   }
 
-  if(hasLocal) {
-    // Boot instantly from localStorage — edits survive refresh without touching Firestore.
-    cb();
-    _startRealtimeListener(uid, true); // skipInitial=true: ignore the first snapshot
+  // Failsafe: if Firestore check hangs, open the write gate after 6 seconds
+  var _syncFailsafe = setTimeout(function() { _setSyncReady(true); }, 6000);
 
-    // Background check: did another device write to Firestore more recently than
-    // our last local edit?  If yes, pull their data and re-render.
-    // If no (we wrote last, or local is newer), do nothing — local wins.
+  if(hasLocal) {
+    // Boot instantly — localStorage preserves any in-flight edits.
+    // _syncReady stays false so init() writes don't fire to Firestore yet.
+    cb();
+    _startRealtimeListener(uid, true);
+
+    // Background: check _syncTS to see if another device is ahead of us
     var localTS = parseInt(_origGetItem('dm_localTS') || '0', 10);
     _db.collection('users').doc(uid).collection('appdata').doc('_syncTS').get()
       .then(function(doc) {
-        if(!doc.exists) return;
-        var data   = doc.data();
-        var fsTS   = parseInt(data.val || '0', 10);
-        var fsSrc  = data.src || '';
-        // Another device wrote more recently than our last local change
+        clearTimeout(_syncFailsafe);
+        if(!doc.exists) {
+          // Nothing in Firestore yet — push our data up
+          _setSyncReady(true);
+          _doFSFullSync();
+          return;
+        }
+        var data  = doc.data();
+        var fsTS  = parseInt(data.val || '0', 10);
+        var fsSrc = data.src || '';
         if(fsSrc !== _deviceId && fsTS > localTS) {
+          // Another device wrote more recently → pull their data
           return _db.collection('users').doc(uid).collection('appdata').get()
             .then(function(snap) {
-              snap.forEach(function(d) {
-                var dd = d.data();
-                if(dd.key && dd.val !== undefined && !SKIP_FS[dd.key]) {
-                  _origSetItem(dd.key, dd.val);
-                }
-              });
-              // Stamp dm_localTS so we don't re-pull on next refresh
-              _origSetItem('dm_localTS', String(fsTS));
-              try { refresh(); } catch(e){}
-              try {
-                if(state.currentPage==='notes')      renderNotes();
-                if(state.currentPage==='calendar')   renderCalendar();
-                if(state.currentPage==='financial')  renderFinancial();
-                if(state.currentPage==='learning')   renderLearning();
-              } catch(e){}
+              _applyFirestoreSnap(snap, fsTS);
+              // Firestore won: discard init writes (they were based on stale local state)
+              _setSyncReady(false);
             });
+        } else {
+          // Local is up-to-date — flush any init writes to Firestore
+          _setSyncReady(true);
         }
       })
-      .catch(function(){});
+      .catch(function() {
+        clearTimeout(_syncFailsafe);
+        _setSyncReady(true); // on error, keep local and allow writes
+      });
 
   } else {
-    // No local data (new device / cleared storage) — pull from Firestore first.
+    // No local data — must pull from Firestore first
     _db.collection('users').doc(uid).collection('appdata').get()
       .then(function(snap) {
+        clearTimeout(_syncFailsafe);
         snap.forEach(function(doc) {
           var d = doc.data();
           if(d.key && d.val !== undefined && !SKIP_FS[d.key]) _origSetItem(d.key, d.val);
         });
         if(snap.empty) _doFSFullSync();
         cb();
-        _startRealtimeListener(uid, false); // skipInitial=false: already loaded above
+        _startRealtimeListener(uid, false);
+        _setSyncReady(true);
       })
-      .catch(function() { cb(); _startRealtimeListener(uid, false); });
+      .catch(function() {
+        clearTimeout(_syncFailsafe);
+        cb();
+        _startRealtimeListener(uid, false);
+        _setSyncReady(true);
+      });
   }
 }
 
-// Realtime listener — receives updates from the other device and applies them.
-// skipInitial=true: discard the very first callback (which is just Firestore echoing
-// its current state — we already booted from localStorage and don't want it
-// overwriting our fresh local data, no matter which device last wrote it).
-// Only subsequent callbacks represent actual new writes from another device.
+// Realtime listener — live updates from the other device while both are open.
+// skipInitial=true: throw away the first snapshot (it's just Firestore echoing
+// its current state on attach — we already booted from localStorage or our own
+// background .get(), so we don't need it and it must not overwrite local data).
 function _startRealtimeListener(uid, skipInitial) {
   if(_fsUnsubscribe) _fsUnsubscribe();
   var ref = _db.collection('users').doc(uid).collection('appdata');
   var _seenFirst = false;
   _fsUnsubscribe = ref.onSnapshot(function(snap) {
     if(!_appInited) return;
-
-    // Discard the initial echo-snapshot when we already have local data
     if(!_seenFirst) {
       _seenFirst = true;
       if(skipInitial) return;
     }
-
-    // Read who wrote this snapshot
     var snapSrc = '';
     snap.forEach(function(doc) {
       if(doc.id === '_syncTS') snapSrc = doc.data().src || '';
     });
-    // If we wrote it (or it's untagged legacy data), ignore
+    // Own write or untagged legacy data — ignore
     if(snapSrc === _deviceId || snapSrc === '') return;
-
-    // Real update from another device — apply it and re-render
+    // Real update from the other device
     snap.forEach(function(doc) {
       var d = doc.data();
       if(d.key && d.val !== undefined && !SKIP_FS[d.key]) _origSetItem(d.key, d.val);
     });
     try { refresh(); } catch(e){}
     try {
-      if(state.currentPage==='notes') renderNotes();
-      if(state.currentPage==='calendar') renderCalendar();
+      if(state.currentPage==='notes')     renderNotes();
+      if(state.currentPage==='calendar')  renderCalendar();
       if(state.currentPage==='financial') renderFinancial();
-      if(state.currentPage==='learning') renderLearning();
+      if(state.currentPage==='learning')  renderLearning();
     } catch(e){}
   }, function(err){ console.warn('FS listener error:', err); });
 }
