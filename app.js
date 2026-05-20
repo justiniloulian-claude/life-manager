@@ -21,125 +21,132 @@ var _fsUnsubscribe = null;
 var _origSetItem = localStorage.setItem.bind(localStorage);
 var _origGetItem = localStorage.getItem.bind(localStorage);
 
-// Permanent device ID — tags every Firestore write so the listener can tell
-// "did I write this?" and skip it.
+// ── Device identity ───────────────────────────────────────────────────────────
 var _deviceId = _origGetItem('dm_deviceId');
-if(!_deviceId) {
+if(!_deviceId){
   _deviceId = 'dev_' + Date.now() + '_' + Math.random().toString(36).slice(2,9);
   _origSetItem('dm_deviceId', _deviceId);
 }
 
-// Keys never synced to/from Firestore
-var SKIP_FS = { 'dm_deviceId': true, 'dm_pendingKeys': true };
-
-// ── Pending-key tracking ──────────────────────────────────────────────────────
-// When we write a dm_ key to localStorage we immediately fire a Firestore write,
-// but the server round-trip takes ~200ms.  If the user refreshes before the write
-// is confirmed, the key is still listed in dm_pendingKeys.  On boot we load every
-// key from Firestore EXCEPT the pending ones, which we keep from localStorage.
-// Once Firestore confirms a write we remove the key from pending.
-function _getPendingKeys() {
-  var s = _origGetItem('dm_pendingKeys') || '';
-  return s ? s.split(',').filter(Boolean) : [];
-}
-function _addPendingKey(key) {
-  var keys = _getPendingKeys();
-  if(keys.indexOf(key) === -1) keys.push(key);
-  _origSetItem('dm_pendingKeys', keys.join(','));
-}
-function _removePendingKey(key) {
-  var keys = _getPendingKeys().filter(function(k){ return k !== key; });
-  _origSetItem('dm_pendingKeys', keys.join(','));
+// Keys that are local-only metadata and must never be sent to Firestore.
+// dm_ts_* = per-key write timestamps used for conflict resolution.
+function _skipFS(key){
+  return key === 'dm_deviceId' ||
+         key === 'dm_localTS'  ||
+         key === 'dm_v94init'  ||
+         key.startsWith('dm_ts_');
 }
 
-// Every user edit: save to localStorage immediately, push to Firestore, mark pending
-localStorage.setItem = function(key, value) {
+// ── Per-key timestamps (one-time migration) ───────────────────────────────────
+// Seed dm_ts_{key} for every existing dm_ key from the old global dm_localTS.
+// After this, any legacy Firestore document (ts=0) can NEVER beat the local
+// timestamp, so legacy cloud data will never overwrite current local data.
+(function(){
+  if(_origGetItem('dm_v94init')) return;
+  _origSetItem('dm_v94init','1');
+  var gts = parseInt(_origGetItem('dm_localTS')||'0',10) || (Date.now()-1);
+  for(var i=0;i<localStorage.length;i++){
+    var k=localStorage.key(i);
+    if(k && k.startsWith('dm_') && !_skipFS(k) && !_origGetItem('dm_ts_'+k))
+      _origSetItem('dm_ts_'+k, String(gts));
+  }
+})();
+
+// ── Write intercept ───────────────────────────────────────────────────────────
+// Every dm_ write: stamp the per-key timestamp, push to Firestore.
+localStorage.setItem = function(key, value){
   _origSetItem(key, value);
-  if(key && key.startsWith('dm_') && !SKIP_FS[key]) {
-    _addPendingKey(key);
-    if(_uid) _fsSaveKey(key, value);
+  if(key && key.startsWith('dm_') && !_skipFS(key)){
+    var now = Date.now();
+    _origSetItem('dm_ts_'+key, String(now));
+    if(_uid) _fsSaveKey(key, value, now);
   }
 };
 
-// Write one key to Firestore; on confirmation remove it from pending
-function _fsSaveKey(key, value) {
+// Push one key to Firestore with its write timestamp.
+function _fsSaveKey(key, value, ts){
   if(!_uid) return;
-  var now = Date.now();
+  ts = ts || Date.now();
   var batch = _db.batch();
   var ref = _db.collection('users').doc(_uid).collection('appdata');
-  batch.set(ref.doc(key.replace(/\//g,'__')), { key: key, val: value });
-  batch.set(ref.doc('_syncTS'), { val: String(now), src: _deviceId });
-  batch.commit()
-    .then(function(){ _removePendingKey(key); })
-    .catch(function(err){ console.warn('FS write err:', err); });
+  batch.set(ref.doc(key.replace(/\//g,'__')), {key:key, val:value, ts:ts, src:_deviceId});
+  batch.set(ref.doc('_syncTS'), {val:String(ts), src:_deviceId});
+  batch.commit().catch(function(e){ console.warn('FS write err:',e); });
 }
 
-// Full upload (new device / empty Firestore)
-function _doFSFullSync() {
+// Full upload — only called when Firestore is empty (brand-new account).
+function _doFSFullSync(){
   if(!_uid) return;
   var now = Date.now();
   var batch = _db.batch();
   var ref = _db.collection('users').doc(_uid).collection('appdata');
-  for(var i = 0; i < localStorage.length; i++) {
-    var k = localStorage.key(i);
-    if(k && k.startsWith('dm_') && !SKIP_FS[k]) {
-      batch.set(ref.doc(k.replace(/\//g,'__')), { key: k, val: _origGetItem(k) });
+  for(var i=0;i<localStorage.length;i++){
+    var k=localStorage.key(i);
+    if(k && k.startsWith('dm_') && !_skipFS(k)){
+      var kts = parseInt(_origGetItem('dm_ts_'+k)||'0',10) || now;
+      batch.set(ref.doc(k.replace(/\//g,'__')), {key:k, val:_origGetItem(k), ts:kts, src:_deviceId});
     }
   }
-  batch.set(ref.doc('_syncTS'), { val: String(now), src: _deviceId });
-  batch.commit().catch(function(err){ console.warn('FS full sync err:', err); });
+  batch.set(ref.doc('_syncTS'), {val:String(now), src:_deviceId});
+  batch.commit().catch(function(e){ console.warn('FS full sync err:',e); });
+}
+
+// ── Conflict resolution ───────────────────────────────────────────────────────
+// Apply a Firestore document to localStorage ONLY if its timestamp is strictly
+// newer than our local write timestamp for that key.
+//
+//  Firestore ts  >  local ts  →  apply  (other device edited more recently)
+//  Firestore ts  ≤  local ts  →  skip   (we edited more recently, or same — keep ours)
+//
+// This means:
+//   • Our own writes (ts == local ts after confirmation): NOT re-applied  ✓
+//   • Our in-flight writes (Firestore still has old ts < local ts): NOT overwritten ✓
+//   • Other device's newer writes (ts > local ts): applied immediately  ✓
+function _applyFSDoc(d){
+  if(!d || !d.key || d.val===undefined || _skipFS(d.key)) return false;
+  var localTS = parseInt(_origGetItem('dm_ts_'+d.key)||'0',10);
+  var fsTS    = parseInt(d.ts||'0',10);
+  if(fsTS > localTS){
+    _origSetItem(d.key, d.val);
+    _origSetItem('dm_ts_'+d.key, String(fsTS));
+    return true;
+  }
+  return false;
+}
+
+function _rerender(){
+  try{ refresh(); }catch(e){}
+  try{
+    if(state.currentPage==='notes')     renderNotes();
+    if(state.currentPage==='calendar')  renderCalendar();
+    if(state.currentPage==='financial') renderFinancial();
+    if(state.currentPage==='learning')  renderLearning();
+  }catch(e){}
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
-// Always render immediately from localStorage (zero-delay).
-// Then do a Firestore .get() in the background to pull in any changes from the
-// other device.  Any key that has a pending unconfirmed local write is protected
-// and will NOT be overwritten by the Firestore value.
-function _loadFromFS(uid, cb) {
+// If local data exists: render immediately (zero delay), then let the realtime
+// listener handle catching up with any changes from the other device.
+// If no local data: load from Firestore first, then render.
+function _loadFromFS(uid, cb){
   var hasLocal = false;
-  for(var i = 0; i < localStorage.length; i++) {
-    var k = localStorage.key(i);
-    if(k && k.startsWith('dm_') && !SKIP_FS[k]) { hasLocal = true; break; }
+  for(var i=0;i<localStorage.length;i++){
+    var k=localStorage.key(i);
+    if(k && k.startsWith('dm_') && !_skipFS(k)){ hasLocal=true; break; }
   }
 
-  if(hasLocal) {
-    cb(); // render immediately from localStorage
+  if(hasLocal){
+    cb();
     _startRealtimeListener(uid);
-
-    // Background sync: pull Firestore, apply everything except pending keys
-    var pendingKeys = _getPendingKeys();
-    _db.collection('users').doc(uid).collection('appdata').get()
-      .then(function(snap) {
-        if(snap.empty) { _doFSFullSync(); return; }
-        var changed = false;
-        snap.forEach(function(doc) {
-          var d = doc.data();
-          if(!d.key || d.val === undefined || SKIP_FS[d.key]) return;
-          if(pendingKeys.indexOf(d.key) !== -1) return; // local write in-flight, keep it
-          if(_origGetItem(d.key) !== d.val) {
-            _origSetItem(d.key, d.val);
-            changed = true;
-          }
-        });
-        if(changed) {
-          try { refresh(); } catch(e){}
-          try {
-            if(state.currentPage==='notes')     renderNotes();
-            if(state.currentPage==='calendar')  renderCalendar();
-            if(state.currentPage==='financial') renderFinancial();
-            if(state.currentPage==='learning')  renderLearning();
-          } catch(e){}
-        }
-      })
-      .catch(function(){}); // network error — stay with localStorage
-
   } else {
-    // No local data at all (first install / cleared storage): load from Firestore first
     _db.collection('users').doc(uid).collection('appdata').get()
-      .then(function(snap) {
-        snap.forEach(function(doc) {
-          var d = doc.data();
-          if(d.key && d.val !== undefined && !SKIP_FS[d.key]) _origSetItem(d.key, d.val);
+      .then(function(snap){
+        snap.forEach(function(doc){
+          var d=doc.data();
+          if(d.key && d.val!==undefined && !_skipFS(d.key)){
+            _origSetItem(d.key, d.val);
+            _origSetItem('dm_ts_'+d.key, String(d.ts||Date.now()));
+          }
         });
         if(snap.empty) _doFSFullSync();
         cb();
@@ -150,37 +157,22 @@ function _loadFromFS(uid, cb) {
 }
 
 // ── Realtime listener ─────────────────────────────────────────────────────────
-// Fires whenever Firestore changes.  The very first callback is the current
-// snapshot — identical to what the background .get() already applied, so we
-// skip it.  Every subsequent callback is a genuine write from the other device.
-function _startRealtimeListener(uid) {
+// Firestore fires this callback immediately on attach (current state) and again
+// whenever any document changes.  Both cases use _applyFSDoc with per-key
+// timestamp comparison, so:
+//   • Boot catch-up:   other device's newer keys are applied on the first callback
+//   • Real-time sync:  edits from the other device appear within ~1 second
+//   • Own writes:      never re-applied (ts == localTS, not strictly greater)
+//   • In-flight edits: never overwritten (localTS > any old Firestore ts)
+function _startRealtimeListener(uid){
   if(_fsUnsubscribe) _fsUnsubscribe();
-  var ref = _db.collection('users').doc(uid).collection('appdata');
-  var _seenFirst = false;
-  _fsUnsubscribe = ref.onSnapshot(function(snap) {
+  var ref = _db.collection('users').doc(_uid).collection('appdata');
+  _fsUnsubscribe = ref.onSnapshot(function(snap){
     if(!_appInited) return;
-    if(!_seenFirst) { _seenFirst = true; return; } // skip the initial echo
-
-    var snapSrc = '';
-    snap.forEach(function(doc) {
-      if(doc.id === '_syncTS') snapSrc = doc.data().src || '';
-    });
-    // Our own write confirmed back to us — ignore (already in localStorage)
-    if(snapSrc === _deviceId) return;
-
-    // Update from the other device — apply it
-    snap.forEach(function(doc) {
-      var d = doc.data();
-      if(d.key && d.val !== undefined && !SKIP_FS[d.key]) _origSetItem(d.key, d.val);
-    });
-    try { refresh(); } catch(e){}
-    try {
-      if(state.currentPage==='notes')     renderNotes();
-      if(state.currentPage==='calendar')  renderCalendar();
-      if(state.currentPage==='financial') renderFinancial();
-      if(state.currentPage==='learning')  renderLearning();
-    } catch(e){}
-  }, function(err){ console.warn('FS listener error:', err); });
+    var changed = false;
+    snap.forEach(function(doc){ if(_applyFSDoc(doc.data())) changed=true; });
+    if(changed) _rerender();
+  }, function(err){ console.warn('FS listener error:',err); });
 }
 
 // ============================================================
