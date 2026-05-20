@@ -83,7 +83,7 @@ function _loadFromFS(uid, cb) {
   if(hasLocal) {
     // Boot instantly from localStorage — edits survive refresh without touching Firestore.
     cb();
-    _startRealtimeListener(uid);
+    _startRealtimeListener(uid, true); // skipInitial=true: ignore the first snapshot
   } else {
     // No local data (new device / cleared storage) — pull from Firestore first.
     _db.collection('users').doc(uid).collection('appdata').get()
@@ -94,31 +94,39 @@ function _loadFromFS(uid, cb) {
         });
         if(snap.empty) _doFSFullSync();
         cb();
-        _startRealtimeListener(uid);
+        _startRealtimeListener(uid, false); // skipInitial=false: already loaded above
       })
-      .catch(function() { cb(); _startRealtimeListener(uid); });
+      .catch(function() { cb(); _startRealtimeListener(uid, false); });
   }
 }
 
 // Realtime listener — receives updates from the other device and applies them.
-// Ignores writes that came from THIS device (tagged with _deviceId).
-function _startRealtimeListener(uid) {
+// skipInitial=true: discard the very first callback (which is just Firestore echoing
+// its current state — we already booted from localStorage and don't want it
+// overwriting our fresh local data, no matter which device last wrote it).
+// Only subsequent callbacks represent actual new writes from another device.
+function _startRealtimeListener(uid, skipInitial) {
   if(_fsUnsubscribe) _fsUnsubscribe();
   var ref = _db.collection('users').doc(uid).collection('appdata');
+  var _seenFirst = false;
   _fsUnsubscribe = ref.onSnapshot(function(snap) {
     if(!_appInited) return;
+
+    // Discard the initial echo-snapshot when we already have local data
+    if(!_seenFirst) {
+      _seenFirst = true;
+      if(skipInitial) return;
+    }
+
     // Read who wrote this snapshot
     var snapSrc = '';
     snap.forEach(function(doc) {
       if(doc.id === '_syncTS') snapSrc = doc.data().src || '';
     });
-    // If we wrote it, ignore — we already have this data in localStorage
-    if(snapSrc === _deviceId) return;
-    // If no src tag (legacy data from before v88), ignore — don't let stale
-    // cloud data overwrite the fresh localStorage we booted from.
-    if(snapSrc === '') return;
+    // If we wrote it (or it's untagged legacy data), ignore
+    if(snapSrc === _deviceId || snapSrc === '') return;
 
-    // From another device — apply it
+    // Real update from another device — apply it and re-render
     snap.forEach(function(doc) {
       var d = doc.data();
       if(d.key && d.val !== undefined && !SKIP_FS[d.key]) _origSetItem(d.key, d.val);
