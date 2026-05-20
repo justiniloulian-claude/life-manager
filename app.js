@@ -31,7 +31,7 @@ if(!_deviceId) {
 }
 
 // Keys that are device-local and must never be synced to/from Firestore
-var SKIP_FS = { 'dm_deviceId': true, 'dm_localTS': true };
+var SKIP_FS = { 'dm_deviceId': true, 'dm_localTS': true, 'dm_v88synced': true };
 
 // Every local write: stamp dm_localTS and push key to Firestore immediately
 localStorage.setItem = function(key, value) {
@@ -83,6 +83,13 @@ function _loadFromFS(uid, cb) {
   if(hasLocal) {
     cb();
     _startRealtimeListener(uid);
+    // One-time migration: push all local data to Firestore tagged with our deviceId.
+    // This converts any legacy untagged Firestore data so the listener can tell
+    // own-writes from cross-device writes going forward.
+    if(!_origGetItem('dm_v88synced')) {
+      _origSetItem('dm_v88synced', '1');
+      setTimeout(_doFSFullSync, 1500); // slight delay so app renders first
+    }
   } else {
     _db.collection('users').doc(uid).collection('appdata').get()
       .then(function(snap) {
@@ -93,6 +100,11 @@ function _loadFromFS(uid, cb) {
         if(snap.empty) _doFSFullSync();
         cb();
         _startRealtimeListener(uid);
+        // Tag newly-loaded data in Firestore as ours
+        if(!_origGetItem('dm_v88synced')) {
+          _origSetItem('dm_v88synced', '1');
+          setTimeout(_doFSFullSync, 1500);
+        }
       })
       .catch(function() { cb(); _startRealtimeListener(uid); });
   }
@@ -112,6 +124,9 @@ function _startRealtimeListener(uid) {
     });
     // If we wrote it, ignore — we already have this data in localStorage
     if(snapSrc === _deviceId) return;
+    // If no src tag (legacy data from before v88), ignore — don't let stale
+    // cloud data overwrite the fresh localStorage we booted from.
+    if(snapSrc === '') return;
 
     // From another device — apply it
     snap.forEach(function(doc) {
