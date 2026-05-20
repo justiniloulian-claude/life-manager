@@ -19,21 +19,28 @@ var _appInited = false;
 var _fsUnsubscribe = null;  // real-time listener handle
 var _ownSyncTS = 0;         // timestamp of our last write — used to ignore our own snapshots
 
-// Patch localStorage so every dm_ write auto-syncs to Firestore
+// Patch localStorage so every dm_ write auto-syncs to Firestore IMMEDIATELY
 var _origSetItem = localStorage.setItem.bind(localStorage);
 var _origGetItem = localStorage.getItem.bind(localStorage);
 localStorage.setItem = function(key, value) {
   _origSetItem(key, value);
-  if(_uid && key && key.startsWith('dm_')) _scheduleFSSync();
+  if(_uid && key && key.startsWith('dm_')) _fsSaveKey(key, value);
 };
 
-var _syncTimer = null;
-function _scheduleFSSync() {
-  clearTimeout(_syncTimer);
-  _syncTimer = setTimeout(_doFSSync, 250);
+// Write a single changed key to Firestore right now — no delay
+function _fsSaveKey(key, value) {
+  if(!_uid) return;
+  var now = Date.now();
+  _ownSyncTS = now;
+  var batch = _db.batch();
+  var ref = _db.collection('users').doc(_uid).collection('appdata');
+  batch.set(ref.doc(key.replace(/\//g,'__')), { key: key, val: value });
+  batch.set(ref.doc('_syncTS'), { val: String(now) });
+  batch.commit().catch(function(err){ console.warn('FS write err:', err); });
 }
 
-function _doFSSync() {
+// Full sync — writes every dm_ key to Firestore (used on first login & tab hide)
+function _doFSFullSync() {
   if(!_uid) return;
   var now = Date.now();
   _ownSyncTS = now;
@@ -45,10 +52,14 @@ function _doFSSync() {
       batch.set(ref.doc(k.replace(/\//g,'__')), { key: k, val: _origGetItem(k) });
     }
   }
-  // _syncTS lets other devices know this is a fresh write
   batch.set(ref.doc('_syncTS'), { val: String(now) });
-  batch.commit().catch(function(err){ console.warn('FS sync error:', err); });
+  batch.commit().catch(function(err){ console.warn('FS full sync err:', err); });
 }
+
+// Backup: full sync whenever tab loses focus or is closed
+document.addEventListener('visibilitychange', function() {
+  if(document.visibilityState === 'hidden' && _uid) _doFSFullSync();
+});
 
 // Load all data from Firestore into localStorage, then boot the app
 function _loadFromFS(uid, cb) {
@@ -56,7 +67,7 @@ function _loadFromFS(uid, cb) {
     .then(function(snap) {
       if(snap.empty) {
         // First ever login — upload existing localStorage data
-        _doFSSync();
+        _doFSFullSync();
       } else {
         // Always trust Firestore on startup — it's the source of truth
         snap.forEach(function(doc) {
