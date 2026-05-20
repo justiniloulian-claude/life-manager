@@ -84,6 +84,41 @@ function _loadFromFS(uid, cb) {
     // Boot instantly from localStorage — edits survive refresh without touching Firestore.
     cb();
     _startRealtimeListener(uid, true); // skipInitial=true: ignore the first snapshot
+
+    // Background check: did another device write to Firestore more recently than
+    // our last local edit?  If yes, pull their data and re-render.
+    // If no (we wrote last, or local is newer), do nothing — local wins.
+    var localTS = parseInt(_origGetItem('dm_localTS') || '0', 10);
+    _db.collection('users').doc(uid).collection('appdata').doc('_syncTS').get()
+      .then(function(doc) {
+        if(!doc.exists) return;
+        var data   = doc.data();
+        var fsTS   = parseInt(data.val || '0', 10);
+        var fsSrc  = data.src || '';
+        // Another device wrote more recently than our last local change
+        if(fsSrc !== _deviceId && fsTS > localTS) {
+          return _db.collection('users').doc(uid).collection('appdata').get()
+            .then(function(snap) {
+              snap.forEach(function(d) {
+                var dd = d.data();
+                if(dd.key && dd.val !== undefined && !SKIP_FS[dd.key]) {
+                  _origSetItem(dd.key, dd.val);
+                }
+              });
+              // Stamp dm_localTS so we don't re-pull on next refresh
+              _origSetItem('dm_localTS', String(fsTS));
+              try { refresh(); } catch(e){}
+              try {
+                if(state.currentPage==='notes')      renderNotes();
+                if(state.currentPage==='calendar')   renderCalendar();
+                if(state.currentPage==='financial')  renderFinancial();
+                if(state.currentPage==='learning')   renderLearning();
+              } catch(e){}
+            });
+        }
+      })
+      .catch(function(){});
+
   } else {
     // No local data (new device / cleared storage) — pull from Firestore first.
     _db.collection('users').doc(uid).collection('appdata').get()
