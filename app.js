@@ -34,29 +34,45 @@ function _skipFS(key){
   return key === 'dm_deviceId' ||
          key === 'dm_localTS'  ||
          key === 'dm_v94init'  ||
+         key === 'dm_v95init'  ||
          key.startsWith('dm_ts_');
 }
 
-// ── Per-key timestamps (one-time migration) ───────────────────────────────────
-// Seed dm_ts_{key} for every existing dm_ key from the old global dm_localTS.
-// After this, any legacy Firestore document (ts=0) can NEVER beat the local
-// timestamp, so legacy cloud data will never overwrite current local data.
+// ── _bootMode ─────────────────────────────────────────────────────────────────
+// TRUE while init() is running at startup.
+// init() calls localStorage.setItem for computed dm_ values (e.g. task states).
+// We must NOT let those writes stamp dm_ts_ or push to Firestore — doing so
+// sets a very recent "local" timestamp that blocks the other device's legitimate
+// edits from ever being applied (fsTS < localTS_just_now = false → not applied).
+// _bootMode ensures those startup writes save to localStorage ONLY.
+// Set to false immediately after init() returns, so user edits work normally.
+var _bootMode = true;
+
+// ── Per-key timestamps (v95 migration) ───────────────────────────────────────
+// RESET all dm_ts_ values to dm_localTS (the last real user-edit time from
+// before v94).  v94 let init() stamp dm_ts_ with Date.now(), making all
+// local timestamps appear very recent and blocking cross-device sync.
+// This migration undoes that corruption.
 (function(){
-  if(_origGetItem('dm_v94init')) return;
-  _origSetItem('dm_v94init','1');
-  var gts = parseInt(_origGetItem('dm_localTS')||'0',10) || (Date.now()-1);
+  if(_origGetItem('dm_v95init')) return;
+  _origSetItem('dm_v95init','1');
+  var gts = parseInt(_origGetItem('dm_localTS')||'0',10);
+  if(!gts) gts = Date.now() - 86400000; // no history → treat as 1 day ago
   for(var i=0;i<localStorage.length;i++){
     var k=localStorage.key(i);
-    if(k && k.startsWith('dm_') && !_skipFS(k) && !_origGetItem('dm_ts_'+k))
-      _origSetItem('dm_ts_'+k, String(gts));
+    if(k && k.startsWith('dm_') && !_skipFS(k))
+      _origSetItem('dm_ts_'+k, String(gts)); // unconditional reset
   }
 })();
 
 // ── Write intercept ───────────────────────────────────────────────────────────
-// Every dm_ write: stamp the per-key timestamp, push to Firestore.
+// User edits: stamp per-key timestamp + push to Firestore.
+// Startup writes (_bootMode=true): save to localStorage ONLY — no timestamp,
+// no Firestore write.  This keeps dm_ts_ at migration values so the listener's
+// first snapshot can correctly apply the other device's newer data.
 localStorage.setItem = function(key, value){
   _origSetItem(key, value);
-  if(key && key.startsWith('dm_') && !_skipFS(key)){
+  if(!_bootMode && key && key.startsWith('dm_') && !_skipFS(key)){
     var now = Date.now();
     _origSetItem('dm_ts_'+key, String(now));
     if(_uid) _fsSaveKey(key, value, now);
@@ -96,12 +112,7 @@ function _doFSFullSync(){
 // newer than our local write timestamp for that key.
 //
 //  Firestore ts  >  local ts  →  apply  (other device edited more recently)
-//  Firestore ts  ≤  local ts  →  skip   (we edited more recently, or same — keep ours)
-//
-// This means:
-//   • Our own writes (ts == local ts after confirmation): NOT re-applied  ✓
-//   • Our in-flight writes (Firestore still has old ts < local ts): NOT overwritten ✓
-//   • Other device's newer writes (ts > local ts): applied immediately  ✓
+//  Firestore ts  ≤  local ts  →  skip   (we edited more recently, or same)
 function _applyFSDoc(d){
   if(!d || !d.key || d.val===undefined || _skipFS(d.key)) return false;
   var localTS = parseInt(_origGetItem('dm_ts_'+d.key)||'0',10);
@@ -125,9 +136,6 @@ function _rerender(){
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
-// If local data exists: render immediately (zero delay), then let the realtime
-// listener handle catching up with any changes from the other device.
-// If no local data: load from Firestore first, then render.
 function _loadFromFS(uid, cb){
   var hasLocal = false;
   for(var i=0;i<localStorage.length;i++){
@@ -136,9 +144,18 @@ function _loadFromFS(uid, cb){
   }
 
   if(hasLocal){
+    // Render immediately from localStorage.
+    // _bootMode=true: init() writes go to localStorage only, dm_ts_ untouched.
     cb();
+    // Now init() is done. Open the write gate — user edits after this point
+    // will stamp dm_ts_ and push to Firestore.
+    _bootMode = false;
+    // Attach listener. First snapshot = catch-up (uses migration dm_ts_ values,
+    // which are pre-init and correctly reflect when we last edited each key).
+    // Subsequent snapshots = real-time updates from the other device.
     _startRealtimeListener(uid);
   } else {
+    // No local data: must load from Firestore first.
     _db.collection('users').doc(uid).collection('appdata').get()
       .then(function(snap){
         snap.forEach(function(doc){
@@ -150,20 +167,24 @@ function _loadFromFS(uid, cb){
         });
         if(snap.empty) _doFSFullSync();
         cb();
+        _bootMode = false;
         _startRealtimeListener(uid);
       })
-      .catch(function(){ cb(); _startRealtimeListener(uid); });
+      .catch(function(){
+        cb();
+        _bootMode = false;
+        _startRealtimeListener(uid);
+      });
   }
 }
 
 // ── Realtime listener ─────────────────────────────────────────────────────────
-// Firestore fires this callback immediately on attach (current state) and again
-// whenever any document changes.  Both cases use _applyFSDoc with per-key
-// timestamp comparison, so:
-//   • Boot catch-up:   other device's newer keys are applied on the first callback
-//   • Real-time sync:  edits from the other device appear within ~1 second
-//   • Own writes:      never re-applied (ts == localTS, not strictly greater)
-//   • In-flight edits: never overwritten (localTS > any old Firestore ts)
+// Every snapshot (initial catch-up AND ongoing changes) runs _applyFSDoc.
+// Per-key timestamp comparison handles everything:
+//   • First callback on boot: applies other device's newer keys (catch-up)
+//   • Subsequent callbacks: applies real-time edits from the other device
+//   • Own confirmed writes: ts == localTS → not re-applied
+//   • Own in-flight writes: localTS > Firestore ts → never overwritten
 function _startRealtimeListener(uid){
   if(_fsUnsubscribe) _fsUnsubscribe();
   var ref = _db.collection('users').doc(_uid).collection('appdata');
