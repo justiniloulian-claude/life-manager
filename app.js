@@ -56,7 +56,7 @@ function _doFSFullSync() {
   var ref = _db.collection('users').doc(_uid).collection('appdata');
   for(var i = 0; i < localStorage.length; i++) {
     var k = localStorage.key(i);
-    if(k && k.startsWith('dm_')) {
+    if(k && k.startsWith('dm_') && k !== 'dm_pendingSync') {
       batch.set(ref.doc(k.replace(/\//g,'__')), { key: k, val: _origGetItem(k) });
     }
   }
@@ -83,7 +83,7 @@ function _loadFromFS(uid, cb) {
         } else {
           snap.forEach(function(doc) {
             var d = doc.data();
-            if(d.key && d.val !== undefined) _origSetItem(d.key, d.val);
+            if(d.key && d.val !== undefined && d.key !== 'dm_pendingSync') _origSetItem(d.key, d.val);
           });
         }
       }
@@ -114,7 +114,7 @@ function _startRealtimeListener(uid) {
     // Apply changes from the other device into localStorage
     snap.forEach(function(doc) {
       var d = doc.data();
-      if(d.key && d.val !== undefined) _origSetItem(d.key, d.val);
+      if(d.key && d.val !== undefined && d.key !== 'dm_pendingSync') _origSetItem(d.key, d.val);
     });
     // Re-render the current view to show the new data
     try { refresh(); } catch(e){}
