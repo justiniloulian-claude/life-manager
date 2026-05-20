@@ -28,69 +28,73 @@ if(!_deviceId){
   _origSetItem('dm_deviceId', _deviceId);
 }
 
-// Keys that are local-only metadata and must never be sent to Firestore.
-// dm_ts_* = per-key write timestamps used for conflict resolution.
+// ── Keys never synced to Firestore ───────────────────────────────────────────
 function _skipFS(key){
-  return key === 'dm_deviceId' ||
-         key === 'dm_localTS'  ||
-         key === 'dm_v94init'  ||
-         key === 'dm_v95init'  ||
-         key.startsWith('dm_ts_');
+  return key === 'dm_deviceId' || key.startsWith('dm_edit_');
 }
 
+// ── Visible sync status badge ─────────────────────────────────────────────────
+// Shows version, write status, and receive status directly in the UI so we can
+// see exactly what the sync is doing without opening the console.
+var _syncBadge = null;
+function _initSyncBadge(){
+  var b = document.createElement('div');
+  b.id = 'syncBadge';
+  b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
+    'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
+    'border-radius:12px;font-family:monospace;pointer-events:none;';
+  b.textContent = 'v96 …';
+  document.body.appendChild(b);
+  _syncBadge = b;
+}
+function _syncStatus(state, detail){
+  if(!_syncBadge) return;
+  var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗', idle:'·'};
+  _syncBadge.textContent = 'v96 ' + (icons[state]||state) + (detail?' '+detail:'');
+  _syncBadge.style.background = state==='err' ? 'rgba(180,0,0,0.85)' :
+                                  state==='ok'  ? 'rgba(0,120,0,0.75)' :
+                                  state==='recv'? 'rgba(0,80,160,0.75)' :
+                                                  'rgba(0,0,0,0.75)';
+}
+document.addEventListener('DOMContentLoaded', _initSyncBadge);
+
 // ── _bootMode ─────────────────────────────────────────────────────────────────
-// TRUE while init() is running at startup.
-// init() calls localStorage.setItem for computed dm_ values (e.g. task states).
-// We must NOT let those writes stamp dm_ts_ or push to Firestore — doing so
-// sets a very recent "local" timestamp that blocks the other device's legitimate
-// edits from ever being applied (fsTS < localTS_just_now = false → not applied).
-// _bootMode ensures those startup writes save to localStorage ONLY.
-// Set to false immediately after init() returns, so user edits work normally.
+// TRUE while init() runs. init() writes dm_ keys for computed state — we must
+// NOT push those to Firestore (they'd push stale data tagged with "now",
+// blocking other device's legitimate edits from applying).
 var _bootMode = true;
 
-// ── Per-key timestamps (v95 migration) ───────────────────────────────────────
-// RESET all dm_ts_ values to dm_localTS (the last real user-edit time from
-// before v94).  v94 let init() stamp dm_ts_ with Date.now(), making all
-// local timestamps appear very recent and blocking cross-device sync.
-// This migration undoes that corruption.
-(function(){
-  if(_origGetItem('dm_v95init')) return;
-  _origSetItem('dm_v95init','1');
-  var gts = parseInt(_origGetItem('dm_localTS')||'0',10);
-  if(!gts) gts = Date.now() - 86400000; // no history → treat as 1 day ago
-  for(var i=0;i<localStorage.length;i++){
-    var k=localStorage.key(i);
-    if(k && k.startsWith('dm_') && !_skipFS(k))
-      _origSetItem('dm_ts_'+k, String(gts)); // unconditional reset
-  }
-})();
+// ── In-flight edit markers ────────────────────────────────────────────────────
+// When the user edits a key we save dm_edit_{key} with the new value.
+// If the page reloads before Firestore confirms, dm_edit_{key} still exists and
+// we keep the local value instead of overwriting with stale Firestore data.
+// Cleared when Firestore confirms the write.
+function _setEdit(k,v){ _origSetItem('dm_edit_'+k, v); }
+function _clearEdit(k){ try{ localStorage.removeItem('dm_edit_'+k); }catch(e){} }
+function _hasEdit(k){ return _origGetItem('dm_edit_'+k) !== null; }
 
 // ── Write intercept ───────────────────────────────────────────────────────────
-// User edits: stamp per-key timestamp + push to Firestore.
-// Startup writes (_bootMode=true): save to localStorage ONLY — no timestamp,
-// no Firestore write.  This keeps dm_ts_ at migration values so the listener's
-// first snapshot can correctly apply the other device's newer data.
 localStorage.setItem = function(key, value){
   _origSetItem(key, value);
   if(!_bootMode && key && key.startsWith('dm_') && !_skipFS(key)){
-    var now = Date.now();
-    _origSetItem('dm_ts_'+key, String(now));
-    if(_uid) _fsSaveKey(key, value, now);
+    _setEdit(key, value);          // mark as in-flight
+    if(_uid) _fsSaveKey(key, value);
   }
 };
 
-// Push one key to Firestore with its write timestamp.
-function _fsSaveKey(key, value, ts){
+function _fsSaveKey(key, value){
   if(!_uid) return;
-  ts = ts || Date.now();
+  _syncStatus('send');
+  var now = Date.now();
   var batch = _db.batch();
   var ref = _db.collection('users').doc(_uid).collection('appdata');
-  batch.set(ref.doc(key.replace(/\//g,'__')), {key:key, val:value, ts:ts, src:_deviceId});
-  batch.set(ref.doc('_syncTS'), {val:String(ts), src:_deviceId});
-  batch.commit().catch(function(e){ console.warn('FS write err:',e); });
+  batch.set(ref.doc(key.replace(/\//g,'__')), {key:key, val:value, ts:now, src:_deviceId});
+  batch.set(ref.doc('_syncTS'), {val:String(now), src:_deviceId});
+  batch.commit()
+    .then(function(){ _clearEdit(key); _syncStatus('ok'); })
+    .catch(function(e){ console.error('FS write FAILED:',e); _syncStatus('err', String(e).slice(0,40)); });
 }
 
-// Full upload — only called when Firestore is empty (brand-new account).
 function _doFSFullSync(){
   if(!_uid) return;
   var now = Date.now();
@@ -98,31 +102,21 @@ function _doFSFullSync(){
   var ref = _db.collection('users').doc(_uid).collection('appdata');
   for(var i=0;i<localStorage.length;i++){
     var k=localStorage.key(i);
-    if(k && k.startsWith('dm_') && !_skipFS(k)){
-      var kts = parseInt(_origGetItem('dm_ts_'+k)||'0',10) || now;
-      batch.set(ref.doc(k.replace(/\//g,'__')), {key:k, val:_origGetItem(k), ts:kts, src:_deviceId});
-    }
+    if(k && k.startsWith('dm_') && !_skipFS(k))
+      batch.set(ref.doc(k.replace(/\//g,'__')), {key:k, val:_origGetItem(k), ts:now, src:_deviceId});
   }
   batch.set(ref.doc('_syncTS'), {val:String(now), src:_deviceId});
-  batch.commit().catch(function(e){ console.warn('FS full sync err:',e); });
+  batch.commit().catch(function(e){ _syncStatus('err', String(e).slice(0,40)); });
 }
 
-// ── Conflict resolution ───────────────────────────────────────────────────────
-// Apply a Firestore document to localStorage ONLY if its timestamp is strictly
-// newer than our local write timestamp for that key.
-//
-//  Firestore ts  >  local ts  →  apply  (other device edited more recently)
-//  Firestore ts  ≤  local ts  →  skip   (we edited more recently, or same)
+// Apply one Firestore document to localStorage.
+// Skipped if the key has an in-flight local edit (our pending write wins).
 function _applyFSDoc(d){
   if(!d || !d.key || d.val===undefined || _skipFS(d.key)) return false;
-  var localTS = parseInt(_origGetItem('dm_ts_'+d.key)||'0',10);
-  var fsTS    = parseInt(d.ts||'0',10);
-  if(fsTS > localTS){
-    _origSetItem(d.key, d.val);
-    _origSetItem('dm_ts_'+d.key, String(fsTS));
-    return true;
-  }
-  return false;
+  if(_hasEdit(d.key)) return false;   // our pending write, don't overwrite
+  if(_origGetItem(d.key) === d.val)   return false;   // no change
+  _origSetItem(d.key, d.val);
+  return true;
 }
 
 function _rerender(){
@@ -144,56 +138,62 @@ function _loadFromFS(uid, cb){
   }
 
   if(hasLocal){
-    // Render immediately from localStorage.
-    // _bootMode=true: init() writes go to localStorage only, dm_ts_ untouched.
-    cb();
-    // Now init() is done. Open the write gate — user edits after this point
-    // will stamp dm_ts_ and push to Firestore.
+    cb();           // render immediately — _bootMode=true so init() writes don't push to FS
     _bootMode = false;
-    // Attach listener. First snapshot = catch-up (uses migration dm_ts_ values,
-    // which are pre-init and correctly reflect when we last edited each key).
-    // Subsequent snapshots = real-time updates from the other device.
     _startRealtimeListener(uid);
+
+    // Background: pull Firestore, apply anything newer (skip in-flight edits)
+    _db.collection('users').doc(uid).collection('appdata').get()
+      .then(function(snap){
+        if(snap.empty){ _doFSFullSync(); return; }
+        var changed = false;
+        snap.forEach(function(doc){ if(_applyFSDoc(doc.data())) changed=true; });
+        if(changed){ _syncStatus('recv'); _rerender(); }
+        else _syncStatus('ok');
+      })
+      .catch(function(e){ _syncStatus('err', String(e).slice(0,40)); });
+
   } else {
-    // No local data: must load from Firestore first.
     _db.collection('users').doc(uid).collection('appdata').get()
       .then(function(snap){
         snap.forEach(function(doc){
           var d=doc.data();
-          if(d.key && d.val!==undefined && !_skipFS(d.key)){
-            _origSetItem(d.key, d.val);
-            _origSetItem('dm_ts_'+d.key, String(d.ts||Date.now()));
-          }
+          if(d.key && d.val!==undefined && !_skipFS(d.key)) _origSetItem(d.key, d.val);
         });
         if(snap.empty) _doFSFullSync();
         cb();
         _bootMode = false;
         _startRealtimeListener(uid);
+        _syncStatus('ok');
       })
-      .catch(function(){
-        cb();
-        _bootMode = false;
-        _startRealtimeListener(uid);
+      .catch(function(e){
+        _syncStatus('err', String(e).slice(0,40));
+        cb(); _bootMode = false; _startRealtimeListener(uid);
       });
   }
 }
 
 // ── Realtime listener ─────────────────────────────────────────────────────────
-// Every snapshot (initial catch-up AND ongoing changes) runs _applyFSDoc.
-// Per-key timestamp comparison handles everything:
-//   • First callback on boot: applies other device's newer keys (catch-up)
-//   • Subsequent callbacks: applies real-time edits from the other device
-//   • Own confirmed writes: ts == localTS → not re-applied
-//   • Own in-flight writes: localTS > Firestore ts → never overwritten
+// Skip the first snapshot (same state the background .get() already applied).
+// Every subsequent snapshot is a real write from the other device.
 function _startRealtimeListener(uid){
   if(_fsUnsubscribe) _fsUnsubscribe();
   var ref = _db.collection('users').doc(_uid).collection('appdata');
+  var first = true;
   _fsUnsubscribe = ref.onSnapshot(function(snap){
     if(!_appInited) return;
+    if(first){ first=false; return; }  // skip the initial echo
+
+    var snapSrc='';
+    snap.forEach(function(doc){
+      if(doc.id==='_syncTS') snapSrc=doc.data().src||'';
+    });
+    if(snapSrc===_deviceId) return;    // our own write bouncing back
+
     var changed = false;
     snap.forEach(function(doc){ if(_applyFSDoc(doc.data())) changed=true; });
-    if(changed) _rerender();
-  }, function(err){ console.warn('FS listener error:',err); });
+    if(changed){ _syncStatus('recv'); _rerender(); }
+  }, function(err){ _syncStatus('err', String(err).slice(0,40)); });
 }
 
 // ============================================================
