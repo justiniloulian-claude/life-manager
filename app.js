@@ -14,97 +14,94 @@ var _fbConfig = {
 firebase.initializeApp(_fbConfig);
 var _db   = firebase.firestore();
 var _auth = firebase.auth();
-var _uid  = null;   // set after login
+var _uid  = null;
 var _appInited = false;
+var _fsUnsubscribe = null;  // real-time listener handle
+var _ownSyncTS = 0;         // timestamp of our last write — used to ignore our own snapshots
 
-// Patch localStorage so every dm_ write stamps a local timestamp + schedules sync
+// Patch localStorage so every dm_ write auto-syncs to Firestore
 var _origSetItem = localStorage.setItem.bind(localStorage);
 var _origGetItem = localStorage.getItem.bind(localStorage);
 localStorage.setItem = function(key, value) {
   _origSetItem(key, value);
-  if(_uid && key && key.startsWith('dm_') && key !== 'dm_localTS') {
-    // Stamp local modification time immediately so refresh knows local is newest
-    _origSetItem('dm_localTS', String(Date.now()));
-    _scheduleFSSync();
-  }
+  if(_uid && key && key.startsWith('dm_')) _scheduleFSSync();
 };
 
 var _syncTimer = null;
 function _scheduleFSSync() {
   clearTimeout(_syncTimer);
-  _syncTimer = setTimeout(_doFSSync, 400);
+  _syncTimer = setTimeout(_doFSSync, 250);
 }
 
 function _doFSSync() {
   if(!_uid) return;
-  var now = String(Date.now());
-  _origSetItem('dm_localTS', now);          // keep local TS in sync with what we upload
+  var now = Date.now();
+  _ownSyncTS = now;
   var batch = _db.batch();
   var ref = _db.collection('users').doc(_uid).collection('appdata');
   for(var i = 0; i < localStorage.length; i++) {
     var k = localStorage.key(i);
     if(k && k.startsWith('dm_')) {
-      var docId = k.replace(/\//g,'__');
-      batch.set(ref.doc(docId), { key: k, val: _origGetItem(k) });
+      batch.set(ref.doc(k.replace(/\//g,'__')), { key: k, val: _origGetItem(k) });
     }
   }
-  // Write a cloud timestamp so other devices know when Firestore was last updated
-  batch.set(ref.doc('_cloudTS'), { key: '_cloudTS', val: now });
+  // _syncTS lets other devices know this is a fresh write
+  batch.set(ref.doc('_syncTS'), { val: String(now) });
   batch.commit().catch(function(err){ console.warn('FS sync error:', err); });
 }
 
-function _hasLocalData() {
-  for(var i = 0; i < localStorage.length; i++) {
-    var k = localStorage.key(i);
-    if(k && k.startsWith('dm_') && k !== 'dm_darkMode' && k !== 'dm_localTS') return true;
-  }
-  return false;
-}
-
+// Load all data from Firestore into localStorage, then boot the app
 function _loadFromFS(uid, cb) {
   _db.collection('users').doc(uid).collection('appdata').get()
     .then(function(snap) {
       if(snap.empty) {
-        // Firestore empty — first ever login, upload what's here
+        // First ever login — upload existing localStorage data
         _doFSSync();
-        cb();
-        return;
-      }
-
-      // Read Firestore's cloud timestamp and all docs
-      var cloudTS = 0;
-      var docs = [];
-      snap.forEach(function(doc) {
-        var d = doc.data();
-        if(d.key === '_cloudTS') { cloudTS = parseInt(d.val) || 0; }
-        else if(d.key && d.val !== undefined) docs.push(d);
-      });
-
-      var localTS  = parseInt(_origGetItem('dm_localTS')) || 0;
-      var hasLocal = _hasLocalData();
-
-      if(hasLocal && localTS === 0) {
-        // Device has data but hasn't run the new timestamp system yet.
-        // Trust local — it was just modified this session. Upload it.
-        _doFSSync();
-        cb();
-        return;
-      }
-
-      if(!hasLocal || cloudTS > localTS) {
-        // No local data (new device) OR cloud is provably newer — load from Firestore
-        docs.forEach(function(d) { _origSetItem(d.key, d.val); });
-        _origSetItem('dm_localTS', String(cloudTS));
       } else {
-        // Local is same age or newer — use it, push up to Firestore
-        _doFSSync();
+        // Always trust Firestore on startup — it's the source of truth
+        snap.forEach(function(doc) {
+          var d = doc.data();
+          if(d.key && d.val !== undefined) _origSetItem(d.key, d.val);
+        });
       }
       cb();
+      // Start real-time listener so changes from other devices appear automatically
+      _startRealtimeListener(uid);
     })
     .catch(function(err) {
       console.warn('FS load error:', err);
-      cb();
+      cb(); // still boot even if offline
     });
+}
+
+// Real-time listener — applies changes made on other devices instantly
+function _startRealtimeListener(uid) {
+  if(_fsUnsubscribe) _fsUnsubscribe();
+  var ref = _db.collection('users').doc(uid).collection('appdata');
+  _fsUnsubscribe = ref.onSnapshot(function(snap) {
+    if(!_appInited) return;
+    // Check if this snapshot was triggered by our own write — if so, skip it
+    var snapTS = 0;
+    snap.forEach(function(doc) {
+      if(doc.id === '_syncTS') snapTS = parseInt(doc.data().val) || 0;
+    });
+    if(snapTS && snapTS === _ownSyncTS) return; // our own write, ignore
+    if(snapTS && snapTS < _ownSyncTS) return;   // older than our last write, ignore
+
+    // Apply changes from the other device into localStorage
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      if(d.key && d.val !== undefined) _origSetItem(d.key, d.val);
+    });
+    // Re-render the current view to show the new data
+    try { refresh(); } catch(e){}
+    try {
+      if(state.currentPage==='notes') renderNotes();
+      if(state.currentPage==='calendar') renderCalendar();
+      if(state.currentPage==='financial') renderFinancial();
+      if(state.currentPage==='learning') renderLearning();
+    } catch(e){}
+  }, function(err){ console.warn('FS listener error:', err); });
 }
 
 // ============================================================
