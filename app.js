@@ -18,30 +18,29 @@ var _uid  = null;
 var _appInited = false;
 var _fsUnsubscribe = null;
 var _ownSyncTS = 0;
+var _bootTS    = 0; // set to Date.now() at session start — filters pre-session snapshots
 
-// Enable offline persistence where available (Chrome/Edge).
-// Safari may not support it — dm_localTS guard below covers that case.
+// Enable offline persistence where available (helps in Chrome/Edge)
 _db.enablePersistence({ synchronizeTabs: true }).catch(function(err) {
-  console.warn('Firestore persistence unavailable (' + err.code + ') — using localTS guard');
+  console.warn('Firestore persistence unavailable:', err.code);
 });
 
-// dm_localTS: written to localStorage on every local change, NEVER synced to
-// Firestore. On startup we compare it against Firestore's _syncTS to detect
-// whether this device has unconfirmed writes that need to be pushed up.
-var SKIP_FS = { 'dm_localTS': true }; // keys never written to / read from Firestore
+// dm_localTS: stamped locally on every write, NEVER written to or read from Firestore.
+// Lets us detect on reload whether this device has writes that may not have
+// reached the Firestore server yet.
+var SKIP_FS = { 'dm_localTS': true };
 
-// Patch localStorage so every dm_ write stamps a local timestamp and syncs to Firestore
 var _origSetItem = localStorage.setItem.bind(localStorage);
 var _origGetItem = localStorage.getItem.bind(localStorage);
 localStorage.setItem = function(key, value) {
   _origSetItem(key, value);
   if(key && key.startsWith('dm_') && !SKIP_FS[key]) {
-    _origSetItem('dm_localTS', String(Date.now())); // local-only timestamp
+    _origSetItem('dm_localTS', String(Date.now()));
     if(_uid) _fsSaveKey(key, value);
   }
 };
 
-// Write a single changed key to Firestore immediately
+// Write one key to Firestore immediately
 function _fsSaveKey(key, value) {
   if(!_uid) return;
   var now = Date.now();
@@ -53,7 +52,7 @@ function _fsSaveKey(key, value) {
   batch.commit().catch(function(err){ console.warn('FS write err:', err); });
 }
 
-// Full sync — writes every dm_ key to Firestore (excludes local-only keys)
+// Write every dm_ key to Firestore (first login or recovery)
 function _doFSFullSync() {
   if(!_uid) return;
   var now = Date.now();
@@ -70,56 +69,58 @@ function _doFSFullSync() {
   batch.commit().catch(function(err){ console.warn('FS full sync err:', err); });
 }
 
-// Load data on startup.
-// Strategy: try Firestore cache first (includes pending writes if persistence works).
-// If cache is unavailable, fall back to server — but if dm_localTS > server _syncTS,
-// this device has unconfirmed local writes so we keep local and push up instead.
-function _loadFromFS(uid, cb) {
-  var ref = _db.collection('users').doc(uid).collection('appdata');
-
-  function _boot(snap, fromCache) {
-    if(snap.empty) {
-      _doFSFullSync();
-    } else if(!fromCache) {
-      // Came from server — check whether local data is newer (write was in-flight)
-      var localTS = parseInt(_origGetItem('dm_localTS') || '0');
-      var fsTS = 0;
-      snap.forEach(function(doc) {
-        if(doc.id === '_syncTS') fsTS = parseInt(doc.data().val) || 0;
-      });
-      if(localTS > fsTS) {
-        // Local is ahead — keep local data and push it to Firestore
-        _doFSFullSync();
-      } else {
-        // Firestore is current — load it
-        snap.forEach(function(doc) {
-          var d = doc.data();
-          if(d.key && d.val !== undefined && !SKIP_FS[d.key]) _origSetItem(d.key, d.val);
-        });
-      }
-    } else {
-      // Came from cache (includes pending writes) — always trust it
-      snap.forEach(function(doc) {
-        var d = doc.data();
-        if(d.key && d.val !== undefined && !SKIP_FS[d.key]) _origSetItem(d.key, d.val);
-      });
-    }
-    cb();
-    _startRealtimeListener(uid);
+// Called with a Firestore snapshot (from cache or server).
+// Applies the snapshot UNLESS local data is newer (unconfirmed write in-flight).
+function _applySnap(snap) {
+  if(snap.empty) {
+    _doFSFullSync(); // first login — push local
+    return;
   }
+  var localTS = parseInt(_origGetItem('dm_localTS') || '0');
+  var fsTS = 0;
+  snap.forEach(function(doc) {
+    if(doc.id === '_syncTS') fsTS = parseInt(doc.data().val) || 0;
+  });
+  if(localTS > fsTS) {
+    // This device wrote something more recently than Firestore's last confirmed write.
+    // Keep local data (it's in localStorage already) and push it up.
+    _doFSFullSync();
+  } else {
+    // Firestore is current — overwrite localStorage with it
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      if(d.key && d.val !== undefined && !SKIP_FS[d.key]) _origSetItem(d.key, d.val);
+    });
+  }
+}
 
-  // Try cache first (has pending writes if persistence is working)
+function _loadFromFS(uid, cb) {
+  _bootTS = Date.now();
+  var ref = _db.collection('users').doc(uid).collection('appdata');
+  // Try IndexedDB cache first (includes pending writes if offline persistence works)
   ref.get({ source: 'cache' })
-    .then(function(snap) { _boot(snap, true); })
+    .then(function(snap) {
+      _applySnap(snap);
+      cb();
+      _startRealtimeListener(uid);
+    })
     .catch(function() {
-      // No cache — load from server with localTS guard as fallback
+      // No cache — load from server
       ref.get()
-        .then(function(snap) { _boot(snap, false); })
-        .catch(function(err) { console.warn('FS load error:', err); cb(); });
+        .then(function(snap) {
+          _applySnap(snap);
+          cb();
+          _startRealtimeListener(uid);
+        })
+        .catch(function(err) {
+          console.warn('FS load error:', err);
+          cb();
+          _startRealtimeListener(uid);
+        });
     });
 }
 
-// Real-time listener — applies changes from other devices instantly
+// Real-time listener — receives changes from other devices
 function _startRealtimeListener(uid) {
   if(_fsUnsubscribe) _fsUnsubscribe();
   var ref = _db.collection('users').doc(uid).collection('appdata');
@@ -129,8 +130,9 @@ function _startRealtimeListener(uid) {
     snap.forEach(function(doc) {
       if(doc.id === '_syncTS') snapTS = parseInt(doc.data().val) || 0;
     });
-    if(snapTS && snapTS === _ownSyncTS) return; // our own write
-    if(snapTS && snapTS < _ownSyncTS) return;   // stale
+    // Ignore our own writes and anything written before this session loaded
+    if(snapTS && snapTS === _ownSyncTS) return;
+    if(snapTS && snapTS < _bootTS) return;
 
     snap.forEach(function(doc) {
       var d = doc.data();
