@@ -18,38 +18,42 @@ var _uid  = null;
 var _appInited = false;
 var _fsUnsubscribe = null;
 
-// Offline persistence disabled — with it on, batch.commit() resolves from the
-// local IndexedDB cache and shows ✓ even when Firestore server never received
-// the write, making failures invisible. Without it, ✓ means server confirmed.
-// localStorage already keeps data through refreshes, so offline persistence
-// is not needed for the refresh-survival use-case.
+// Offline persistence: survives refresh even before server confirms the write.
+// When the page reloads, onSnapshot fires from IndexedDB cache which already
+// contains pending writes — so the value matches localStorage → no overwrite.
+_db.enablePersistence({synchronizeTabs: true})
+  .catch(function(err){ console.warn('FS persistence unavailable:', err.code); });
 
 var _origSetItem = localStorage.setItem.bind(localStorage);
 var _origGetItem = localStorage.getItem.bind(localStorage);
 
 // ── Device identity ───────────────────────────────────────────────────────────
-// Use sessionStorage so iCloud Safari sync never shares the same ID between
-// Mac and iPhone. Each browser session is a distinct device for sync purposes.
+// sessionStorage: never synced by iCloud, so Mac and iPhone always get
+// different IDs. A new ID per session is fine — the snapSrc===_deviceId check
+// skips our OWN writes; value-equality in _applyFSDoc handles same-value docs.
 var _deviceId = sessionStorage.getItem('dm_deviceId');
 if(!_deviceId){
   _deviceId = 'dev_' + Date.now() + '_' + Math.random().toString(36).slice(2,9);
   sessionStorage.setItem('dm_deviceId', _deviceId);
 }
-// Clean up any old localStorage copy so it doesn't confuse anything.
+// Remove any old localStorage copies (iCloud would sync those between devices).
 localStorage.removeItem('dm_deviceId');
+// Remove old dm_wts_* keys — they were stored in localStorage in v99-v102 and
+// iCloud would sync them cross-device, corrupting conflict resolution.
+(function(){
+  var toRemove = [];
+  for(var i=0; i<localStorage.length; i++){
+    var k=localStorage.key(i);
+    if(k && k.startsWith('dm_wts_')) toRemove.push(k);
+  }
+  toRemove.forEach(function(k){ localStorage.removeItem(k); });
+})();
 
 function _skipFS(key){
   return key === 'dm_deviceId' ||
          key === 'dm_last_opened' ||
          key.startsWith('dm_wts_');
 }
-
-// Per-key write timestamps — kept in memory only (NOT localStorage) so that
-// iCloud Safari sync cannot share timestamps between Mac and iPhone, which
-// would make _applyFSDoc think the other device's writes are "already local".
-var _wtsMap = {};
-function _setWts(key){ _wtsMap[key] = Date.now(); }
-function _getWts(key){ return _wtsMap[key] || 0; }
 
 var _syncBadge = null;
 function _initSyncBadge(){
@@ -58,14 +62,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v104 …';
+  b.textContent = 'v105 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v104 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v105 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -78,7 +82,6 @@ var _bootMode = true;
 localStorage.setItem = function(key, value){
   _origSetItem(key, value);
   if(!_bootMode && key && key.startsWith('dm_') && !_skipFS(key)){
-    _setWts(key);
     if(_uid) _fsSaveKey(key, value);
   }
 };
@@ -86,7 +89,7 @@ localStorage.setItem = function(key, value){
 function _fsSaveKey(key, value){
   if(!_uid) return;
   _syncStatus('send');
-  var ts = _getWts(key);
+  var ts = Date.now();
   var batch = _db.batch();
   var ref = _db.collection('users').doc(_uid).collection('appdata');
   batch.set(ref.doc(key.replace(/\//g,'__')), {key:key, val:value, ts:ts, src:_deviceId});
@@ -110,20 +113,14 @@ function _doFSFullSync(){
   batch.commit().catch(function(e){ _syncStatus('err', String(e).slice(0,40)); });
 }
 
-// _applyFSDoc: apply a Firestore doc to localStorage if it's newer than local.
-// The snapSrc===_deviceId check in the listener already guarantees we only
-// get here when ANOTHER device wrote last — so apply unless our local write
-// is provably newer. BOTH timestamps must be real (>0) for local to win;
-// if fsTs===0 (old pre-stamp doc) we always apply so legacy data can sync.
+// _applyFSDoc: write Firestore value into localStorage if it differs.
+// The snapSrc===_deviceId guard in the listener/poll already ensures we only
+// reach this when another device was the last writer, so we always apply.
+// Value-equality check prevents unnecessary rerenders for unchanged keys.
 function _applyFSDoc(d){
   if(!d || !d.key || d.val===undefined || _skipFS(d.key)) return false;
-  if(_origGetItem(d.key) === d.val) return false;  // no change needed
-  var localWts = _getWts(d.key);
-  var fsTs     = Number(d.ts || '0');
-  // Block only when BOTH timestamps are valid AND local is newer-or-equal
-  if(localWts > 0 && fsTs > 0 && fsTs <= localWts) return false;
+  if(_origGetItem(d.key) === d.val) return false; // already up to date
   _origSetItem(d.key, d.val);
-  _wtsMap[d.key] = fsTs > 0 ? fsTs : Date.now();
   return true;
 }
 
