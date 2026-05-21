@@ -48,14 +48,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v100 …';
+  b.textContent = 'v101 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v100 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v101 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -188,6 +188,25 @@ function _startRealtimeListener(uid){
     else _syncStatus('ok');
   }, function(err){ _syncStatus('err', String(err).slice(0,40)); });
 }
+
+// ── Cross-device poll ─────────────────────────────────────────────────────────
+// The real-time listener can miss updates on mobile (iOS throttles background
+// WebSocket connections). This poll runs whenever the page becomes visible so
+// the user always sees fresh data when they switch back to the app.
+// _applyFSDoc's timestamp protection means Mac's own edits are never clobbered.
+function _pollForUpdates(){
+  if(!_uid || !_appInited) return;
+  _db.collection('users').doc(_uid).collection('appdata').get()
+    .then(function(snap){
+      var changed=false;
+      snap.forEach(function(doc){ if(_applyFSDoc(doc.data())) changed=true; });
+      if(changed){ _syncStatus('recv'); _rerender(); }
+    })
+    .catch(function(){});
+}
+document.addEventListener('visibilitychange', function(){
+  if(!document.hidden) _pollForUpdates();
+});
 
 // ============================================================
 // COLOR OPTIONS
