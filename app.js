@@ -18,8 +18,11 @@ var _uid  = null;
 var _appInited = false;
 var _fsUnsubscribe = null;
 
-_db.enablePersistence({synchronizeTabs: true})
-  .catch(function(err){ console.warn('FS persistence unavailable:', err.code); });
+// Offline persistence disabled — with it on, batch.commit() resolves from the
+// local IndexedDB cache and shows ✓ even when Firestore server never received
+// the write, making failures invisible. Without it, ✓ means server confirmed.
+// localStorage already keeps data through refreshes, so offline persistence
+// is not needed for the refresh-survival use-case.
 
 var _origSetItem = localStorage.setItem.bind(localStorage);
 var _origGetItem = localStorage.getItem.bind(localStorage);
@@ -55,14 +58,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v103 …';
+  b.textContent = 'v104 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v103 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v104 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
