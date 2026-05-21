@@ -18,17 +18,15 @@ var _uid  = null;
 var _appInited = false;
 var _fsUnsubscribe = null;
 
-// Force long-polling instead of WebSocket — WebSocket connections to Firestore
-// are silently dropped on Safari/iOS and some networks, causing writes to queue
-// in IndexedDB forever and never reach the server. Long-polling is slower but
-// always gets through. autoDetect tries WebSocket first, falls back if needed.
-_db.settings({experimentalAutoDetectLongPolling: true, merge: true});
+// Force long-polling — WebSocket to Firestore is silently dropped on Safari/iOS.
+// Long-polling uses plain HTTP so it always gets through.
+_db.settings({experimentalForceLongPolling: true, merge: true});
 
-// Offline persistence: survives refresh even before server confirms the write.
-// When the page reloads, onSnapshot fires from IndexedDB cache which already
-// contains pending writes — so the value matches localStorage → no overwrite.
-_db.enablePersistence({synchronizeTabs: true})
-  .catch(function(err){ console.warn('FS persistence unavailable:', err.code); });
+// No offline persistence. The IndexedDB queue from earlier broken-WebSocket
+// sessions was blocking all new writes from ever reaching the server.
+// Refresh safety comes from the _FS_TS_MIN floor in _applyFSDoc instead:
+// legacy docs (ts=1) never overwrite localStorage, so local edits survive
+// refresh regardless of what Firestore has.
 
 var _origSetItem = localStorage.setItem.bind(localStorage);
 var _origGetItem = localStorage.getItem.bind(localStorage);
@@ -68,14 +66,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v107 …';
+  b.textContent = 'v108 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v107 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v108 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -120,7 +118,7 @@ function _doFSFullSync(){
 }
 
 // Minimum timestamp that counts as a real user write.
-// Our Python script stamped legacy docs with ts=1. Any real write from v107+
+// Our Python script stamped legacy docs with ts=1. Any real write from v108+
 // uses Date.now() which is ~1.7 trillion (milliseconds since epoch in 2026).
 // Docs below this floor are treated as stale and will never overwrite local data.
 var _FS_TS_MIN = 1704067200000; // 2024-01-01 in ms
