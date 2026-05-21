@@ -18,6 +18,12 @@ var _uid  = null;
 var _appInited = false;
 var _fsUnsubscribe = null;
 
+// Force long-polling instead of WebSocket — WebSocket connections to Firestore
+// are silently dropped on Safari/iOS and some networks, causing writes to queue
+// in IndexedDB forever and never reach the server. Long-polling is slower but
+// always gets through. autoDetect tries WebSocket first, falls back if needed.
+_db.settings({experimentalAutoDetectLongPolling: true, merge: true});
+
 // Offline persistence: survives refresh even before server confirms the write.
 // When the page reloads, onSnapshot fires from IndexedDB cache which already
 // contains pending writes — so the value matches localStorage → no overwrite.
@@ -62,14 +68,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v105 …';
+  b.textContent = 'v106 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v105 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v106 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
