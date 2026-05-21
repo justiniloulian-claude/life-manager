@@ -18,15 +18,9 @@ var _uid  = null;
 var _appInited = false;
 var _fsUnsubscribe = null;
 
-// ── Offline persistence ───────────────────────────────────────────────────────
-// This is the key to edits surviving refresh even before the server confirms.
-// Firebase caches writes locally (IndexedDB) so a refresh sees your own pending
-// writes immediately, just like Google Keep / Notes.
+// Offline persistence: belt-and-suspenders so pending writes survive tab close.
 _db.enablePersistence({synchronizeTabs: true})
-  .catch(function(err){
-    // Non-fatal: app still works, edits just need server confirmation before refresh
-    console.warn('Firestore persistence unavailable (' + err.code + '). Edits may not survive rapid refresh.');
-  });
+  .catch(function(err){ console.warn('FS persistence unavailable:', err.code); });
 
 var _origSetItem = localStorage.setItem.bind(localStorage);
 var _origGetItem = localStorage.getItem.bind(localStorage);
@@ -38,11 +32,23 @@ if(!_deviceId){
   _origSetItem('dm_deviceId', _deviceId);
 }
 
-// ── Keys never synced to Firestore ───────────────────────────────────────────
-// dm_last_opened is per-device (controls missed-tasks modal) — don't sync it.
+// ── Keys never pushed to Firestore ───────────────────────────────────────────
+// dm_last_opened: per-device (drives missed-tasks modal, must not cross-sync)
+// dm_wts_*: per-device write-timestamps used for conflict resolution
 function _skipFS(key){
-  return key === 'dm_deviceId' || key === 'dm_last_opened';
+  return key === 'dm_deviceId' ||
+         key === 'dm_last_opened' ||
+         key.startsWith('dm_wts_');
 }
+
+// ── Per-key write timestamps ──────────────────────────────────────────────────
+// Saved in localStorage at the moment a USER edit happens (never during init).
+// Compared against Firestore doc.ts to decide which version is newer.
+// Rule: keep local if localWts >= fsTs  (local write is same age or newer)
+//       apply FS   if fsTs > localWts   (Firestore has a more recent write)
+//       fresh key  if localWts === 0    (never written locally → FS always wins)
+function _setWts(key)  { _origSetItem('dm_wts_' + key, String(Date.now())); }
+function _getWts(key)  { return Number(_origGetItem('dm_wts_' + key) || '0'); }
 
 // ── Visible sync status badge ─────────────────────────────────────────────────
 var _syncBadge = null;
@@ -52,14 +58,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v97 …';
+  b.textContent = 'v98 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
-  var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗', boot:'⟳'};
-  _syncBadge.textContent = 'v97 ' + (icons[st]||st) + (detail?' '+detail:'');
+  var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
+  _syncBadge.textContent = 'v98 ' + (icons[st]||st) + (detail?' '+detail:'');
   _syncBadge.style.background = st==='err'  ? 'rgba(180,0,0,0.85)' :
                                   st==='ok'   ? 'rgba(0,120,0,0.75)' :
                                   st==='recv' ? 'rgba(0,80,160,0.75)' :
@@ -68,50 +74,61 @@ function _syncStatus(st, detail){
 document.addEventListener('DOMContentLoaded', _initSyncBadge);
 
 // ── _bootMode ─────────────────────────────────────────────────────────────────
-// TRUE while init() runs so computed/seeded writes don't push to Firestore.
+// TRUE while init() runs.  Prevents seeded/computed writes from:
+//   (a) being pushed to Firestore, and
+//   (b) updating dm_wts_ timestamps (which would make local look "newer" and
+//       permanently block other-device edits from ever applying).
 var _bootMode = true;
 
 // ── Write intercept ───────────────────────────────────────────────────────────
 localStorage.setItem = function(key, value){
   _origSetItem(key, value);
   if(!_bootMode && key && key.startsWith('dm_') && !_skipFS(key)){
-    if(_uid) _fsSaveKey(key, value);
+    _setWts(key);                    // record user-write timestamp
+    if(_uid) _fsSaveKey(key, value); // push to Firestore
   }
 };
 
 function _fsSaveKey(key, value){
   if(!_uid) return;
   _syncStatus('send');
-  var now = Date.now();
+  var ts = _getWts(key);  // use the same timestamp we stored locally
   var batch = _db.batch();
   var ref = _db.collection('users').doc(_uid).collection('appdata');
-  batch.set(ref.doc(key.replace(/\//g,'__')), {key:key, val:value, ts:now, src:_deviceId});
-  batch.set(ref.doc('_syncTS'), {val:String(now), src:_deviceId});
-  // With persistence the batch is cached locally immediately — server confirms async.
+  batch.set(ref.doc(key.replace(/\//g,'__')), {key:key, val:value, ts:ts, src:_deviceId});
+  batch.set(ref.doc('_syncTS'), {val:String(ts), src:_deviceId});
   batch.commit()
     .then(function(){ _syncStatus('ok'); })
     .catch(function(e){ console.error('FS write err:', e); _syncStatus('err', String(e).slice(0,40)); });
 }
 
 function _doFSFullSync(){
-  // Push everything currently in localStorage up to Firestore.
-  // Called once on first-ever load when Firestore collection is empty.
+  // First-ever session: push all localStorage data up to Firestore.
   if(!_uid) return;
-  var now = Date.now();
+  var ts = Date.now();
   var batch = _db.batch();
   var ref = _db.collection('users').doc(_uid).collection('appdata');
-  for(var i=0;i<localStorage.length;i++){
-    var k=localStorage.key(i);
+  for(var i=0; i<localStorage.length; i++){
+    var k = localStorage.key(i);
     if(k && k.startsWith('dm_') && !_skipFS(k))
-      batch.set(ref.doc(k.replace(/\//g,'__')), {key:k, val:_origGetItem(k), ts:now, src:_deviceId});
+      batch.set(ref.doc(k.replace(/\//g,'__')), {key:k, val:_origGetItem(k), ts:ts, src:_deviceId});
   }
-  batch.set(ref.doc('_syncTS'), {val:String(now), src:_deviceId});
+  batch.set(ref.doc('_syncTS'), {val:String(ts), src:_deviceId});
   batch.commit().catch(function(e){ _syncStatus('err', String(e).slice(0,40)); });
 }
 
+// ── Apply one Firestore doc to localStorage ───────────────────────────────────
+// THE KEY RULE: only overwrite local data if Firestore's write is provably newer.
+//   localWts === 0  → key was never written by user on this device → FS wins
+//   fsTs > localWts → Firestore write happened after our last local write → FS wins
+//   fsTs <= localWts → local write is same age or newer → keep local (protects
+//                      edits that haven't confirmed to server yet on refresh)
 function _applyFSDoc(d){
   if(!d || !d.key || d.val===undefined || _skipFS(d.key)) return false;
-  if(_origGetItem(d.key) === d.val) return false;   // no change
+  if(_origGetItem(d.key) === d.val) return false;   // value identical, skip
+  var localWts = _getWts(d.key);
+  var fsTs     = Number(d.ts || '0');
+  if(localWts > 0 && fsTs <= localWts) return false; // local is newer-or-equal, protect it
   _origSetItem(d.key, d.val);
   return true;
 }
@@ -126,63 +143,81 @@ function _rerender(){
   }catch(e){}
 }
 
-// ── Unified sync: boot + realtime ─────────────────────────────────────────────
-// With persistence enabled, the FIRST onSnapshot fires immediately from the
-// local IndexedDB cache (which includes any pending/unconfirmed writes from the
-// previous session). This is why edits survive refresh even before the server
-// confirms them. No separate background .get() needed.
-function _startSync(uid, cb){
+// ── Boot loader ───────────────────────────────────────────────────────────────
+// If local data exists: render immediately (fast), then background-merge Firestore.
+// If no local data: fetch Firestore first, populate localStorage, then render.
+function _loadFromFS(uid, cb){
+  var hasLocal = false;
+  for(var i=0; i<localStorage.length; i++){
+    var k = localStorage.key(i);
+    if(k && k.startsWith('dm_') && !_skipFS(k)){ hasLocal = true; break; }
+  }
+
+  if(hasLocal){
+    // Render immediately from localStorage — user sees their data with zero wait.
+    _bootMode = true;
+    cb();           // _appInited=true, hide login, init() runs
+    _bootMode = false;
+    _startRealtimeListener(uid);
+
+    // Background: merge Firestore. _applyFSDoc uses timestamps so local edits win.
+    _db.collection('users').doc(uid).collection('appdata').get()
+      .then(function(snap){
+        if(snap.empty){ _doFSFullSync(); return; }
+        var changed = false;
+        snap.forEach(function(doc){ if(_applyFSDoc(doc.data())) changed = true; });
+        if(changed){ _syncStatus('recv'); _rerender(); }
+        else _syncStatus('ok');
+      })
+      .catch(function(e){ _syncStatus('err', String(e).slice(0,40)); });
+
+  } else {
+    // Fresh device: Firestore is the source of truth, fetch it first.
+    _db.collection('users').doc(uid).collection('appdata').get()
+      .then(function(snap){
+        snap.forEach(function(doc){
+          var d = doc.data();
+          if(d && d.key && d.val !== undefined && !_skipFS(d.key))
+            _origSetItem(d.key, d.val);  // no timestamp check: localWts=0 so FS always wins
+        });
+        if(snap.empty) { /* first-ever load — seeded data pushed after init */ }
+        _bootMode = true;
+        cb();
+        _bootMode = false;
+        if(snap.empty) _doFSFullSync();  // push seeded data now that init() ran
+        _startRealtimeListener(uid);
+        _syncStatus('ok');
+      })
+      .catch(function(e){
+        _syncStatus('err', String(e).slice(0,40));
+        _bootMode = true; cb(); _bootMode = false;
+        _startRealtimeListener(uid);
+      });
+  }
+}
+
+// ── Realtime listener ─────────────────────────────────────────────────────────
+// Fires whenever Firestore changes. Skips the initial echo (same state as the
+// background .get() we already applied). All subsequent snapshots are real writes
+// from another device — apply via _applyFSDoc (timestamp-protected).
+function _startRealtimeListener(uid){
   if(_fsUnsubscribe) _fsUnsubscribe();
   var ref = _db.collection('users').doc(uid).collection('appdata');
-  var initialized = false;
-
+  var first = true;
   _fsUnsubscribe = ref.onSnapshot(function(snap){
+    if(!_appInited) return;
+    if(first){ first = false; return; }    // skip initial echo
 
-    if(!initialized){
-      // ── First snapshot: comes from local cache (fast). Apply all docs, then boot.
-      initialized = true;
-      _syncStatus('boot');
-      var anyData = false;
-      snap.forEach(function(doc){
-        var d = doc.data();
-        if(d && d.key && d.val !== undefined && !_skipFS(d.key)){
-          _origSetItem(d.key, d.val);
-          anyData = true;
-        }
-      });
-      // Boot the app with whatever data we just loaded
-      _bootMode = true;
-      cb();          // sets _appInited=true, hides login overlay, calls init()
-      _bootMode = false;
-      if(!anyData){
-        // Truly first-ever load: push seeded/local data up to Firestore
-        _doFSFullSync();
-      }
-      _syncStatus('ok');
+    var snapSrc = '';
+    snap.forEach(function(doc){
+      if(doc.id === '_syncTS') snapSrc = (doc.data().src || '');
+    });
+    if(snapSrc === _deviceId) return;      // our own write bouncing back
 
-    } else {
-      // ── Subsequent snapshots: changes from the other device
-      if(!_appInited) return;
-
-      // Skip bounce-back from our own writes
-      var snapSrc = '';
-      snap.forEach(function(doc){
-        if(doc.id === '_syncTS') snapSrc = (doc.data().src || '');
-      });
-      if(snapSrc === _deviceId) return;
-
-      var changed = false;
-      snap.forEach(function(doc){ if(_applyFSDoc(doc.data())) changed = true; });
-      if(changed){ _syncStatus('recv'); _rerender(); }
-    }
-
-  }, function(err){
-    _syncStatus('err', String(err).slice(0,40));
-    if(!initialized){
-      initialized = true;
-      _bootMode = true; cb(); _bootMode = false;
-    }
-  });
+    var changed = false;
+    snap.forEach(function(doc){ if(_applyFSDoc(doc.data())) changed = true; });
+    if(changed){ _syncStatus('recv'); _rerender(); }
+  }, function(err){ _syncStatus('err', String(err).slice(0,40)); });
 }
 
 // ============================================================
@@ -5537,10 +5572,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if(user) {
       _uid = user.uid;
       if(!_appInited) {
-        // Show loading spinner, then boot via _startSync (persistence + realtime)
         document.getElementById('loginLoading').style.display = 'block';
         document.getElementById('loginBtn').style.display = 'none';
-        _startSync(user.uid, function() {
+        _loadFromFS(user.uid, function() {
           _appInited = true;
           document.getElementById('loginOverlay').style.display = 'none';
           init();

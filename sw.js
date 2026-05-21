@@ -1,4 +1,4 @@
-// v97: unregister service worker and stop caching entirely.
+// v98: unregister service worker and stop caching entirely.
 // Caching was causing stale code to persist. App loads fresh from network every time.
 self.addEventListener('install', function() {
   self.skipWaiting();
