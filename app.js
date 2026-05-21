@@ -48,14 +48,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v101 …';
+  b.textContent = 'v102 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v101 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v102 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -102,15 +102,16 @@ function _doFSFullSync(){
 
 // _applyFSDoc: apply a Firestore doc to localStorage if it's newer than local.
 // The snapSrc===_deviceId check in the listener already guarantees we only
-// get here when ANOTHER device wrote — so we should apply unless our local
-// write on this device is provably newer (localWts > 0 && fsTs <= localWts).
+// get here when ANOTHER device wrote last — so apply unless our local write
+// is provably newer. BOTH timestamps must be real (>0) for local to win;
+// if fsTs===0 (old pre-stamp doc) we always apply so legacy data can sync.
 function _applyFSDoc(d){
   if(!d || !d.key || d.val===undefined || _skipFS(d.key)) return false;
-  if(_origGetItem(d.key) === d.val) return false;  // no change
+  if(_origGetItem(d.key) === d.val) return false;  // no change needed
   var localWts = _getWts(d.key);
   var fsTs     = Number(d.ts || '0');
-  // Only block if this device has a v99+ write timestamp AND it's newer-or-equal
-  if(localWts > 0 && fsTs <= localWts) return false;
+  // Block only when BOTH timestamps are valid AND local is newer-or-equal
+  if(localWts > 0 && fsTs > 0 && fsTs <= localWts) return false;
   _origSetItem(d.key, d.val);
   _origSetItem('dm_wts_' + d.key, String(fsTs > 0 ? fsTs : Date.now()));
   return true;
@@ -133,9 +134,10 @@ function _loadFromFS(uid, cb){
     if(k && k.startsWith('dm_') && !_skipFS(k)){ hasLocal=true; break; }
   }
   if(hasLocal){
-    // Boot immediately from localStorage.
-    // The listener (below) handles cross-device sync — including on boot.
-    _bootMode = true; cb(); _bootMode = false;
+    // Boot immediately from localStorage — listener handles cross-device sync.
+    _bootMode = true;
+    try { cb(); } catch(e) { console.error('[sync] init error:', e); }
+    _bootMode = false;
     _startRealtimeListener(uid);
   } else {
     // Fresh device: pull Firestore first, then boot.
@@ -149,14 +151,18 @@ function _loadFromFS(uid, cb){
             _origSetItem('dm_wts_'+d.key, String(ts>0?ts:Date.now()));
           }
         });
-        _bootMode=true; cb(); _bootMode=false;
+        _bootMode=true;
+        try { cb(); } catch(e) { console.error('[sync] init error:', e); }
+        _bootMode=false;
         if(snap.empty) _doFSFullSync();
         _startRealtimeListener(uid);
         _syncStatus('ok');
       })
       .catch(function(e){
         _syncStatus('err', String(e).slice(0,40));
-        _bootMode=true; cb(); _bootMode=false;
+        _bootMode=true;
+        try { cb(); } catch(er) { console.error('[sync] init error:', er); }
+        _bootMode=false;
         _startRealtimeListener(uid);
       });
   }
@@ -193,11 +199,18 @@ function _startRealtimeListener(uid){
 // The real-time listener can miss updates on mobile (iOS throttles background
 // WebSocket connections). This poll runs whenever the page becomes visible so
 // the user always sees fresh data when they switch back to the app.
-// _applyFSDoc's timestamp protection means Mac's own edits are never clobbered.
+// We honour the same snapSrc guard as the realtime listener so our own edits
+// are never clobbered by a stale poll.
 function _pollForUpdates(){
   if(!_uid || !_appInited) return;
   _db.collection('users').doc(_uid).collection('appdata').get()
     .then(function(snap){
+      // If WE wrote last, Firestore already has our data — nothing to apply.
+      var snapSrc='';
+      snap.forEach(function(doc){
+        if(doc.id==='_syncTS') snapSrc=(doc.data().src||'');
+      });
+      if(snapSrc===_deviceId) return;
       var changed=false;
       snap.forEach(function(doc){ if(_applyFSDoc(doc.data())) changed=true; });
       if(changed){ _syncStatus('recv'); _rerender(); }
