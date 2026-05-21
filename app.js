@@ -25,11 +25,15 @@ var _origSetItem = localStorage.setItem.bind(localStorage);
 var _origGetItem = localStorage.getItem.bind(localStorage);
 
 // ── Device identity ───────────────────────────────────────────────────────────
-var _deviceId = _origGetItem('dm_deviceId');
+// Use sessionStorage so iCloud Safari sync never shares the same ID between
+// Mac and iPhone. Each browser session is a distinct device for sync purposes.
+var _deviceId = sessionStorage.getItem('dm_deviceId');
 if(!_deviceId){
   _deviceId = 'dev_' + Date.now() + '_' + Math.random().toString(36).slice(2,9);
-  _origSetItem('dm_deviceId', _deviceId);
+  sessionStorage.setItem('dm_deviceId', _deviceId);
 }
+// Clean up any old localStorage copy so it doesn't confuse anything.
+localStorage.removeItem('dm_deviceId');
 
 function _skipFS(key){
   return key === 'dm_deviceId' ||
@@ -37,9 +41,12 @@ function _skipFS(key){
          key.startsWith('dm_wts_');
 }
 
-// Per-key write timestamps — set ONLY on real user writes (never during _bootMode)
-function _setWts(key){ _origSetItem('dm_wts_' + key, String(Date.now())); }
-function _getWts(key){ return Number(_origGetItem('dm_wts_' + key) || '0'); }
+// Per-key write timestamps — kept in memory only (NOT localStorage) so that
+// iCloud Safari sync cannot share timestamps between Mac and iPhone, which
+// would make _applyFSDoc think the other device's writes are "already local".
+var _wtsMap = {};
+function _setWts(key){ _wtsMap[key] = Date.now(); }
+function _getWts(key){ return _wtsMap[key] || 0; }
 
 var _syncBadge = null;
 function _initSyncBadge(){
@@ -48,14 +55,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v102 …';
+  b.textContent = 'v103 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v102 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v103 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -113,7 +120,7 @@ function _applyFSDoc(d){
   // Block only when BOTH timestamps are valid AND local is newer-or-equal
   if(localWts > 0 && fsTs > 0 && fsTs <= localWts) return false;
   _origSetItem(d.key, d.val);
-  _origSetItem('dm_wts_' + d.key, String(fsTs > 0 ? fsTs : Date.now()));
+  _wtsMap[d.key] = fsTs > 0 ? fsTs : Date.now();
   return true;
 }
 
@@ -148,7 +155,7 @@ function _loadFromFS(uid, cb){
           if(d && d.key && d.val!==undefined && !_skipFS(d.key)){
             _origSetItem(d.key, d.val);
             var ts=Number(d.ts||'0');
-            _origSetItem('dm_wts_'+d.key, String(ts>0?ts:Date.now()));
+            _wtsMap[d.key] = ts > 0 ? ts : Date.now();
           }
         });
         _bootMode=true;
