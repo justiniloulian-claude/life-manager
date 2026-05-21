@@ -1,5 +1,30 @@
 'use strict';
 
+// ── Wipe stale Firestore IndexedDB ────────────────────────────────────────────
+// Think of this like clearing a jammed printer queue. Earlier versions stored
+// writes in your browser's built-in database (IndexedDB). Those queued writes
+// never reached the server and are now blocking everything. We delete the whole
+// queue so the SDK starts fresh every time the page loads.
+(function(){
+  try {
+    if(indexedDB.databases){
+      indexedDB.databases().then(function(dbs){
+        dbs.forEach(function(db){
+          if(db.name && (db.name.indexOf('firestore')!==-1 || db.name.indexOf('firebase')!==-1)){
+            indexedDB.deleteDatabase(db.name);
+          }
+        });
+      });
+    } else {
+      // Safari fallback — delete known Firestore DB names directly
+      ['firestore/[DEFAULT]/justin-dashboard-b2746/main',
+       'firestore/[DEFAULT]/justin-dashboard-b2746/metadata'].forEach(function(n){
+        indexedDB.deleteDatabase(n);
+      });
+    }
+  } catch(e){}
+})();
+
 // ============================================================
 // FIREBASE — init, auth, sync
 // ============================================================
@@ -62,14 +87,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v113 …';
+  b.textContent = 'v114 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v113 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v114 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -98,17 +123,30 @@ function _fsSaveKey(key, value){
     .catch(function(e){ _syncStatus('err', String(e).slice(0,60)); });
 }
 
-// Called once after login to verify writes actually reach the server.
-// Result appears in the badge — if you see ✗ paste the error to Claude.
+// Called once after login to verify writes reach the server.
+// Shows a big red banner if it fails so we know exactly what's wrong.
 function _testWrite(uid){
   var ref = _db.collection('users').doc(uid).collection('appdata');
   ref.doc('_ping').set({ts: Date.now(), src: _deviceId})
-    .then(function(){ console.log('[sync] write test OK'); })
-    .catch(function(e){ _syncStatus('err', 'WRITE FAIL: '+String(e).slice(0,50)); });
+    .then(function(){
+      _syncStatus('ok');
+      console.log('[sync] write test PASSED');
+    })
+    .catch(function(e){
+      var msg = String(e);
+      console.error('[sync] write test FAILED:', msg);
+      _syncStatus('err', msg.slice(0,60));
+      // Big visible banner so we can't miss the error
+      var banner = document.createElement('div');
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;'+
+        'background:red;color:white;font-size:14px;padding:12px;text-align:center;font-family:monospace;';
+      banner.textContent = 'WRITE ERROR: ' + msg.slice(0,120);
+      document.body.appendChild(banner);
+    });
 }
 
 // Minimum timestamp that counts as a real user write.
-// Our Python script stamped legacy docs with ts=1. Any real write from v113+
+// Our Python script stamped legacy docs with ts=1. Any real write from v114+
 // uses Date.now() which is ~1.7 trillion (milliseconds since epoch in 2026).
 // Docs below this floor are treated as stale and will never overwrite local data.
 var _FS_TS_MIN = 1704067200000; // 2024-01-01 in ms
