@@ -48,14 +48,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v99 …';
+  b.textContent = 'v100 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v99 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v100 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -100,26 +100,19 @@ function _doFSFullSync(){
   batch.commit().catch(function(e){ _syncStatus('err', String(e).slice(0,40)); });
 }
 
-// _applyFSDoc: three cases
-//  1. No local data for this key → always apply (key came from another device)
-//  2. Local exists, localWts===0 → pre-v99 local data of unknown age → KEEP LOCAL
-//     (this is the critical fix: we never know if Firestore is newer than pre-v99 data)
-//  3. Local exists, localWts>0  → user wrote this key in v99+ → timestamp decides
+// _applyFSDoc: apply a Firestore doc to localStorage if it's newer than local.
+// The snapSrc===_deviceId check in the listener already guarantees we only
+// get here when ANOTHER device wrote — so we should apply unless our local
+// write on this device is provably newer (localWts > 0 && fsTs <= localWts).
 function _applyFSDoc(d){
   if(!d || !d.key || d.val===undefined || _skipFS(d.key)) return false;
-  if(_origGetItem(d.key) === d.val) return false;
+  if(_origGetItem(d.key) === d.val) return false;  // no change
   var localWts = _getWts(d.key);
   var fsTs     = Number(d.ts || '0');
-  if(_origGetItem(d.key) === null){
-    // Case 1: fresh key
-    _origSetItem(d.key, d.val);
-    _origSetItem('dm_wts_' + d.key, String(fsTs > 0 ? fsTs : Date.now()));
-    return true;
-  }
-  if(localWts === 0) return false;         // Case 2: protect pre-v99 local data
-  if(fsTs <= localWts) return false;       // Case 3: local is same age or newer
+  // Only block if this device has a v99+ write timestamp AND it's newer-or-equal
+  if(localWts > 0 && fsTs <= localWts) return false;
   _origSetItem(d.key, d.val);
-  _origSetItem('dm_wts_' + d.key, String(fsTs));
+  _origSetItem('dm_wts_' + d.key, String(fsTs > 0 ? fsTs : Date.now()));
   return true;
 }
 
