@@ -62,14 +62,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v111 …';
+  b.textContent = 'v112 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v111 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v112 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -140,7 +140,7 @@ function _doFSFullSync(){
 }
 
 // Minimum timestamp that counts as a real user write.
-// Our Python script stamped legacy docs with ts=1. Any real write from v111+
+// Our Python script stamped legacy docs with ts=1. Any real write from v112+
 // uses Date.now() which is ~1.7 trillion (milliseconds since epoch in 2026).
 // Docs below this floor are treated as stale and will never overwrite local data.
 var _FS_TS_MIN = 1704067200000; // 2024-01-01 in ms
@@ -169,41 +169,31 @@ function _rerender(){
 }
 
 function _loadFromFS(uid, cb){
-  var hasLocal = false;
-  for(var i=0; i<localStorage.length; i++){
-    var k=localStorage.key(i);
-    if(k && k.startsWith('dm_') && !_skipFS(k)){ hasLocal=true; break; }
-  }
-  if(hasLocal){
-    // Boot immediately from localStorage — listener handles cross-device sync.
-    _bootMode = true;
-    try { cb(); } catch(e) { console.error('[sync] init error:', e); }
-    _bootMode = false;
-    _startRealtimeListener(uid);
-  } else {
-    // Fresh device: pull Firestore first, then boot.
-    _db.collection('users').doc(uid).collection('appdata').get()
-      .then(function(snap){
-        snap.forEach(function(doc){
-          var d=doc.data();
-          if(d && d.key && d.val!==undefined && !_skipFS(d.key)){
-            _origSetItem(d.key, d.val);
-          }
-        });
-        _bootMode=true;
-        try { cb(); } catch(e) { console.error('[sync] init error:', e); }
-        _bootMode=false;
-        _startRealtimeListener(uid);
-        _syncStatus('ok');
-      })
-      .catch(function(e){
-        _syncStatus('err', String(e).slice(0,40));
-        _bootMode=true;
-        try { cb(); } catch(er) { console.error('[sync] init error:', er); }
-        _bootMode=false;
-        _startRealtimeListener(uid);
+  // Firestore is the ONLY source of truth. Every page load reads from the
+  // database first — no localStorage shortcuts. This means Mac and iPhone
+  // always see the same data because they're both reading the same place.
+  _db.collection('users').doc(uid).collection('appdata').get()
+    .then(function(snap){
+      snap.forEach(function(doc){
+        var d=doc.data();
+        if(d && d.key && d.val!==undefined && !_skipFS(d.key)){
+          _origSetItem(d.key, d.val);
+        }
       });
-  }
+      _bootMode=true;
+      try { cb(); } catch(e){ console.error('[sync] init error:', e); }
+      _bootMode=false;
+      _startRealtimeListener(uid);
+      _syncStatus('ok');
+    })
+    .catch(function(e){
+      // Firestore unreachable — fall back to whatever localStorage has cached
+      _syncStatus('err', String(e).slice(0,40));
+      _bootMode=true;
+      try { cb(); } catch(er){ console.error('[sync] init error:', er); }
+      _bootMode=false;
+      _startRealtimeListener(uid);
+    });
 }
 
 // The listener processes EVERY snapshot including the initial one.
