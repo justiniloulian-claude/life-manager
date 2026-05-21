@@ -66,14 +66,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v108 …';
+  b.textContent = 'v109 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v108 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v109 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -90,35 +90,61 @@ localStorage.setItem = function(key, value){
   }
 };
 
+// ── REST-based write helpers ──────────────────────────────────────────────────
+// We bypass the Firestore JS SDK for writes entirely and use the REST API with
+// fetch(). This avoids all offline-persistence queue issues and WebSocket
+// problems — it's just plain HTTPS that always works on every platform.
+var _FS_REST = 'https://firestore.googleapis.com/v1/projects/justin-dashboard-b2746/databases/(default)/documents';
+
+function _fsRestPatch(path, fields){
+  var user = firebase.auth().currentUser;
+  if(!user) return Promise.reject(new Error('not authenticated'));
+  return user.getIdToken().then(function(token){
+    var fieldPaths = Object.keys(fields).map(function(k){ return 'updateMask.fieldPaths='+encodeURIComponent(k); }).join('&');
+    return fetch(_FS_REST + path + '?' + fieldPaths, {
+      method: 'PATCH',
+      headers: {'Authorization':'Bearer '+token, 'Content-Type':'application/json'},
+      body: JSON.stringify({fields: fields})
+    });
+  }).then(function(r){
+    if(!r.ok) return r.text().then(function(t){ throw new Error(r.status+' '+t.slice(0,80)); });
+  });
+}
+
+function _fsField(v){ return typeof v==='number' ? {integerValue:String(v)} : {stringValue:String(v)}; }
+
 function _fsSaveKey(key, value){
   if(!_uid) return;
   _syncStatus('send');
   var ts = Date.now();
-  var batch = _db.batch();
-  var ref = _db.collection('users').doc(_uid).collection('appdata');
-  batch.set(ref.doc(key.replace(/\//g,'__')), {key:key, val:value, ts:ts, src:_deviceId});
-  batch.set(ref.doc('_syncTS'), {val:String(ts), src:_deviceId});
-  batch.commit()
+  var docId = key.replace(/\//g,'__');
+  var dataFields = {key:_fsField(key), val:_fsField(value), ts:_fsField(ts), src:_fsField(_deviceId)};
+  var syncFields = {val:_fsField(String(ts)), src:_fsField(_deviceId)};
+  _fsRestPatch('/users/'+_uid+'/appdata/'+docId, dataFields)
+    .then(function(){ return _fsRestPatch('/users/'+_uid+'/appdata/_syncTS', syncFields); })
     .then(function(){ _syncStatus('ok'); })
-    .catch(function(e){ _syncStatus('err', String(e).slice(0,40)); });
+    .catch(function(e){ _syncStatus('err', String(e).slice(0,60)); });
 }
 
 function _doFSFullSync(){
   if(!_uid) return;
   var ts = Date.now();
-  var batch = _db.batch();
-  var ref = _db.collection('users').doc(_uid).collection('appdata');
+  var promises = [];
   for(var i=0; i<localStorage.length; i++){
     var k=localStorage.key(i);
-    if(k && k.startsWith('dm_') && !_skipFS(k))
-      batch.set(ref.doc(k.replace(/\//g,'__')), {key:k, val:_origGetItem(k), ts:ts, src:_deviceId});
+    if(k && k.startsWith('dm_') && !_skipFS(k)){
+      var fields = {key:_fsField(k), val:_fsField(_origGetItem(k)), ts:_fsField(ts), src:_fsField(_deviceId)};
+      promises.push(_fsRestPatch('/users/'+_uid+'/appdata/'+k.replace(/\//g,'__'), fields));
+    }
   }
-  batch.set(ref.doc('_syncTS'), {val:String(ts), src:_deviceId});
-  batch.commit().catch(function(e){ _syncStatus('err', String(e).slice(0,40)); });
+  var syncF = {val:_fsField(String(ts)), src:_fsField(_deviceId)};
+  Promise.all(promises)
+    .then(function(){ return _fsRestPatch('/users/'+_uid+'/appdata/_syncTS', syncF); })
+    .catch(function(e){ _syncStatus('err', String(e).slice(0,60)); });
 }
 
 // Minimum timestamp that counts as a real user write.
-// Our Python script stamped legacy docs with ts=1. Any real write from v108+
+// Our Python script stamped legacy docs with ts=1. Any real write from v109+
 // uses Date.now() which is ~1.7 trillion (milliseconds since epoch in 2026).
 // Docs below this floor are treated as stale and will never overwrite local data.
 var _FS_TS_MIN = 1704067200000; // 2024-01-01 in ms
