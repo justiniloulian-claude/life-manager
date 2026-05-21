@@ -68,14 +68,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v106 …';
+  b.textContent = 'v107 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v106 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v107 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -119,13 +119,21 @@ function _doFSFullSync(){
   batch.commit().catch(function(e){ _syncStatus('err', String(e).slice(0,40)); });
 }
 
-// _applyFSDoc: write Firestore value into localStorage if it differs.
-// The snapSrc===_deviceId guard in the listener/poll already ensures we only
-// reach this when another device was the last writer, so we always apply.
-// Value-equality check prevents unnecessary rerenders for unchanged keys.
+// Minimum timestamp that counts as a real user write.
+// Our Python script stamped legacy docs with ts=1. Any real write from v107+
+// uses Date.now() which is ~1.7 trillion (milliseconds since epoch in 2026).
+// Docs below this floor are treated as stale and will never overwrite local data.
+var _FS_TS_MIN = 1704067200000; // 2024-01-01 in ms
+
+// _applyFSDoc: write Firestore value into localStorage only when the Firestore
+// doc carries a real recent timestamp AND the value actually differs.
+// This means legacy docs (ts=1) never clobber local edits, but real cross-device
+// writes (ts ≈ now) always come through.
 function _applyFSDoc(d){
   if(!d || !d.key || d.val===undefined || _skipFS(d.key)) return false;
   if(_origGetItem(d.key) === d.val) return false; // already up to date
+  var fsTs = Number(d.ts || '0');
+  if(fsTs < _FS_TS_MIN) return false; // stale legacy doc — never overwrite local
   _origSetItem(d.key, d.val);
   return true;
 }
