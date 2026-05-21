@@ -18,10 +18,6 @@ var _uid  = null;
 var _appInited = false;
 var _fsUnsubscribe = null;
 
-// Force long-polling — WebSocket to Firestore is silently dropped on Safari/iOS.
-// Long-polling uses plain HTTP so it always gets through.
-_db.settings({experimentalForceLongPolling: true, merge: true});
-
 // No offline persistence. The IndexedDB queue from earlier broken-WebSocket
 // sessions was blocking all new writes from ever reaching the server.
 // Refresh safety comes from the _FS_TS_MIN floor in _applyFSDoc instead:
@@ -66,14 +62,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v110 …';
+  b.textContent = 'v111 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v110 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v111 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -144,7 +140,7 @@ function _doFSFullSync(){
 }
 
 // Minimum timestamp that counts as a real user write.
-// Our Python script stamped legacy docs with ts=1. Any real write from v110+
+// Our Python script stamped legacy docs with ts=1. Any real write from v111+
 // uses Date.now() which is ~1.7 trillion (milliseconds since epoch in 2026).
 // Docs below this floor are treated as stale and will never overwrite local data.
 var _FS_TS_MIN = 1704067200000; // 2024-01-01 in ms
@@ -197,7 +193,6 @@ function _loadFromFS(uid, cb){
         _bootMode=true;
         try { cb(); } catch(e) { console.error('[sync] init error:', e); }
         _bootMode=false;
-        if(snap.empty) _doFSFullSync();
         _startRealtimeListener(uid);
         _syncStatus('ok');
       })
