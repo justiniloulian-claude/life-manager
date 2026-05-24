@@ -10,7 +10,9 @@
     if(indexedDB.databases){
       indexedDB.databases().then(function(dbs){
         dbs.forEach(function(db){
-          if(db.name && (db.name.indexOf('firestore')!==-1 || db.name.indexOf('firebase')!==-1)){
+          // Only delete Firestore databases — NOT Firebase Auth databases.
+          // Deleting Auth databases logs the user out on every refresh.
+          if(db.name && db.name.indexOf('firestore')!==-1){
             indexedDB.deleteDatabase(db.name);
           }
         });
@@ -87,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v114 …';
+  b.textContent = 'v115 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v114 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v115 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -146,7 +148,7 @@ function _testWrite(uid){
 }
 
 // Minimum timestamp that counts as a real user write.
-// Our Python script stamped legacy docs with ts=1. Any real write from v114+
+// Our Python script stamped legacy docs with ts=1. Any real write from v115+
 // uses Date.now() which is ~1.7 trillion (milliseconds since epoch in 2026).
 // Docs below this floor are treated as stale and will never overwrite local data.
 var _FS_TS_MIN = 1704067200000; // 2024-01-01 in ms
