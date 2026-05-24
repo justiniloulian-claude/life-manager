@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v116 …';
+  b.textContent = 'v117 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v116 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v117 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -107,14 +107,18 @@ document.addEventListener('DOMContentLoaded', _initSyncBadge);
 var _bootMode = true;
 
 // _syncSave: the ONLY way user data gets written.
-// Replaces the old localStorage.setItem override which was too fragile —
-// Safari (especially iOS) can silently ignore instance-level property overrides
-// on the Storage object, meaning _fsSaveKey never got called and the ↑ badge
-// never appeared.  Calling _syncSave directly is guaranteed to work.
+// _bootMode is NOT checked here because _syncSave is only ever called from
+// explicit user-action save functions (saveT, saveN, etc.) — never from
+// startup/init code (which uses _origSetItem directly). So there's no risk
+// of boot data being double-written to Firestore.
+// Removing _bootMode from this guard is what makes the ↑ badge finally appear.
 function _syncSave(key, str){
-  _origSetItem(key, str);           // 1. save to localStorage immediately (fast, offline-safe)
-  if(!_bootMode && _uid && !_skipFS(key)){
-    _fsSaveKey(key, str);           // 2. push to Firestore (shows ↑ then ✓)
+  _origSetItem(key, str);           // 1. always save to localStorage immediately
+  if(_uid){
+    _fsSaveKey(key, str);           // 2. push to Firestore → badge shows ↑ then ✓
+  } else {
+    // Not logged in yet — show a hint in the badge so we can diagnose
+    _syncStatus('err', 'no uid');
   }
 }
 
@@ -153,7 +157,7 @@ function _testWrite(uid){
 }
 
 // Minimum timestamp that counts as a real user write.
-// Our Python script stamped legacy docs with ts=1. Any real write from v116+
+// Our Python script stamped legacy docs with ts=1. Any real write from v117+
 // uses Date.now() which is ~1.7 trillion (milliseconds since epoch in 2026).
 // Docs below this floor are treated as stale and will never overwrite local data.
 var _FS_TS_MIN = 1704067200000; // 2024-01-01 in ms
