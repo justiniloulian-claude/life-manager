@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v115 …';
+  b.textContent = 'v116 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v115 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v116 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -106,12 +106,17 @@ document.addEventListener('DOMContentLoaded', _initSyncBadge);
 
 var _bootMode = true;
 
-localStorage.setItem = function(key, value){
-  _origSetItem(key, value);
-  if(!_bootMode && key && key.startsWith('dm_') && !_skipFS(key)){
-    if(_uid) _fsSaveKey(key, value);
+// _syncSave: the ONLY way user data gets written.
+// Replaces the old localStorage.setItem override which was too fragile —
+// Safari (especially iOS) can silently ignore instance-level property overrides
+// on the Storage object, meaning _fsSaveKey never got called and the ↑ badge
+// never appeared.  Calling _syncSave directly is guaranteed to work.
+function _syncSave(key, str){
+  _origSetItem(key, str);           // 1. save to localStorage immediately (fast, offline-safe)
+  if(!_bootMode && _uid && !_skipFS(key)){
+    _fsSaveKey(key, str);           // 2. push to Firestore (shows ↑ then ✓)
   }
-};
+}
 
 // ── Firestore SDK writes (no offline persistence = goes straight to server) ───
 function _fsSaveKey(key, value){
@@ -148,7 +153,7 @@ function _testWrite(uid){
 }
 
 // Minimum timestamp that counts as a real user write.
-// Our Python script stamped legacy docs with ts=1. Any real write from v115+
+// Our Python script stamped legacy docs with ts=1. Any real write from v116+
 // uses Date.now() which is ~1.7 trillion (milliseconds since epoch in 2026).
 // Docs below this floor are treated as stale and will never overwrite local data.
 var _FS_TS_MIN = 1704067200000; // 2024-01-01 in ms
@@ -202,6 +207,30 @@ function _loadFromFS(uid, cb){
       _bootMode=false;
       _startRealtimeListener(uid);
     });
+}
+
+// _doFSFullSync: called when the Firestore snapshot is empty (no docs yet).
+// Just re-saves everything in localStorage to Firestore so the database
+// gets populated on first use.
+function _doFSFullSync(){
+  if(!_uid) return;
+  var ref = _db.collection('users').doc(_uid).collection('appdata');
+  var keys = [];
+  for(var i=0; i<localStorage.length; i++){
+    var k = localStorage.key(i);
+    if(k && k.startsWith('dm_') && !_skipFS(k)) keys.push(k);
+  }
+  if(!keys.length) return;
+  var ts = Date.now();
+  var batch = _db.batch();
+  keys.forEach(function(k){
+    var v = _origGetItem(k);
+    if(v !== null){
+      batch.set(ref.doc(k.replace(/\//g,'__')), {key:k, val:v, ts:ts, src:_deviceId});
+    }
+  });
+  batch.set(ref.doc('_syncTS'), {val:String(ts), src:_deviceId});
+  batch.commit().then(function(){ _syncStatus('ok'); }).catch(function(e){ _syncStatus('err', String(e).slice(0,40)); });
 }
 
 // The listener processes EVERY snapshot including the initial one.
@@ -404,44 +433,47 @@ function getData() {
     weightLastSunday: localStorage.getItem('dm_weight_last_sunday')             || '',
   };
 }
-function saveT(v)   { localStorage.setItem('dm_tasks',       JSON.stringify(v)); }
-function saveR(v)   { localStorage.setItem('dm_routine',     JSON.stringify(v)); }
-function saveCE(v)  { localStorage.setItem('dm_calEvents',   JSON.stringify(v)); }
-function saveN(v)   { localStorage.setItem('dm_notes',       JSON.stringify(v)); }
-function saveF(v)   { localStorage.setItem('dm_folders',     JSON.stringify(v)); }
-function saveST(v)  { localStorage.setItem('dm_shortterm',   JSON.stringify(v)); }
-function saveLT(v)  { localStorage.setItem('dm_longterm',    JSON.stringify(v)); }
-function saveRem(v) { localStorage.setItem('dm_reminders',   JSON.stringify(v)); }
-function saveLrn(v) { localStorage.setItem('dm_learning',    JSON.stringify(v)); }
-function saveFinInc(v)  { localStorage.setItem('dm_fin_income',   JSON.stringify(v)); }
-function saveFinExp(v)  { localStorage.setItem('dm_fin_expenses', JSON.stringify(v)); }
-function saveFinBon(v)  { localStorage.setItem('dm_fin_bonuses',  JSON.stringify(v)); }
-function saveFinWish(v) { localStorage.setItem('dm_fin_wishlist', JSON.stringify(v)); }
-function saveFinPts(v)  { localStorage.setItem('dm_fin_points',   JSON.stringify(v)); }
-function saveFinBank(v) { localStorage.setItem('dm_fin_bank',     JSON.stringify(v)); }
-function saveMM(v)  { localStorage.setItem('dm_moneymaking',       JSON.stringify(v)); }
-function saveRO(v)   { localStorage.setItem('dm_routine_overrides',      JSON.stringify(v)); }
-function saveGrat(v) { localStorage.setItem('dm_gratitude',              JSON.stringify(v)); }
-function saveAyin(v) { localStorage.setItem('dm_ayin_tov',               JSON.stringify(v)); }
-function saveLrnd(v) { localStorage.setItem('dm_learned',                v); }
-function saveFeel(v) { localStorage.setItem('dm_feeling',                v); }
-function saveRHist(v){ localStorage.setItem('dm_refl_history',           JSON.stringify(v)); }
-function saveChi(v)  { localStorage.setItem('dm_cheshbon_items',         JSON.stringify(v)); }
-function saveChk(v)  { localStorage.setItem('dm_cheshbon_checks',        JSON.stringify(v)); }
-function saveChWH(v) { localStorage.setItem('dm_cheshbon_week_history',  JSON.stringify(v)); }
-function saveDietPlan(v) { localStorage.setItem('dm_diet_plan', JSON.stringify(v)); }
-function saveHW(v)   { localStorage.setItem('dm_health_water',    JSON.stringify(v)); }
-function saveAP(v)   { localStorage.setItem('dm_activity_plan',   JSON.stringify(v)); }
-function saveAD(v)   { localStorage.setItem('dm_activity_done',   JSON.stringify(v)); }
-function saveWI(v)   { localStorage.setItem('dm_weekly_items',              JSON.stringify(v)); }
-function saveWS(v)   { localStorage.setItem('dm_weekly_scores',             JSON.stringify(v)); }
-function saveWH(v)   { localStorage.setItem('dm_weekly_history',            JSON.stringify(v)); }
-function saveWLS(v)  { localStorage.setItem('dm_weekly_last_sunday',        v); }
-function saveFRH(v)  { localStorage.setItem('dm_free_refl_history',         JSON.stringify(v)); }
-function saveMJH(v)  { localStorage.setItem('dm_monthly_jewish_history',    JSON.stringify(v)); }
-function saveMSH(v)  { localStorage.setItem('dm_monthly_secular_history',   JSON.stringify(v)); }
-function saveMJD(v)  { localStorage.setItem('dm_monthly_jewish_draft',      JSON.stringify(v)); }
-function saveMSD(v)  { localStorage.setItem('dm_monthly_secular_draft',     JSON.stringify(v)); }
+// Every save function calls _syncSave(key, string).
+// _syncSave writes to localStorage immediately AND pushes to Firestore
+// (when not in boot mode and uid is set), so Mac ↔ iPhone sync works.
+function saveT(v)   { _syncSave('dm_tasks',                      JSON.stringify(v)); }
+function saveR(v)   { _syncSave('dm_routine',                    JSON.stringify(v)); }
+function saveCE(v)  { _syncSave('dm_calEvents',                  JSON.stringify(v)); }
+function saveN(v)   { _syncSave('dm_notes',                      JSON.stringify(v)); }
+function saveF(v)   { _syncSave('dm_folders',                    JSON.stringify(v)); }
+function saveST(v)  { _syncSave('dm_shortterm',                  JSON.stringify(v)); }
+function saveLT(v)  { _syncSave('dm_longterm',                   JSON.stringify(v)); }
+function saveRem(v) { _syncSave('dm_reminders',                  JSON.stringify(v)); }
+function saveLrn(v) { _syncSave('dm_learning',                   JSON.stringify(v)); }
+function saveFinInc(v)  { _syncSave('dm_fin_income',             JSON.stringify(v)); }
+function saveFinExp(v)  { _syncSave('dm_fin_expenses',           JSON.stringify(v)); }
+function saveFinBon(v)  { _syncSave('dm_fin_bonuses',            JSON.stringify(v)); }
+function saveFinWish(v) { _syncSave('dm_fin_wishlist',           JSON.stringify(v)); }
+function saveFinPts(v)  { _syncSave('dm_fin_points',             JSON.stringify(v)); }
+function saveFinBank(v) { _syncSave('dm_fin_bank',               JSON.stringify(v)); }
+function saveMM(v)  { _syncSave('dm_moneymaking',                JSON.stringify(v)); }
+function saveRO(v)  { _syncSave('dm_routine_overrides',          JSON.stringify(v)); }
+function saveGrat(v){ _syncSave('dm_gratitude',                  JSON.stringify(v)); }
+function saveAyin(v){ _syncSave('dm_ayin_tov',                   JSON.stringify(v)); }
+function saveLrnd(v){ _syncSave('dm_learned',                    v); }
+function saveFeel(v){ _syncSave('dm_feeling',                    v); }
+function saveRHist(v){ _syncSave('dm_refl_history',              JSON.stringify(v)); }
+function saveChi(v) { _syncSave('dm_cheshbon_items',             JSON.stringify(v)); }
+function saveChk(v) { _syncSave('dm_cheshbon_checks',            JSON.stringify(v)); }
+function saveChWH(v){ _syncSave('dm_cheshbon_week_history',      JSON.stringify(v)); }
+function saveDietPlan(v){ _syncSave('dm_diet_plan',              JSON.stringify(v)); }
+function saveHW(v)  { _syncSave('dm_health_water',               JSON.stringify(v)); }
+function saveAP(v)  { _syncSave('dm_activity_plan',              JSON.stringify(v)); }
+function saveAD(v)  { _syncSave('dm_activity_done',              JSON.stringify(v)); }
+function saveWI(v)  { _syncSave('dm_weekly_items',               JSON.stringify(v)); }
+function saveWS(v)  { _syncSave('dm_weekly_scores',              JSON.stringify(v)); }
+function saveWH(v)  { _syncSave('dm_weekly_history',             JSON.stringify(v)); }
+function saveWLS(v) { _syncSave('dm_weekly_last_sunday',         v); }
+function saveFRH(v) { _syncSave('dm_free_refl_history',          JSON.stringify(v)); }
+function saveMJH(v) { _syncSave('dm_monthly_jewish_history',     JSON.stringify(v)); }
+function saveMSH(v) { _syncSave('dm_monthly_secular_history',    JSON.stringify(v)); }
+function saveMJD(v) { _syncSave('dm_monthly_jewish_draft',       JSON.stringify(v)); }
+function saveMSD(v) { _syncSave('dm_monthly_secular_draft',      JSON.stringify(v)); }
 function uid()      { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 
 // Module-level media recorder state
