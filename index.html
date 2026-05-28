@@ -1281,9 +1281,23 @@
       <label class="field-label">Ayin Tov (one per line)</label>
       <textarea id="editReflAyinTov" class="field" rows="3" placeholder="1. ...&#10;2. ..."></textarea>
       <label class="field-label">What I learned</label>
-      <textarea id="editReflLearned" class="field" rows="2"></textarea>
+      <div class="refl-fmt-bar">
+        <button class="fmt-btn" onmousedown="event.preventDefault();reflFmt('editReflLearned','bold')" title="Bold"><b>B</b></button>
+        <button class="fmt-btn" onmousedown="event.preventDefault();reflFmt('editReflLearned','italic')" title="Italic"><i>I</i></button>
+        <button class="fmt-btn" onmousedown="event.preventDefault();reflFmt('editReflLearned','underline')" title="Underline"><u>U</u></button>
+        <button class="fmt-btn" onmousedown="event.preventDefault();reflUndo('editReflLearned')" title="Undo">↩</button>
+        <button class="fmt-btn" onmousedown="event.preventDefault();reflRedo('editReflLearned')" title="Redo">↪</button>
+      </div>
+      <div id="editReflLearned" class="field refl-rich-editor" contenteditable="true" style="min-height:60px;margin-bottom:12px"></div>
       <label class="field-label">How I felt</label>
-      <textarea id="editReflFeeling" class="field" rows="2"></textarea>
+      <div class="refl-fmt-bar">
+        <button class="fmt-btn" onmousedown="event.preventDefault();reflFmt('editReflFeeling','bold')" title="Bold"><b>B</b></button>
+        <button class="fmt-btn" onmousedown="event.preventDefault();reflFmt('editReflFeeling','italic')" title="Italic"><i>I</i></button>
+        <button class="fmt-btn" onmousedown="event.preventDefault();reflFmt('editReflFeeling','underline')" title="Underline"><u>U</u></button>
+        <button class="fmt-btn" onmousedown="event.preventDefault();reflUndo('editReflFeeling')" title="Undo">↩</button>
+        <button class="fmt-btn" onmousedown="event.preventDefault();reflRedo('editReflFeeling')" title="Redo">↪</button>
+      </div>
+      <div id="editReflFeeling" class="field refl-rich-editor" contenteditable="true" style="min-height:60px"></div>
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeModal('editDailyReflModal')">Cancel</button>
@@ -1304,7 +1318,14 @@
       <label class="field-label">Title</label>
       <input type="text" id="editFreeReflTitle" class="field">
       <label class="field-label">Reflection</label>
-      <textarea id="editFreeReflText" class="field" rows="6"></textarea>
+      <div class="refl-fmt-bar">
+        <button class="fmt-btn" onmousedown="event.preventDefault();reflFmt('editFreeReflText','bold')" title="Bold"><b>B</b></button>
+        <button class="fmt-btn" onmousedown="event.preventDefault();reflFmt('editFreeReflText','italic')" title="Italic"><i>I</i></button>
+        <button class="fmt-btn" onmousedown="event.preventDefault();reflFmt('editFreeReflText','underline')" title="Underline"><u>U</u></button>
+        <button class="fmt-btn" onmousedown="event.preventDefault();reflUndo('editFreeReflText')" title="Undo">↩</button>
+        <button class="fmt-btn" onmousedown="event.preventDefault();reflRedo('editFreeReflText')" title="Redo">↪</button>
+      </div>
+      <div id="editFreeReflText" class="field refl-rich-editor" contenteditable="true" style="min-height:140px"></div>
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeModal('editFreeReflModal')">Cancel</button>
@@ -1450,6 +1471,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="app.js?v=119"></script>
+<script src="app.js?v=120"></script>
 </body>
 </html>
