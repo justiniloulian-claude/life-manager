@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v120 …';
+  b.textContent = 'v121 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v120 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v121 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -157,7 +157,7 @@ function _testWrite(uid){
 }
 
 // Minimum timestamp that counts as a real user write.
-// Our Python script stamped legacy docs with ts=1. Any real write from v120+
+// Our Python script stamped legacy docs with ts=1. Any real write from v121+
 // uses Date.now() which is ~1.7 trillion (milliseconds since epoch in 2026).
 // Docs below this floor are treated as stale and will never overwrite local data.
 var _FS_TS_MIN = 1704067200000; // 2024-01-01 in ms
@@ -509,6 +509,20 @@ window.reflRedo=function(id){
   var el=document.getElementById(id); if(!el)return;
   el.focus(); document.execCommand('redo',false,null);
 };
+// Keyboard shortcuts for all rich-text editors (Cmd/Ctrl + B/I/U/Z/Shift+Z)
+document.addEventListener('keydown',function(e){
+  var el=e.target;
+  if(!el||!el.classList||!el.classList.contains('refl-rich-editor'))return;
+  var meta=e.metaKey||e.ctrlKey;
+  if(!meta)return;
+  var k=e.key.toLowerCase();
+  if(k==='b'){e.preventDefault();document.execCommand('bold',false,null);}
+  else if(k==='i'){e.preventDefault();document.execCommand('italic',false,null);}
+  else if(k==='u'){e.preventDefault();document.execCommand('underline',false,null);}
+  else if(k==='z'&&!e.shiftKey){e.preventDefault();document.execCommand('undo',false,null);}
+  else if(k==='z'&&e.shiftKey){e.preventDefault();document.execCommand('redo',false,null);}
+  else if(k==='y'){e.preventDefault();document.execCommand('redo',false,null);}
+});
 // Note drag state
 var _draggingNoteId=null;
 
