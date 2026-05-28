@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v121 …';
+  b.textContent = 'v122 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v121 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v122 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -157,7 +157,7 @@ function _testWrite(uid){
 }
 
 // Minimum timestamp that counts as a real user write.
-// Our Python script stamped legacy docs with ts=1. Any real write from v121+
+// Our Python script stamped legacy docs with ts=1. Any real write from v122+
 // uses Date.now() which is ~1.7 trillion (milliseconds since epoch in 2026).
 // Docs below this floor are treated as stale and will never overwrite local data.
 var _FS_TS_MIN = 1704067200000; // 2024-01-01 in ms
@@ -958,14 +958,51 @@ function getRemindersForDate(ds){
   });
   return result;
 }
+// --- Reminder dismiss helpers ---
+function _getDismissed(){
+  try{
+    var raw=localStorage.getItem('dm_dismissed_reminders');
+    var arr=raw?JSON.parse(raw):[];
+    // Purge entries older than 7 days
+    var cutoff=Date.now()-7*24*60*60*1000;
+    arr=arr.filter(function(d){return d.ts>cutoff;});
+    return arr;
+  }catch(e){return[];}
+}
+function _isDismissed(key){
+  return _getDismissed().some(function(d){return d.key===key;});
+}
+window.dismissCalReminder=function(key){
+  var arr=_getDismissed();
+  if(!arr.some(function(d){return d.key===key;})){
+    arr.push({key:key,ts:Date.now()});
+    localStorage.setItem('dm_dismissed_reminders',JSON.stringify(arr));
+  }
+  // Re-render both banner locations
+  var single=document.getElementById('singleDayContainer');
+  if(single){
+    var remBanner=renderReminderBanner();
+    var banner=renderCarryOverBanner();
+    single.innerHTML=remBanner+banner+dayCardHTML(dateFromOffset(state.dayOffset),false);
+    loadZstrip(toDateStr(dateFromOffset(state.dayOffset)));
+    loadHebrewDate(toDateStr(dateFromOffset(state.dayOffset)));
+  }
+  var remEl=document.getElementById('sevenRemBanner');
+  if(remEl) remEl.innerHTML=renderReminderBanner();
+};
 function renderReminderBanner(){
   var todayDs=toDateStr(dateFromOffset(0));
-  var rems=getRemindersForDate(todayDs);
+  var rems=getRemindersForDate(todayDs).filter(function(r){
+    var key=r.ev.id+'|'+r.label+'|'+r.eventDate;
+    return!_isDismissed(key);
+  });
   if(!rems.length)return'';
   var rows=rems.map(function(r){
+    var key=r.ev.id+'|'+r.label+'|'+r.eventDate;
     return'<div class="rem-banner-item">'+
       '<span class="rem-banner-title">'+escHtml(r.ev.title)+'</span>'+
       '<span class="rem-banner-when">'+escHtml(r.label)+'</span>'+
+      '<button class="rem-dismiss-btn" onclick="dismissCalReminder(\''+key.replace(/'/g,"\\'")+'\')" title="Dismiss">&times;</button>'+
     '</div>';
   }).join('');
   return'<div class="rem-banner"><div class="rem-banner-hdr">🔔 '+rems.length+' upcoming reminder'+(rems.length>1?'s':'')+'</div>'+rows+'</div>';

@@ -2451,6 +2451,12 @@ textarea.field { resize: vertical; }
 .rem-banner-item:last-child { border-bottom: none; }
 .rem-banner-title { color: #1a1a1a; flex: 1; }
 .rem-banner-when { color: #b45309; font-size: 12px; margin-left: 8px; }
+.rem-dismiss-btn {
+  background: none; border: none; cursor: pointer;
+  color: #b45309; font-size: 16px; line-height: 1;
+  padding: 0 0 0 10px; opacity: 0.5; flex-shrink: 0;
+}
+.rem-dismiss-btn:hover { opacity: 1; }
 
 /* Edit scope modal buttons */
 .edit-scope-opts { display: flex; flex-direction: column; gap: 10px; }
