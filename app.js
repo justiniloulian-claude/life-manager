@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v118 …';
+  b.textContent = 'v119 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v118 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v119 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -157,7 +157,7 @@ function _testWrite(uid){
 }
 
 // Minimum timestamp that counts as a real user write.
-// Our Python script stamped legacy docs with ts=1. Any real write from v118+
+// Our Python script stamped legacy docs with ts=1. Any real write from v119+
 // uses Date.now() which is ~1.7 trillion (milliseconds since epoch in 2026).
 // Docs below this floor are treated as stale and will never overwrite local data.
 var _FS_TS_MIN = 1704067200000; // 2024-01-01 in ms
@@ -496,6 +496,18 @@ window.noteRedo=function(){
 window.execFmt=function(cmd){
   var el=document.getElementById('noteViewContent'); if(!el)return;
   el.focus(); document.execCommand(cmd,false,null);
+};
+window.reflFmt=function(id,cmd){
+  var el=document.getElementById(id); if(!el)return;
+  el.focus(); document.execCommand(cmd,false,null);
+};
+window.reflUndo=function(id){
+  var el=document.getElementById(id); if(!el)return;
+  el.focus(); document.execCommand('undo',false,null);
+};
+window.reflRedo=function(id){
+  var el=document.getElementById(id); if(!el)return;
+  el.focus(); document.execCommand('redo',false,null);
 };
 // Note drag state
 var _draggingNoteId=null;
@@ -1316,6 +1328,17 @@ function renderSeven() {
   document.getElementById('sevenDayGrid').innerHTML=html;
   var coEl=document.getElementById('sevenCarryOver');
   if(coEl) coEl.innerHTML=renderCarryOverBanner();
+  // Show today's reminder banner in 7-day view
+  var remEl=document.getElementById('sevenRemBanner');
+  if(!remEl){
+    var grid=document.getElementById('sevenDayGrid');
+    if(grid&&grid.parentElement){
+      remEl=document.createElement('div');
+      remEl.id='sevenRemBanner';
+      grid.parentElement.insertBefore(remEl,grid);
+    }
+  }
+  if(remEl) remEl.innerHTML=renderReminderBanner();
   dates.forEach(function(d){ loadHebrewDate(toDateStr(d)); }); // No zmanim in 7-day
 }
 function refresh() {
@@ -1375,8 +1398,8 @@ function renderCheshbonLeft() {
     return '<div class="refl-input-row"><span class="refl-num">'+(i+1)+'.</span>'+
       '<input type="text" class="refl-input" value="'+escHtml(v)+'" placeholder="Something good I noticed..." oninput="autoSaveAyinTov()"></div>';
   }).join('');
-  var lEl=document.getElementById('learnedToday'); if(lEl) lEl.value=data.learned;
-  var fEl=document.getElementById('feelingToday'); if(fEl) fEl.value=data.feeling;
+  var lEl=document.getElementById('learnedToday'); if(lEl) lEl.innerHTML=data.learned||'';
+  var fEl=document.getElementById('feelingToday'); if(fEl) fEl.innerHTML=data.feeling||'';
 }
 function renderCheshbonRight() {
   var data=getData(); var el=document.getElementById('cheshbonItemsList'); if(!el)return;
@@ -1384,10 +1407,11 @@ function renderCheshbonRight() {
   el.innerHTML=data.cheshbonItems.map(function(item){
     var checks=data.cheshbonChecks[item.id]||{};
     var dayBoxes=CHESHBON_DAYS.map(function(d){
-      var sc=checks[d]||0;
+      var raw=checks[d];
+      var sc=(raw===true||raw===false)?(raw?1:0):(Number(raw)||0);
       var cls=sc?('score-'+sc):'score-empty';
       return '<div class="cheshbon-day-cell">'+
-        '<div class="cheshbon-score '+cls+'" onclick="cycleCheshbonScore(\''+item.id+'\',\''+d+'\')" title="'+CHESHBON_DAY_LABELS[d]+': '+(sc?sc:'not set')+'">'+
+        '<div class="cheshbon-score '+cls+'" onclick="openScorePicker(\''+item.id+'\',\''+d+'\',this)" title="'+CHESHBON_DAY_LABELS[d]+': '+(sc?sc:'not set')+'">'+
         (sc?sc:'–')+'</div></div>';
     }).join('');
     return '<div class="cheshbon-item-row" draggable="true" data-cid="'+item.id+'"'+
@@ -1969,7 +1993,8 @@ window.playJewishAudio = function(key, btnEl) {
 // ============================================================
 window.storeFreeRefl = function() {
   var title = (document.getElementById('freeReflTitle')||{}).value.trim();
-  var text  = (document.getElementById('freeReflText')||{}).value.trim();
+  var freeEl = document.getElementById('freeReflText');
+  var text  = freeEl ? (freeEl.innerHTML||'').trim() : '';
   if (!text) { alert('Please write something before storing.'); return; }
   if (!title) title = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
   var data = getData();
@@ -1978,7 +2003,7 @@ window.storeFreeRefl = function() {
   });
   saveFRH(data.freeReflHistory);
   var ti = document.getElementById('freeReflTitle'); if (ti) ti.value = '';
-  var tx = document.getElementById('freeReflText');  if (tx) tx.value = '';
+  var tx = document.getElementById('freeReflText');  if (tx) tx.innerHTML = '';
   renderFreeReflHist();
 };
 
@@ -2034,16 +2059,16 @@ window.deleteFreeRefl = function(id) {
 // Auto-save (called inline from input oninput)
 window.autoSaveGratitude = function(){ saveGrat(Array.from(document.querySelectorAll('#gratitudeList .refl-input')).map(function(i){return i.value;})); };
 window.autoSaveAyinTov   = function(){ saveAyin(Array.from(document.querySelectorAll('#ayinTovList .refl-input')).map(function(i){return i.value;})); };
-window.autoSaveLearned   = function(){ var e=document.getElementById('learnedToday'); if(e)saveLrnd(e.value); };
-window.autoSaveFeeling   = function(){ var e=document.getElementById('feelingToday'); if(e)saveFeel(e.value); };
+window.autoSaveLearned   = function(){ var e=document.getElementById('learnedToday'); if(e)saveLrnd(e.innerHTML); };
+window.autoSaveFeeling   = function(){ var e=document.getElementById('feelingToday'); if(e)saveFeel(e.innerHTML); };
 
 // Refresh left panel — stores to history and clears
 window.refreshReflection = function() {
   if(!confirm('Save this reflection to history and start a fresh entry?'))return;
   var grat=Array.from(document.querySelectorAll('#gratitudeList .refl-input')).map(function(i){return i.value;});
   var ayin=Array.from(document.querySelectorAll('#ayinTovList .refl-input')).map(function(i){return i.value;});
-  var learned=(document.getElementById('learnedToday')||{}).value||'';
-  var feeling=(document.getElementById('feelingToday')||{}).value||'';
+  var learned=(document.getElementById('learnedToday')||{}).innerHTML||'';
+  var feeling=(document.getElementById('feelingToday')||{}).innerHTML||'';
   var data=getData();
   data.reflHistory.unshift({date:toDateStr(new Date()),gratitude:grat,ayinTov:ayin,learned:learned,feeling:feeling});
   saveRHist(data.reflHistory);
@@ -2129,13 +2154,32 @@ window.toggleReflHistEntry = function(el,idx) {
 };
 
 // Cheshbon HaNefesh actions
-window.cycleCheshbonScore = function(itemId,day){
+window.openScorePicker = function(itemId, day, el){
+  var old = document.getElementById('_scorePicker');
+  if(old) old.remove();
+  var picker = document.createElement('div');
+  picker.id = '_scorePicker';
+  picker.className = 'score-picker-popup';
+  var btns = [0,1,2,3,4,5,6,7,8,9,10].map(function(n){
+    var cls = n===0?'sp-clear':n<=3?'sp-low':n<=6?'sp-mid':n<=8?'sp-high':'sp-top';
+    return '<button class="sp-btn '+cls+'" onmousedown="event.preventDefault()" onclick="pickCheshbonScore(\''+itemId+'\',\''+day+'\','+n+')">'+(n===0?'✕':n)+'</button>';
+  }).join('');
+  picker.innerHTML = btns;
+  document.body.appendChild(picker);
+  var r = el.getBoundingClientRect();
+  var pw = 252; // approximate popup width
+  var left = Math.min(r.left, window.innerWidth - pw - 8);
+  picker.style.cssText = 'position:fixed;top:'+(r.bottom+6)+'px;left:'+Math.max(4,left)+'px;z-index:99999';
+  function close(e){ if(!picker.contains(e.target)&&e.target!==el){picker.remove();document.removeEventListener('mousedown',close);document.removeEventListener('touchstart',close);} }
+  setTimeout(function(){ document.addEventListener('mousedown',close); document.addEventListener('touchstart',close); },50);
+};
+window.pickCheshbonScore = function(itemId, day, score){
   var data=getData();
   if(!data.cheshbonChecks[itemId]) data.cheshbonChecks[itemId]={};
-  var cur=data.cheshbonChecks[itemId][day]||0;
-  data.cheshbonChecks[itemId][day]= cur>=10 ? 0 : cur+1;
+  data.cheshbonChecks[itemId][day]=score;
   saveChk(data.cheshbonChecks);
   renderCheshbonRight();
+  var p=document.getElementById('_scorePicker'); if(p) p.remove();
 };
 window.openEditCheshbonItem = function(id){
   var data=getData(); var item=data.cheshbonItems.find(function(i){return i.id===id;}); if(!item)return;

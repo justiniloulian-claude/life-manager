@@ -1775,8 +1775,42 @@ textarea.field { resize: vertical; }
 .score-4, .score-5, .score-6  { color: #d97706; background: #fffbeb; }
 .score-7, .score-8             { color: #16a34a; background: #f0fdf4; }
 .score-9, .score-10            { color: #7c3aed; background: #f5f3ff; }
+.score-picker-popup {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  padding: 8px 10px;
+  background: #fff; border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.16);
+  width: 252px;
+}
+.sp-btn {
+  width: 34px; height: 34px; border: none; border-radius: 7px;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: transform 0.1s;
+}
+.sp-btn:active { transform: scale(0.88); }
+.sp-clear { background: #f3f4f6; color: #9ca3af; }
+.sp-low   { background: #fef2f2; color: #dc2626; }
+.sp-mid   { background: #fffbeb; color: #d97706; }
+.sp-high  { background: #f0fdf4; color: #16a34a; }
+.sp-top   { background: #f5f3ff; color: #7c3aed; }
 .cheshbon-item-actions { width: 56px; display: flex; gap: 2px; flex-shrink: 0; justify-content: flex-end; }
 .cheshbon-empty { padding: 20px 18px; font-size: 14px; color: #ccc; }
+
+/* Rich text reflection editors */
+.refl-editor-wrap { margin-bottom: 12px; }
+.refl-fmt-bar {
+  display: flex; gap: 4px; margin-bottom: 4px;
+}
+.refl-rich-editor {
+  min-height: 72px; outline: none; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word;
+  cursor: text;
+}
+.refl-rich-editor:empty::before {
+  content: attr(data-placeholder);
+  color: #aaa; pointer-events: none;
+}
 
 /* Reflection history entries */
 .refl-hist-entry {
@@ -2805,6 +2839,7 @@ textarea.field { resize: vertical; }
     width: 100% !important;
     max-width: 100% !important;
     border-radius: 20px 20px 0 0 !important;
+    max-height: 90vh !important;
     max-height: 90svh !important;
     overflow-y: hidden !important;
     margin: 0 !important;
@@ -2812,7 +2847,7 @@ textarea.field { resize: vertical; }
     flex-direction: column !important;
   }
   .modal-header { flex-shrink: 0 !important; }
-  .modal-body   { flex: 1 1 auto !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch !important; }
+  .modal-body   { flex: 1 1 auto !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch !important; min-height: 0 !important; }
   .modal-footer { flex-shrink: 0 !important; }
   .modal-wide { max-width: 100% !important; }
 
