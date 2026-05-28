@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v117 …';
+  b.textContent = 'v118 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v117 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v118 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -157,7 +157,7 @@ function _testWrite(uid){
 }
 
 // Minimum timestamp that counts as a real user write.
-// Our Python script stamped legacy docs with ts=1. Any real write from v117+
+// Our Python script stamped legacy docs with ts=1. Any real write from v118+
 // uses Date.now() which is ~1.7 trillion (milliseconds since epoch in 2026).
 // Docs below this floor are treated as stale and will never overwrite local data.
 var _FS_TS_MIN = 1704067200000; // 2024-01-01 in ms
@@ -1384,8 +1384,11 @@ function renderCheshbonRight() {
   el.innerHTML=data.cheshbonItems.map(function(item){
     var checks=data.cheshbonChecks[item.id]||{};
     var dayBoxes=CHESHBON_DAYS.map(function(d){
-      return '<div class="cheshbon-day-cell"><input type="checkbox"'+(checks[d]?' checked':'')+
-        ' onchange="toggleCheshbonCheck(\''+item.id+'\',\''+d+'\')" title="'+CHESHBON_DAY_LABELS[d]+'"></div>';
+      var sc=checks[d]||0;
+      var cls=sc?('score-'+sc):'score-empty';
+      return '<div class="cheshbon-day-cell">'+
+        '<div class="cheshbon-score '+cls+'" onclick="cycleCheshbonScore(\''+item.id+'\',\''+d+'\')" title="'+CHESHBON_DAY_LABELS[d]+': '+(sc?sc:'not set')+'">'+
+        (sc?sc:'–')+'</div></div>';
     }).join('');
     return '<div class="cheshbon-item-row" draggable="true" data-cid="'+item.id+'"'+
       ' ondragstart="chiDragStart(event)" ondragover="chiDragOver(event)" ondrop="chiDrop(event)" ondragleave="chiDragLeave(event)" ondragend="chiDragEnd(event)">'+
@@ -1991,14 +1994,41 @@ window.renderFreeReflHist = function() {
   if (!entries.length) { list.innerHTML='<div style="color:#aaa;font-size:13px">No reflections stored yet.</div>'; return; }
   list.innerHTML = entries.map(function(e) {
     var dt = new Date(e.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-    return '<div class="hist-entry" onclick="this.querySelector(\'.hist-entry-body\').classList.toggle(\'open\')">'+
-      '<div class="hist-entry-hdr">'+
+    return '<div class="hist-entry">'+
+      '<div class="hist-entry-hdr" onclick="this.nextElementSibling.classList.toggle(\'open\')">'+
         '<span class="hist-entry-title">'+escHtml(e.title)+'</span>'+
-        '<span class="hist-entry-date">'+escHtml(dt)+'</span>'+
+        '<span style="display:flex;align-items:center;gap:6px">'+
+          '<span class="hist-entry-date">'+escHtml(dt)+'</span>'+
+          '<button class="btn-icon" style="font-size:13px" title="Edit" onclick="event.stopPropagation();openEditFreeRefl(\''+e.id+'\')">✏️</button>'+
+          '<button class="btn-icon" style="font-size:13px" title="Delete" onclick="event.stopPropagation();deleteFreeRefl(\''+e.id+'\')">🗑</button>'+
+        '</span>'+
       '</div>'+
       '<div class="hist-entry-body">'+escHtml(e.text)+'</div>'+
     '</div>';
   }).join('');
+};
+window.openEditFreeRefl = function(id) {
+  var data=getData(); var entry=data.freeReflHistory.find(function(e){return e.id===id;}); if(!entry)return;
+  document.getElementById('editFreeReflId').value=id;
+  document.getElementById('editFreeReflTitle').value=entry.title||'';
+  document.getElementById('editFreeReflText').value=entry.text||'';
+  openModal('editFreeReflModal');
+};
+window.saveEditFreeRefl = function() {
+  var id=document.getElementById('editFreeReflId').value;
+  var data=getData(); var entry=data.freeReflHistory.find(function(e){return e.id===id;}); if(!entry)return;
+  entry.title=document.getElementById('editFreeReflTitle').value.trim()||entry.title;
+  entry.text=document.getElementById('editFreeReflText').value;
+  saveFRH(data.freeReflHistory);
+  closeModal('editFreeReflModal');
+  renderFreeReflHist();
+};
+window.deleteFreeRefl = function(id) {
+  if(!confirm('Delete this reflection?'))return;
+  var data=getData();
+  data.freeReflHistory=data.freeReflHistory.filter(function(e){return e.id!==id;});
+  saveFRH(data.freeReflHistory);
+  renderFreeReflHist();
 };
 
 // Auto-save (called inline from input oninput)
@@ -2023,20 +2053,66 @@ window.refreshReflection = function() {
 
 // History viewer — left panel
 window.openReflectionHistory = function() {
+  renderReflHistory();
+  openModal('reflHistoryModal');
+};
+function renderReflHistory() {
   var data=getData(); var body=document.getElementById('reflHistoryBody'); if(!body)return;
   if(!data.reflHistory.length){
     body.innerHTML='<div style="padding:24px;color:#aaa;font-size:14px;text-align:center">No past reflections yet.</div>';
-  } else {
-    body.innerHTML=data.reflHistory.map(function(entry,idx){
-      var preview=entry.gratitude.filter(function(g){return g.trim();}).slice(0,2).join(' · ');
-      return '<div class="refl-hist-entry" onclick="toggleReflHistEntry(this,'+idx+')">'+
-        '<div class="refl-hist-date">'+dayName(fromDateStr(entry.date))+', '+monthDay(fromDateStr(entry.date))+'</div>'+
-        '<div class="refl-hist-preview">'+(preview?escHtml(preview):'—')+'</div>'+
-        '<div class="refl-hist-expanded" style="display:none"></div>'+
-        '</div>';
-    }).join('');
+    return;
   }
-  openModal('reflHistoryModal');
+  body.innerHTML=data.reflHistory.map(function(entry,idx){
+    var preview=entry.gratitude.filter(function(g){return g.trim();}).slice(0,2).join(' · ');
+    return '<div class="refl-hist-entry" data-refl-date="'+entry.date+'" id="refl-entry-'+idx+'">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;cursor:pointer" onclick="toggleReflHistEntry(this.parentElement,'+idx+')">'+
+        '<div>'+
+          '<div class="refl-hist-date">'+dayName(fromDateStr(entry.date))+', '+monthDay(fromDateStr(entry.date))+'</div>'+
+          '<div class="refl-hist-preview">'+(preview?escHtml(preview):'—')+'</div>'+
+        '</div>'+
+        '<div style="display:flex;gap:4px;flex-shrink:0;margin-left:8px" onclick="event.stopPropagation()">'+
+          '<button class="btn-icon" title="Edit" onclick="openEditDailyRefl('+idx+')">✏️</button>'+
+          '<button class="btn-icon" title="Delete" onclick="deleteDailyRefl('+idx+')">🗑</button>'+
+        '</div>'+
+      '</div>'+
+      '<div class="refl-hist-expanded" style="display:none"></div>'+
+    '</div>';
+  }).join('');
+}
+window.jumpToReflDate = function() {
+  var picker=document.getElementById('reflHistDatePicker'); if(!picker||!picker.value)return;
+  var target=document.querySelector('[data-refl-date="'+picker.value+'"]');
+  if(target){
+    target.scrollIntoView({behavior:'smooth',block:'start'});
+    target.style.transition='background 0.3s';
+    target.style.background='#f3e8ff';
+    setTimeout(function(){ target.style.background=''; },1800);
+  }
+};
+window.openEditDailyRefl = function(idx) {
+  var data=getData(); var entry=data.reflHistory[idx]; if(!entry)return;
+  document.getElementById('editDailyReflIdx').value=idx;
+  document.getElementById('editReflGratitude').value=(entry.gratitude||[]).join('\n');
+  document.getElementById('editReflAyinTov').value=(entry.ayinTov||[]).join('\n');
+  document.getElementById('editReflLearned').value=entry.learned||'';
+  document.getElementById('editReflFeeling').value=entry.feeling||'';
+  openModal('editDailyReflModal');
+};
+window.saveEditDailyRefl = function() {
+  var idx=parseInt(document.getElementById('editDailyReflIdx').value);
+  var data=getData(); if(isNaN(idx)||!data.reflHistory[idx])return;
+  data.reflHistory[idx].gratitude=document.getElementById('editReflGratitude').value.split('\n').map(function(s){return s.trim();}).filter(Boolean);
+  data.reflHistory[idx].ayinTov=document.getElementById('editReflAyinTov').value.split('\n').map(function(s){return s.trim();}).filter(Boolean);
+  data.reflHistory[idx].learned=document.getElementById('editReflLearned').value;
+  data.reflHistory[idx].feeling=document.getElementById('editReflFeeling').value;
+  saveRHist(data.reflHistory);
+  closeModal('editDailyReflModal');
+  renderReflHistory();
+};
+window.deleteDailyRefl = function(idx) {
+  if(!confirm('Delete this reflection?'))return;
+  var data=getData(); data.reflHistory.splice(idx,1); saveRHist(data.reflHistory);
+  renderReflHistory();
 };
 window.toggleReflHistEntry = function(el,idx) {
   var exp=el.querySelector('.refl-hist-expanded'); if(!exp)return;
@@ -2053,11 +2129,13 @@ window.toggleReflHistEntry = function(el,idx) {
 };
 
 // Cheshbon HaNefesh actions
-window.toggleCheshbonCheck = function(itemId,day){
+window.cycleCheshbonScore = function(itemId,day){
   var data=getData();
   if(!data.cheshbonChecks[itemId]) data.cheshbonChecks[itemId]={};
-  data.cheshbonChecks[itemId][day]=!data.cheshbonChecks[itemId][day];
+  var cur=data.cheshbonChecks[itemId][day]||0;
+  data.cheshbonChecks[itemId][day]= cur>=10 ? 0 : cur+1;
   saveChk(data.cheshbonChecks);
+  renderCheshbonRight();
 };
 window.openEditCheshbonItem = function(id){
   var data=getData(); var item=data.cheshbonItems.find(function(i){return i.id===id;}); if(!item)return;

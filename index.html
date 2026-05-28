@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Life Manager">
-  <title>Dashboard v117</title>
+  <title>Dashboard v118</title>
   <link rel="stylesheet" href="style.css?v=102">
 </head>
 <body>
@@ -1233,7 +1233,56 @@
       <h2>Past Reflections</h2>
       <button class="modal-close" id="closeReflHistoryModal">&times;</button>
     </div>
-    <div class="modal-body" id="reflHistoryBody" style="padding:0;max-height:65vh;overflow-y:auto"></div>
+    <div style="padding:10px 16px;border-bottom:1px solid #f2f2f2">
+      <input type="date" id="reflHistDatePicker" class="field" placeholder="Jump to date" style="margin-bottom:0" oninput="jumpToReflDate()">
+    </div>
+    <div class="modal-body" id="reflHistoryBody" style="padding:0;overflow-y:auto"></div>
+  </div>
+</div>
+
+<!-- Edit Daily Reflection Modal -->
+<div id="editDailyReflModal" class="modal">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-header">
+      <h2>Edit Reflection</h2>
+      <button class="modal-close" onclick="closeModal('editDailyReflModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editDailyReflIdx">
+      <label class="field-label">Gratitude (one per line)</label>
+      <textarea id="editReflGratitude" class="field" rows="4" placeholder="1. ...&#10;2. ..."></textarea>
+      <label class="field-label">Ayin Tov (one per line)</label>
+      <textarea id="editReflAyinTov" class="field" rows="3" placeholder="1. ...&#10;2. ..."></textarea>
+      <label class="field-label">What I learned</label>
+      <textarea id="editReflLearned" class="field" rows="2"></textarea>
+      <label class="field-label">How I felt</label>
+      <textarea id="editReflFeeling" class="field" rows="2"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('editDailyReflModal')">Cancel</button>
+      <button class="btn-primary" onclick="saveEditDailyRefl()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Free Reflection Modal -->
+<div id="editFreeReflModal" class="modal">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-header">
+      <h2>Edit Reflection</h2>
+      <button class="modal-close" onclick="closeModal('editFreeReflModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editFreeReflId">
+      <label class="field-label">Title</label>
+      <input type="text" id="editFreeReflTitle" class="field">
+      <label class="field-label">Reflection</label>
+      <textarea id="editFreeReflText" class="field" rows="6"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('editFreeReflModal')">Cancel</button>
+      <button class="btn-primary" onclick="saveEditFreeRefl()">Save</button>
+    </div>
   </div>
 </div>
 
@@ -1374,6 +1423,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="app.js?v=117"></script>
+<script src="app.js?v=118"></script>
 </body>
 </html>
