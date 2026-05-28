@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v119 …';
+  b.textContent = 'v120 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v119 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v120 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -157,7 +157,7 @@ function _testWrite(uid){
 }
 
 // Minimum timestamp that counts as a real user write.
-// Our Python script stamped legacy docs with ts=1. Any real write from v119+
+// Our Python script stamped legacy docs with ts=1. Any real write from v120+
 // uses Date.now() which is ~1.7 trillion (milliseconds since epoch in 2026).
 // Docs below this floor are treated as stale and will never overwrite local data.
 var _FS_TS_MIN = 1704067200000; // 2024-01-01 in ms
@@ -2019,16 +2019,20 @@ window.renderFreeReflHist = function() {
   if (!entries.length) { list.innerHTML='<div style="color:#aaa;font-size:13px">No reflections stored yet.</div>'; return; }
   list.innerHTML = entries.map(function(e) {
     var dt = new Date(e.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    var editedLine = e.editedAt ? '<div class="refl-hist-edited">Edited '+new Date(e.editedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+'</div>' : '';
     return '<div class="hist-entry">'+
       '<div class="hist-entry-hdr" onclick="this.nextElementSibling.classList.toggle(\'open\')">'+
         '<span class="hist-entry-title">'+escHtml(e.title)+'</span>'+
         '<span style="display:flex;align-items:center;gap:6px">'+
-          '<span class="hist-entry-date">'+escHtml(dt)+'</span>'+
+          '<span style="display:flex;flex-direction:column;align-items:flex-end">'+
+            '<span class="hist-entry-date">'+escHtml(dt)+'</span>'+
+            editedLine+
+          '</span>'+
           '<button class="btn-icon" style="font-size:13px" title="Edit" onclick="event.stopPropagation();openEditFreeRefl(\''+e.id+'\')">✏️</button>'+
           '<button class="btn-icon" style="font-size:13px" title="Delete" onclick="event.stopPropagation();deleteFreeRefl(\''+e.id+'\')">🗑</button>'+
         '</span>'+
       '</div>'+
-      '<div class="hist-entry-body">'+escHtml(e.text)+'</div>'+
+      '<div class="hist-entry-body">'+e.text+'</div>'+
     '</div>';
   }).join('');
 };
@@ -2036,14 +2040,15 @@ window.openEditFreeRefl = function(id) {
   var data=getData(); var entry=data.freeReflHistory.find(function(e){return e.id===id;}); if(!entry)return;
   document.getElementById('editFreeReflId').value=id;
   document.getElementById('editFreeReflTitle').value=entry.title||'';
-  document.getElementById('editFreeReflText').value=entry.text||'';
+  document.getElementById('editFreeReflText').innerHTML=entry.text||'';
   openModal('editFreeReflModal');
 };
 window.saveEditFreeRefl = function() {
   var id=document.getElementById('editFreeReflId').value;
   var data=getData(); var entry=data.freeReflHistory.find(function(e){return e.id===id;}); if(!entry)return;
   entry.title=document.getElementById('editFreeReflTitle').value.trim()||entry.title;
-  entry.text=document.getElementById('editFreeReflText').value;
+  entry.text=document.getElementById('editFreeReflText').innerHTML;
+  entry.editedAt=new Date().toISOString();
   saveFRH(data.freeReflHistory);
   closeModal('editFreeReflModal');
   renderFreeReflHist();
@@ -2089,10 +2094,12 @@ function renderReflHistory() {
   }
   body.innerHTML=data.reflHistory.map(function(entry,idx){
     var preview=entry.gratitude.filter(function(g){return g.trim();}).slice(0,2).join(' · ');
+    var editedLine=entry.editedAt?'<div class="refl-hist-edited">Edited '+new Date(entry.editedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+'</div>':'';
     return '<div class="refl-hist-entry" data-refl-date="'+entry.date+'" id="refl-entry-'+idx+'">'+
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;cursor:pointer" onclick="toggleReflHistEntry(this.parentElement,'+idx+')">'+
         '<div>'+
           '<div class="refl-hist-date">'+dayName(fromDateStr(entry.date))+', '+monthDay(fromDateStr(entry.date))+'</div>'+
+          editedLine+
           '<div class="refl-hist-preview">'+(preview?escHtml(preview):'—')+'</div>'+
         '</div>'+
         '<div style="display:flex;gap:4px;flex-shrink:0;margin-left:8px" onclick="event.stopPropagation()">'+
@@ -2119,8 +2126,8 @@ window.openEditDailyRefl = function(idx) {
   document.getElementById('editDailyReflIdx').value=idx;
   document.getElementById('editReflGratitude').value=(entry.gratitude||[]).join('\n');
   document.getElementById('editReflAyinTov').value=(entry.ayinTov||[]).join('\n');
-  document.getElementById('editReflLearned').value=entry.learned||'';
-  document.getElementById('editReflFeeling').value=entry.feeling||'';
+  document.getElementById('editReflLearned').innerHTML=entry.learned||'';
+  document.getElementById('editReflFeeling').innerHTML=entry.feeling||'';
   openModal('editDailyReflModal');
 };
 window.saveEditDailyRefl = function() {
@@ -2128,8 +2135,9 @@ window.saveEditDailyRefl = function() {
   var data=getData(); if(isNaN(idx)||!data.reflHistory[idx])return;
   data.reflHistory[idx].gratitude=document.getElementById('editReflGratitude').value.split('\n').map(function(s){return s.trim();}).filter(Boolean);
   data.reflHistory[idx].ayinTov=document.getElementById('editReflAyinTov').value.split('\n').map(function(s){return s.trim();}).filter(Boolean);
-  data.reflHistory[idx].learned=document.getElementById('editReflLearned').value;
-  data.reflHistory[idx].feeling=document.getElementById('editReflFeeling').value;
+  data.reflHistory[idx].learned=document.getElementById('editReflLearned').innerHTML;
+  data.reflHistory[idx].feeling=document.getElementById('editReflFeeling').innerHTML;
+  data.reflHistory[idx].editedAt=new Date().toISOString();
   saveRHist(data.reflHistory);
   closeModal('editDailyReflModal');
   renderReflHistory();
