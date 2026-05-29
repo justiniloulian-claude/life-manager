@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v124 …';
+  b.textContent = 'v125 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v124 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v125 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -157,7 +157,7 @@ function _testWrite(uid){
 }
 
 // Minimum timestamp that counts as a real user write.
-// Our Python script stamped legacy docs with ts=1. Any real write from v124+
+// Our Python script stamped legacy docs with ts=1. Any real write from v125+
 // uses Date.now() which is ~1.7 trillion (milliseconds since epoch in 2026).
 // Docs below this floor are treated as stale and will never overwrite local data.
 var _FS_TS_MIN = 1704067200000; // 2024-01-01 in ms
@@ -3391,11 +3391,19 @@ function showPage(pageId) {
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
   document.querySelectorAll('.header-nav-tab').forEach(function(t){t.classList.remove('active');});
   document.querySelectorAll('.mob-nav-btn').forEach(function(b){b.classList.remove('active');});
+  // Close More menu whenever we navigate
+  var moreMenu=document.getElementById('mobileMoreMenu');
+  if(moreMenu) moreMenu.style.display='none';
   document.getElementById('page-'+pageId).classList.add('active');
   var activeTab=document.querySelector('.header-nav-tab[data-page="'+pageId+'"]');
   if (activeTab) activeTab.classList.add('active');
   var activeMob=document.querySelector('.mob-nav-btn[data-page="'+pageId+'"]');
   if (activeMob) activeMob.classList.add('active');
+  // Learning & Financial live under the More button
+  if (pageId==='learning'||pageId==='financial') {
+    var moreBtn=document.getElementById('mobMoreBtn');
+    if(moreBtn) moreBtn.classList.add('active');
+  }
   state.currentPage=pageId;
   if (pageId==='dashboard') {
     if(isMobile()) setDashView('single');
@@ -4737,18 +4745,40 @@ function initSwipe() {
 // ============================================================
 // MOBILE — bottom nav, FAB, swipe-to-action, keyboard fix
 // ============================================================
+window.toggleMobileMore = function(forceState) {
+  var menu = document.getElementById('mobileMoreMenu');
+  if (!menu) return;
+  var open = forceState !== undefined ? forceState : (menu.style.display === 'none' || menu.style.display === '');
+  menu.style.display = open ? 'block' : 'none';
+  // Close on outside tap
+  if (open) {
+    setTimeout(function() {
+      document.addEventListener('touchstart', function _close(e) {
+        if (!menu.contains(e.target) && e.target.id !== 'mobMoreBtn') {
+          menu.style.display = 'none';
+        }
+        document.removeEventListener('touchstart', _close);
+      });
+      document.addEventListener('mousedown', function _close(e) {
+        if (!menu.contains(e.target) && e.target.id !== 'mobMoreBtn') {
+          menu.style.display = 'none';
+        }
+        document.removeEventListener('mousedown', _close);
+      });
+    }, 50);
+  }
+};
+
 function initMobile() {
   if(!isMobile()) return;
 
-  // Bottom nav page switching
+  // Bottom nav page switching — skip buttons with no data-page (e.g. More button)
   document.querySelectorAll('.mob-nav-btn').forEach(function(btn) {
+    if (!btn.dataset.page) return;
     btn.addEventListener('click', function() {
       showPage(btn.dataset.page);
     });
   });
-
-  // FAB
-  // (handled by inline onclick="mobileFabClick()")
 
   // Keyboard: scroll focused input into view after keyboard opens
   document.addEventListener('focusin', function(e) {

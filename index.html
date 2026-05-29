@@ -1448,22 +1448,29 @@
     <span class="mob-nav-icon">📅</span>
     <span class="mob-nav-label">Calendar</span>
   </button>
+  <!-- Centre raised add button -->
+  <div class="mob-nav-add-wrap">
+    <button class="mob-nav-add-btn" onclick="mobileFabClick()" aria-label="Add">+</button>
+  </div>
   <button class="mob-nav-btn" data-page="notes">
     <span class="mob-nav-icon">📝</span>
     <span class="mob-nav-label">Notes</span>
   </button>
-  <button class="mob-nav-btn" data-page="learning">
-    <span class="mob-nav-icon">📚</span>
-    <span class="mob-nav-label">Learning</span>
-  </button>
-  <button class="mob-nav-btn" data-page="financial">
-    <span class="mob-nav-icon">💰</span>
-    <span class="mob-nav-label">Financial</span>
+  <button class="mob-nav-btn" id="mobMoreBtn" onclick="toggleMobileMore()">
+    <span class="mob-nav-icon">⋯</span>
+    <span class="mob-nav-label">More</span>
   </button>
 </nav>
 
-<!-- MOBILE FAB -->
-<button id="mobileFab" class="mobile-fab" onclick="mobileFabClick()">+</button>
+<!-- More popup (Learning + Financial) -->
+<div id="mobileMoreMenu" class="mob-more-menu" style="display:none">
+  <button class="mob-more-item" onclick="showPage('learning');toggleMobileMore(false)">
+    <span>📚</span> Learning
+  </button>
+  <button class="mob-more-item" onclick="showPage('financial');toggleMobileMore(false)">
+    <span>💰</span> Financial
+  </button>
+</div>
 
 <div id="printArea" style="display:none"></div>
 
@@ -1471,6 +1478,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="app.js?v=124"></script>
+<script src="app.js?v=125"></script>
 </body>
 </html>
