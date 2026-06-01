@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v126 …';
+  b.textContent = 'v127 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v126 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v127 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -157,7 +157,7 @@ function _testWrite(uid){
 }
 
 // Minimum timestamp that counts as a real user write.
-// Our Python script stamped legacy docs with ts=1. Any real write from v126+
+// Our Python script stamped legacy docs with ts=1. Any real write from v127+
 // uses Date.now() which is ~1.7 trillion (milliseconds since epoch in 2026).
 // Docs below this floor are treated as stale and will never overwrite local data.
 var _FS_TS_MIN = 1704067200000; // 2024-01-01 in ms
@@ -386,6 +386,7 @@ const state = {
   hebrewCache: {},
   location: null,
   currentPage: 'dashboard',
+  editingSecularId: null,
 };
 
 // ============================================================
@@ -1687,15 +1688,25 @@ function renderWeeklyTab() {
   var data = getData();
   var sunStr = getSundayStr(new Date());
   var scores = data.weeklyScores[sunStr] || {};
+  var scoreOpts = ['','1','2','3','4','5','6','7','8','9','10','na'].map(function(v){
+    return '<option value="'+v+'">'+(!v?'—':v==='na'?'N/A':v)+'</option>';
+  }).join('');
   var html = '<div class="weekly-week-banner">' + escHtml(getWeekBannerText()) + '</div>';
-  html += '<div style="margin-bottom:12px"><button class="btn-primary" style="font-size:13px;padding:7px 14px" onclick="openAddWeeklyItem()">+ Add Item</button></div>';
+  html += '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">'+
+    '<button class="btn-primary" style="font-size:13px;padding:7px 14px" onclick="openAddWeeklyItem()">+ Add Item</button>'+
+    '<button class="btn-secondary" style="font-size:13px;padding:7px 14px" onclick="storeWeekManually()">Store Week</button>'+
+  '</div>';
   if (data.weeklyItems.length) {
-    html += '<div class="weekly-tbl-hdr"><span>Item</span><span>Score (1-10)</span><span>Actions</span></div>';
+    html += '<div class="weekly-tbl-hdr"><span>Item</span><span>Score</span><span>Actions</span></div>';
     html += data.weeklyItems.map(function(item) {
       var sc = scores[item.id] || {};
+      var curVal = sc.score !== undefined && sc.score !== '' ? String(sc.score) : '';
+      var opts = ['','1','2','3','4','5','6','7','8','9','10','na'].map(function(v){
+        return '<option value="'+v+'"'+(v===curVal?' selected':'')+'>'+(!v?'—':v==='na'?'N/A':v)+'</option>';
+      }).join('');
       return '<div class="weekly-item-row">'+
         '<div class="weekly-item-text">'+escHtml(item.text)+'</div>'+
-        '<div><input type="number" class="weekly-score-input" min="1" max="10" value="'+escHtml(String(sc.score||''))+'" placeholder="—" onchange="updateWeeklyScore(\''+item.id+'\',\'score\',this.value)"></div>'+
+        '<div><select class="weekly-score-select" onchange="updateWeeklyScore(\''+item.id+'\',\'score\',this.value)">'+opts+'</select></div>'+
         '<div style="display:flex;gap:4px">'+
           '<button class="btn-icon" onclick="openEditWeeklyItem(\''+item.id+'\')">✏️</button>'+
           '<button class="btn-icon" onclick="removeWeeklyItem(\''+item.id+'\')">🗑</button>'+
@@ -1745,9 +1756,10 @@ window.toggleWeeklyHistEntry = function(el, entryId) {
     '<div style="display:grid;grid-template-columns:1fr 80px;gap:6px;font-size:11px;font-weight:700;color:#aaa;text-transform:uppercase;margin-bottom:4px;padding:0 2px">'+
     '<span>Item</span><span>Score</span></div>'+
     e.items.map(function(item){
+      var scoreDisplay = item.score===''||item.score===undefined||item.score===null ? '—' : item.score==='na' ? 'N/A' : String(item.score);
       return '<div style="display:grid;grid-template-columns:1fr 80px;gap:6px;font-size:13px;padding:4px 2px;border-bottom:1px solid #f5f5f5">'+
         '<span>'+escHtml(item.text)+'</span>'+
-        '<span style="color:#555">'+(item.score||'—')+'</span>'+
+        '<span style="color:#555">'+escHtml(scoreDisplay)+'</span>'+
       '</div>';
     }).join('')+
   '</div>';
@@ -1759,9 +1771,35 @@ window.updateWeeklyScore = function(itemId, field, val) {
   var sunStr = getSundayStr(new Date());
   if (!data.weeklyScores[sunStr]) data.weeklyScores[sunStr] = {};
   if (!data.weeklyScores[sunStr][itemId]) data.weeklyScores[sunStr][itemId] = {};
-  var n = parseInt(val); if (isNaN(n)||n<1) n=''; else if (n>10) n=10;
-  data.weeklyScores[sunStr][itemId][field] = n;
+  var stored;
+  if (val === 'na') { stored = 'na'; }
+  else { var n = parseInt(val); stored = (isNaN(n)||n<1) ? '' : Math.min(n, 10); }
+  data.weeklyScores[sunStr][itemId][field] = stored;
   saveWS(data.weeklyScores);
+};
+
+window.storeWeekManually = function() {
+  if (!confirm('Store this week\'s scores to history?')) return;
+  var data = getData();
+  var sunStr = getSundayStr(new Date());
+  var scores = data.weeklyScores[sunStr] || {};
+  if (!data.weeklyItems.length) { alert('No items to store.'); return; }
+  var archivedItems = data.weeklyItems.map(function(item) {
+    var sc = scores[item.id] || {};
+    return { text: item.text, score: sc.score !== undefined ? sc.score : '' };
+  });
+  var sun = fromDateStr(sunStr);
+  var sat = new Date(sun); sat.setDate(sun.getDate() + 6);
+  var MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  data.weeklyHistory.unshift({
+    id: uid(),
+    weekStart: MON[sun.getMonth()]+' '+sun.getDate(),
+    weekEnd:   MON[sat.getMonth()]+' '+sat.getDate()+', '+sat.getFullYear(),
+    archivedAt: new Date().toISOString(),
+    items: archivedItems
+  });
+  saveWH(data.weeklyHistory);
+  renderWeeklyTab();
 };
 
 window.removeWeeklyItem = function(id) {
@@ -1934,9 +1972,16 @@ window.storeSecularMonth = function() {
   var text  = (document.getElementById('secularMonthText')||{}).value.trim();
   if (!month) { alert('Please enter a secular month name.'); return; }
   var data = getData();
-  data.monthlySecularHistory.unshift({
-    id: uid(), month: month, text: text, storedAt: new Date().toISOString()
-  });
+  if (state.editingSecularId) {
+    // Update existing entry
+    var entry = data.monthlySecularHistory.find(function(e){return e.id===state.editingSecularId;});
+    if (entry) { entry.month = month; entry.text = text; entry.editedAt = new Date().toISOString(); }
+    state.editingSecularId = null;
+  } else {
+    data.monthlySecularHistory.unshift({
+      id: uid(), month: month, text: text, storedAt: new Date().toISOString()
+    });
+  }
   saveMSH(data.monthlySecularHistory);
   saveMSD({month:'',text:''});
   var si = document.getElementById('secularMonthInput'); if (si) si.value = '';
@@ -1991,15 +2036,48 @@ function renderSecularHist() {
   if (!entries.length) { list.innerHTML='<div style="color:#aaa;font-size:13px;margin-top:8px">No entries yet.</div>'; return; }
   list.innerHTML = entries.map(function(e) {
     var dt = new Date(e.storedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-    return '<div class="hist-entry" onclick="this.querySelector(\'.hist-entry-body\').classList.toggle(\'open\')">'+
-      '<div class="hist-entry-hdr">'+
+    var editedLine = e.editedAt ? '<div class="refl-hist-edited">Edited '+new Date(e.editedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+'</div>' : '';
+    return '<div class="hist-entry">'+
+      '<div class="hist-entry-hdr" onclick="this.nextElementSibling.classList.toggle(\'open\')">'+
         '<span class="hist-entry-title">'+escHtml(e.month)+'</span>'+
-        '<span class="hist-entry-date">'+escHtml(dt)+'</span>'+
+        '<span style="display:flex;align-items:center;gap:6px">'+
+          '<span style="display:flex;flex-direction:column;align-items:flex-end">'+
+            '<span class="hist-entry-date">'+escHtml(dt)+'</span>'+
+            editedLine+
+          '</span>'+
+          '<button class="btn-icon" style="font-size:13px" title="Edit" onclick="event.stopPropagation();editSecularEntry(\''+e.id+'\')">✏️</button>'+
+          '<button class="btn-icon" style="font-size:13px" title="Delete" onclick="event.stopPropagation();deleteSecularEntry(\''+e.id+'\')">🗑</button>'+
+        '</span>'+
       '</div>'+
       '<div class="hist-entry-body">'+escHtml(e.text||'')+'</div>'+
     '</div>';
   }).join('');
 }
+
+window.editSecularEntry = function(id) {
+  var data = getData();
+  var entry = data.monthlySecularHistory.find(function(e){return e.id===id;}); if (!entry) return;
+  state.editingSecularId = id;
+  var si = document.getElementById('secularMonthInput'); if (si) si.value = entry.month || '';
+  var st = document.getElementById('secularMonthText');  if (st) st.value = entry.text  || '';
+  // Scroll to the form
+  if (si) si.scrollIntoView({behavior:'smooth', block:'center'});
+  si && si.focus();
+};
+
+window.deleteSecularEntry = function(id) {
+  if (!confirm('Delete this secular reflection?')) return;
+  var data = getData();
+  data.monthlySecularHistory = data.monthlySecularHistory.filter(function(e){return e.id!==id;});
+  if (state.editingSecularId === id) {
+    state.editingSecularId = null;
+    var si = document.getElementById('secularMonthInput'); if (si) si.value = '';
+    var st = document.getElementById('secularMonthText');  if (st) st.value = '';
+    saveMSD({month:'',text:''});
+  }
+  saveMSH(data.monthlySecularHistory);
+  renderSecularHist();
+};
 
 function buildAudioPlayerHTML(url, playerId) {
   var speeds = [0.5,0.6,0.7,0.8,0.9,1.0,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0];
