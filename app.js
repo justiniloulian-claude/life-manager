@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v125 …';
+  b.textContent = 'v126 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v125 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v126 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -157,7 +157,7 @@ function _testWrite(uid){
 }
 
 // Minimum timestamp that counts as a real user write.
-// Our Python script stamped legacy docs with ts=1. Any real write from v125+
+// Our Python script stamped legacy docs with ts=1. Any real write from v126+
 // uses Date.now() which is ~1.7 trillion (milliseconds since epoch in 2026).
 // Docs below this floor are treated as stale and will never overwrite local data.
 var _FS_TS_MIN = 1704067200000; // 2024-01-01 in ms
@@ -1280,9 +1280,8 @@ function taskHTML(task, ds, noActions) {
   var priorityCls = isR ? '' : ('task-p-'+(task.priority||'standard'));
   var tb = task.time     ? '<span class="badge badge-time">'+fmt12(task.time)+'</span>'       : '';
   var lb = task.location ? '<span class="badge badge-loc">'+escHtml(task.location)+'</span>'  : '';
-  var hasTaskNotes = !isR && task.notes && task.notes.trim();
   var linkedCount = (!isR && task.linkedNoteIds && task.linkedNoteIds.length) ? task.linkedNoteIds.length : 0;
-  var notesDot = hasTaskNotes ? '<span class="task-has-notes" title="Has notes"></span>' : '';
+  var notesDot = '';
   var actionsHTML = '';
   if (!noActions) {
     var eb = isR
