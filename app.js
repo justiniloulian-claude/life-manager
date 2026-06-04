@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v130 …';
+  b.textContent = 'v131 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v130 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v131 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -157,7 +157,7 @@ function _testWrite(uid){
 }
 
 // Minimum timestamp that counts as a real user write.
-// Our Python script stamped legacy docs with ts=1. Any real write from v130+
+// Our Python script stamped legacy docs with ts=1. Any real write from v131+
 // uses Date.now() which is ~1.7 trillion (milliseconds since epoch in 2026).
 // Docs below this floor are treated as stale and will never overwrite local data.
 var _FS_TS_MIN = 1704067200000; // 2024-01-01 in ms
@@ -530,10 +530,19 @@ document.addEventListener('keydown',function(e){
   var tag=e.target.tagName;
   if(tag==='INPUT'||tag==='TEXTAREA'||e.target.isContentEditable)return;
   if(e.metaKey||e.ctrlKey||e.altKey)return;
-  if(e.key==='c'||e.key==='C'){
-    showPage('dashboard');
-    setDashView('cheshbon');
-  }
+  var k=e.key;
+  // Dashboard sub-views
+  if(k==='d'||k==='D'){showPage('dashboard');setDashView('single');}       // D → Today
+  else if(k==='7')    {showPage('dashboard');setDashView('seven');}         // 7 → 7-Day
+  else if(k==='c'||k==='C'){showPage('dashboard');setDashView('cheshbon');} // C → Cheshbon
+  else if(k==='h'||k==='H'){showPage('dashboard');setDashView('health');}   // H → Health
+  else if(k==='r'||k==='R'){showPage('dashboard');setDashView('reminders');}// R → Reminders
+  else if(k==='u'||k==='U'){showPage('dashboard');setDashView('future');}   // U → Future (Upcoming)
+  // Main pages
+  else if(k==='n'||k==='N'){showPage('notes');}                             // N → Notes
+  else if(k==='k'||k==='K'){showPage('calendar');}                          // K → Calendar
+  else if(k==='l'||k==='L'){showPage('learning');}                          // L → Learning
+  else if(k==='m'||k==='M'){showPage('financial');}                         // M → Financial (Money)
 });
 // Note drag state
 var _draggingNoteId=null;
