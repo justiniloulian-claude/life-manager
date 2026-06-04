@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v129 …';
+  b.textContent = 'v130 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v129 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v130 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -157,7 +157,7 @@ function _testWrite(uid){
 }
 
 // Minimum timestamp that counts as a real user write.
-// Our Python script stamped legacy docs with ts=1. Any real write from v129+
+// Our Python script stamped legacy docs with ts=1. Any real write from v130+
 // uses Date.now() which is ~1.7 trillion (milliseconds since epoch in 2026).
 // Docs below this floor are treated as stale and will never overwrite local data.
 var _FS_TS_MIN = 1704067200000; // 2024-01-01 in ms
@@ -523,6 +523,17 @@ document.addEventListener('keydown',function(e){
   else if(k==='z'&&!e.shiftKey){e.preventDefault();document.execCommand('undo',false,null);}
   else if(k==='z'&&e.shiftKey){e.preventDefault();document.execCommand('redo',false,null);}
   else if(k==='y'){e.preventDefault();document.execCommand('redo',false,null);}
+});
+// Global keyboard nav shortcuts (Mac only — skip when typing in any field)
+document.addEventListener('keydown',function(e){
+  if(isMobile())return;
+  var tag=e.target.tagName;
+  if(tag==='INPUT'||tag==='TEXTAREA'||e.target.isContentEditable)return;
+  if(e.metaKey||e.ctrlKey||e.altKey)return;
+  if(e.key==='c'||e.key==='C'){
+    showPage('dashboard');
+    setDashView('cheshbon');
+  }
 });
 // Note drag state
 var _draggingNoteId=null;
