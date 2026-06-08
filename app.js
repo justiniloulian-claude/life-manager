@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v132 …';
+  b.textContent = 'v133 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v132 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v133 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -483,6 +483,7 @@ function saveWtE(v) { _syncSave('dm_weight_entries',             JSON.stringify(
 function saveWtG(v) { _syncSave('dm_weight_goal',                JSON.stringify(v)); }
 function saveWtH(v) { _syncSave('dm_weight_history',             JSON.stringify(v)); }
 function saveWtLS(v){ _syncSave('dm_weight_last_sunday',         v); }
+function saveTOrd(v){ _syncSave('dm_task_order',                JSON.stringify(v)); }
 function uid()      { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 
 // Module-level media recorder state
@@ -3744,7 +3745,7 @@ window.taskDrop=function(e,ds,toId){
     var newTo=ids.indexOf(toId);
     ids.splice(insertBefore?newTo:newTo+1,0,fromId);
     var orderData=JSON.parse(localStorage.getItem('dm_task_order')||'{}');
-    orderData[ds]=ids; localStorage.setItem('dm_task_order',JSON.stringify(orderData));
+    orderData[ds]=ids; saveTOrd(orderData);
     refresh(); refreshDashDayModal();
   } else {
     // ── Cross-day move: insert at exact position ──
@@ -3769,7 +3770,7 @@ window.taskDrop=function(e,ds,toId){
     }
     var orderData2=JSON.parse(localStorage.getItem('dm_task_order')||'{}');
     delete orderData2[fromDs]; orderData2[ds]=tIds;
-    localStorage.setItem('dm_task_order',JSON.stringify(orderData2));
+    saveTOrd(orderData2);
     _dragTaskInfo=null; refresh(); refreshDashDayModal();
   }
 };
@@ -4251,7 +4252,7 @@ window.dayCardDrop=function(e,ds){
   saveT(data.tasks);
   var orderData=JSON.parse(localStorage.getItem('dm_task_order')||'{}');
   delete orderData[fromDs]; delete orderData[ds];
-  localStorage.setItem('dm_task_order',JSON.stringify(orderData));
+  saveTOrd(orderData);
   _dragTaskInfo=null; refresh();
 };
 
