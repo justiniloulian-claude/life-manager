@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v133 …';
+  b.textContent = 'v134 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v133 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v134 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -105,6 +105,10 @@ function _syncStatus(st, detail){
 document.addEventListener('DOMContentLoaded', _initSyncBadge);
 
 var _bootMode = true;
+// Tracks the timestamp of the last _syncSave write per key (in memory only).
+// Used by _applyFSDoc to prevent a visibility-change poll from overwriting
+// a fresh local write that hasn't yet propagated to Firestore.
+var _localWriteTs = {};
 
 // _syncSave: the ONLY way user data gets written.
 // _bootMode is NOT checked here because _syncSave is only ever called from
@@ -114,8 +118,9 @@ var _bootMode = true;
 // Removing _bootMode from this guard is what makes the ↑ badge finally appear.
 function _syncSave(key, str){
   _origSetItem(key, str);           // 1. always save to localStorage immediately
+  _localWriteTs[key] = Date.now(); // 2. stamp this key so polls won't overwrite it
   if(_uid){
-    _fsSaveKey(key, str);           // 2. push to Firestore → badge shows ↑ then ✓
+    _fsSaveKey(key, str);           // 3. push to Firestore → badge shows ↑ then ✓
   } else {
     // Not logged in yet — show a hint in the badge so we can diagnose
     _syncStatus('err', 'no uid');
@@ -171,6 +176,10 @@ function _applyFSDoc(d){
   if(_origGetItem(d.key) === d.val) return false; // already up to date
   var fsTs = Number(d.ts || '0');
   if(fsTs < _FS_TS_MIN) return false; // stale legacy doc — never overwrite local
+  // Guard: if we wrote this key locally more recently than this Firestore doc,
+  // skip — our write is still in-flight and must not be clobbered by an older snapshot.
+  var localTs = _localWriteTs[d.key] || 0;
+  if(localTs > fsTs) return false;
   _origSetItem(d.key, d.val);
   return true;
 }
@@ -1603,6 +1612,55 @@ function checkWeightAutoArchive(){
     saveWtLS(currentSun);
   }
 }
+// Returns all weight entries ever logged, sorted oldest→newest.
+// Combines archived weekly history + current week's entries.
+function getAllWeightEntries(data){
+  var all=[];
+  // Past archived weeks
+  (data.weightHistory||[]).forEach(function(week){
+    var e=week.entries||{};
+    Object.keys(e).forEach(function(ds){if(e[ds])all.push({ds:ds,w:parseFloat(e[ds])});});
+  });
+  // Current week entries
+  var cur=data.weightEntries||{};
+  Object.keys(cur).forEach(function(ds){if(cur[ds])all.push({ds:ds,w:parseFloat(cur[ds])});});
+  // Deduplicate by date, sort chronologically
+  var seen={},deduped=[];
+  all.forEach(function(e){if(!seen[e.ds]){seen[e.ds]=true;deduped.push(e);}});
+  deduped.sort(function(a,b){return a.ds<b.ds?-1:a.ds>b.ds?1:0;});
+  return deduped;
+}
+
+// Renders an all-time weight progress SVG line chart.
+function renderAllTimeWeightChart(all){
+  if(all.length<2)return'<div class="wt-spark-placeholder">Log more days to see your progress chart</div>';
+  var W=400,H=90,PL=38,PR=10,PT=10,PB=20;
+  var weights=all.map(function(e){return e.w;});
+  var minW=Math.min.apply(null,weights),maxW=Math.max.apply(null,weights);
+  var range=maxW-minW||1;
+  var n=all.length;
+  var pts=all.map(function(e,i){
+    return{x:PL+(i/(n-1))*(W-PL-PR),y:PT+(1-(e.w-minW)/range)*(H-PT-PB),w:e.w,ds:e.ds};
+  });
+  var path=pts.map(function(p,i){return(i===0?'M':'L')+p.x.toFixed(1)+','+p.y.toFixed(1);}).join(' ');
+  var area=path+' L'+pts[n-1].x.toFixed(1)+','+(H-PB)+' L'+pts[0].x.toFixed(1)+','+(H-PB)+' Z';
+  // Dots on first and last points only
+  var dots=[pts[0],pts[n-1]].map(function(p){
+    return'<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="4" fill="#6366f1" stroke="#fff" stroke-width="2"/>';
+  }).join('');
+  // Y-axis labels (min/max)
+  var yTop='<text x="'+(PL-5)+'" y="'+(PT+5)+'" text-anchor="end" fill="#bbb" font-size="9">'+maxW.toFixed(0)+'</text>';
+  var yBot='<text x="'+(PL-5)+'" y="'+(H-PB+4)+'" text-anchor="end" fill="#bbb" font-size="9">'+minW.toFixed(0)+'</text>';
+  // X-axis date labels
+  var fmt=function(ds){var d=fromDateStr(ds);return(d.getMonth()+1)+'/'+(d.getDate());};
+  var xL='<text x="'+PL+'" y="'+(H-3)+'" text-anchor="start" fill="#bbb" font-size="9">'+fmt(all[0].ds)+'</text>';
+  var xR='<text x="'+(W-PR)+'" y="'+(H-3)+'" text-anchor="end" fill="#bbb" font-size="9">'+fmt(all[n-1].ds)+'</text>';
+  return'<svg class="wt-alltime-svg" viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg">'+
+    '<path d="'+area+'" fill="#6366f1" fill-opacity="0.08"/>'+
+    '<path d="'+path+'" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+
+    dots+yTop+yBot+xL+xR+'</svg>';
+}
+
 function renderWeightTracker(){
   var el=document.getElementById('weightTrackerContent'); if(!el)return;
   checkWeightAutoArchive();
@@ -1612,14 +1670,19 @@ function renderWeightTracker(){
   var todayDs=toDateStr(new Date());
   var entries=data.weightEntries||{};
   var goal=data.weightGoal;
-  var stats=calcWeightStats(entries,weekDays);
   var todayWeight=entries[todayDs]||'';
-  // Goal
+
+  // ── All-time entries ──────────────────────────────────────────
+  var allEntries=getAllWeightEntries(data);
+  var first=allEntries.length?allEntries[0]:null;
+  var latest=allEntries.length?allEntries[allEntries.length-1]:null;
+
+  // ── Goal banner ───────────────────────────────────────────────
   var goalHTML='';
   if(goal){
-    var cur=stats?stats.current:null;
-    if(cur!==null){
-      var diff=parseFloat((cur-goal).toFixed(1));
+    var curW=latest?latest.w:null;
+    if(curW!==null){
+      var diff=parseFloat((curW-goal).toFixed(1));
       goalHTML=diff<=0
         ?'<div class="wt-goal wt-goal-reached">🎉 Goal reached! ('+goal+' lbs)</div>'
         :'<div class="wt-goal">Goal: <strong>'+goal+' lbs</strong> — <span class="wt-goal-diff">'+diff+' lbs to go</span></div>';
@@ -1627,46 +1690,50 @@ function renderWeightTracker(){
       goalHTML='<div class="wt-goal">Goal: <strong>'+goal+' lbs</strong></div>';
     }
   }
-  // Stats row
-  var statsHTML='';
-  if(stats&&stats.count>=1){
-    var cs=stats.change>0?'wt-stat-up':stats.change<0?'wt-stat-down':'';
-    var csign=stats.change>0?'+':'';
-    statsHTML='<div class="wt-stats-row">'+
-      '<div class="wt-stat"><div class="wt-stat-label">Start</div><div class="wt-stat-val">'+stats.start.toFixed(1)+'</div></div>'+
-      '<div class="wt-stat"><div class="wt-stat-label">Current</div><div class="wt-stat-val">'+stats.current.toFixed(1)+'</div></div>'+
-      '<div class="wt-stat"><div class="wt-stat-label">Change</div><div class="wt-stat-val '+cs+'">'+csign+stats.change.toFixed(1)+'</div></div>'+
-      '<div class="wt-stat"><div class="wt-stat-label">Avg</div><div class="wt-stat-val">'+stats.avg.toFixed(1)+'</div></div>'+
-      '<div class="wt-stat"><div class="wt-stat-label">Low</div><div class="wt-stat-val">'+stats.min.toFixed(1)+'</div></div>'+
-      '<div class="wt-stat"><div class="wt-stat-label">High</div><div class="wt-stat-val">'+stats.max.toFixed(1)+'</div></div>'+
-    '</div>';
+
+  // ── Overall progress section ──────────────────────────────────
+  var progressHTML='';
+  if(allEntries.length>=1){
+    var totalChange=parseFloat((latest.w-first.w).toFixed(1));
+    var changeCls=totalChange<0?'wt-stat-down':totalChange>0?'wt-stat-up':'';
+    var changeSign=totalChange>0?'+':'';
+    progressHTML=
+      '<div class="wt-section-hdr">📊 Overall Progress</div>'+
+      '<div class="wt-progress-stats">'+
+        '<div class="wt-pstat"><div class="wt-pstat-label">Starting</div><div class="wt-pstat-val">'+first.w.toFixed(1)+'</div></div>'+
+        '<div class="wt-pstat"><div class="wt-pstat-label">Current</div><div class="wt-pstat-val">'+latest.w.toFixed(1)+'</div></div>'+
+        '<div class="wt-pstat"><div class="wt-pstat-label">Total Change</div><div class="wt-pstat-val '+changeCls+'">'+changeSign+totalChange.toFixed(1)+'</div></div>'+
+        '<div class="wt-pstat"><div class="wt-pstat-label">Logs</div><div class="wt-pstat-val">'+allEntries.length+'</div></div>'+
+      '</div>'+
+      '<div class="wt-alltime-wrap">'+renderAllTimeWeightChart(allEntries)+'</div>';
   }
-  // Sparkline
-  var sparkHTML='<div class="wt-spark-wrap">'+(stats&&stats.count>=2?renderWeightSparkline(entries,weekDays):'<div class="wt-spark-placeholder">'+(stats&&stats.count===1?'Log more days to see chart':'No entries this week yet')+'</div>')+'</div>';
-  // Daily list
+
+  // ── This-week log & daily rows ────────────────────────────────
+  var sun=fromDateStr(sundayStr);
+  var sat=new Date(sun); sat.setDate(sun.getDate()+6);
+  var weekLabel=sun.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+sat.toLocaleDateString('en-US',{month:'short',day:'numeric'});
   var dayLabels=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var dailyHTML=weekDays.map(function(ds,i){
     var w=entries[ds]; var isT=ds===todayDs;
     var d=fromDateStr(ds);
     var dLabel=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-    var actions=w
-      ?'<div class="wt-day-actions">'+
-          '<button class="btn-icon wt-day-btn" onclick="startEditWeightDay(\''+ds+'\')" title="Edit">✏️</button>'+
-          '<button class="btn-icon wt-day-btn" onclick="deleteWeightDay(\''+ds+'\')" title="Delete">🗑</button>'+
-        '</div>'
-      :'';
+    var actions=w?'<div class="wt-day-actions">'+
+      '<button class="btn-icon wt-day-btn" onclick="startEditWeightDay(\''+ds+'\')" title="Edit">✏️</button>'+
+      '<button class="btn-icon wt-day-btn" onclick="deleteWeightDay(\''+ds+'\')" title="Delete">🗑</button>'+
+    '</div>':'';
     return'<div class="wt-day-row'+(isT?' wt-day-today':'')+'" id="wtr-'+ds+'">'+
       '<span class="wt-day-label">'+dayLabels[i]+'<span class="wt-day-date"> '+dLabel+'</span></span>'+
       (w?'<span class="wt-day-weight">'+parseFloat(w).toFixed(1)+' lbs</span>':'<span class="wt-day-empty">—</span>')+
       actions+
     '</div>';
   }).join('');
-  el.innerHTML=goalHTML+
+
+  el.innerHTML=goalHTML+progressHTML+
+    '<div class="wt-section-hdr" style="margin-top:18px">📅 This Week <span class="wt-week-range">'+weekLabel+'</span></div>'+
     '<div class="wt-log-row">'+
       '<input type="number" id="wtTodayInput" class="field wt-input" placeholder="Today\'s weight (lbs)" value="'+escHtml(String(todayWeight))+'" step="0.1" min="50" max="600">'+
       '<button class="btn-primary wt-log-btn" onclick="logWeight()">Log</button>'+
     '</div>'+
-    statsHTML+sparkHTML+
     '<div class="wt-week-list">'+dailyHTML+'</div>';
 }
 
