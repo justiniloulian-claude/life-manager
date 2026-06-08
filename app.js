@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v135 …';
+  b.textContent = 'v136 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v135 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v136 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -5632,7 +5632,35 @@ function initListeners() {
       var ed2=this; var info2=getNoteLineInfo(ed2); var lt2=info2.text;
       var bulletM=lt2.match(/^(\s*)-/); var numM=lt2.match(/^(\s*)(\d+)\./);
       if(bulletM){var pfx=bulletM[1]+'- ';setTimeout(function(){document.execCommand('insertText',false,pfx);},0);}
-      else if(numM){var pfx2=numM[1]+(parseInt(numM[2])+1)+'. ';setTimeout(function(){document.execCommand('insertText',false,pfx2);},0);}
+      else if(numM){
+        var newNum=parseInt(numM[2])+1;
+        var pfx2=numM[1]+newNum+'. ';
+        setTimeout(function(){
+          document.execCommand('insertText',false,pfx2);
+          // Renumber subsequent lines so there are no duplicate numbers.
+          // After inserting line N, the old line N (and N+1, N+2…) each need +1.
+          var sel3=window.getSelection(); if(!sel3.rangeCount)return;
+          var curNode3=sel3.getRangeAt(0).startContainer;
+          var curBlock3=curNode3.nodeType===3?curNode3.parentNode:curNode3;
+          while(curBlock3&&curBlock3.parentNode!==ed2)curBlock3=curBlock3.parentNode;
+          if(!curBlock3||curBlock3===ed2)return;
+          var expectOld=newNum; // next sibling should currently show this number
+          var sib=curBlock3.nextSibling;
+          while(sib){
+            if(sib.nodeType===3){sib=sib.nextSibling;continue;} // skip bare text nodes
+            var sibText=sib.textContent||'';
+            var sm=sibText.match(/^(\s*)(\d+)\.\s/);
+            if(sm&&parseInt(sm[2])===expectOld){
+              // Find the first text node and rewrite its leading "N. " prefix
+              var tw=document.createTreeWalker(sib,NodeFilter.SHOW_TEXT);
+              var tn2=tw.nextNode();
+              if(tn2){tn2.textContent=tn2.textContent.replace(/^(\s*)\d+\.\s*/,sm[1]+(expectOld+1)+'. ');}
+              expectOld++;
+            } else { break; }
+            sib=sib.nextSibling;
+          }
+        },0);
+      }
     }
   }
   document.getElementById('noteViewContent').addEventListener('keydown', noteEditorKeydown);
