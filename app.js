@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v131 …';
+  b.textContent = 'v132 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v131 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v132 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -157,7 +157,7 @@ function _testWrite(uid){
 }
 
 // Minimum timestamp that counts as a real user write.
-// Our Python script stamped legacy docs with ts=1. Any real write from v131+
+// Our Python script stamped legacy docs with ts=1. Any real write from v132+
 // uses Date.now() which is ~1.7 trillion (milliseconds since epoch in 2026).
 // Docs below this floor are treated as stale and will never overwrite local data.
 var _FS_TS_MIN = 1704067200000; // 2024-01-01 in ms
@@ -479,6 +479,10 @@ function saveMJH(v) { _syncSave('dm_monthly_jewish_history',     JSON.stringify(
 function saveMSH(v) { _syncSave('dm_monthly_secular_history',    JSON.stringify(v)); }
 function saveMJD(v) { _syncSave('dm_monthly_jewish_draft',       JSON.stringify(v)); }
 function saveMSD(v) { _syncSave('dm_monthly_secular_draft',      JSON.stringify(v)); }
+function saveWtE(v) { _syncSave('dm_weight_entries',             JSON.stringify(v)); }
+function saveWtG(v) { _syncSave('dm_weight_goal',                JSON.stringify(v)); }
+function saveWtH(v) { _syncSave('dm_weight_history',             JSON.stringify(v)); }
+function saveWtLS(v){ _syncSave('dm_weight_last_sunday',         v); }
 function uid()      { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 
 // Module-level media recorder state
@@ -1591,11 +1595,11 @@ function checkWeightAutoArchive(){
     if(Object.keys(entries).length>0){
       var stats=calcWeightStats(entries,weekDays);
       var history=data.weightHistory||[]; history.unshift({weekStart:lastSun,entries:entries,stats:stats});
-      localStorage.setItem('dm_weight_history',JSON.stringify(history));
+      saveWtH(history);
     }
-    localStorage.setItem('dm_weight_last_sunday',currentSun);
+    saveWtLS(currentSun);
   } else if(!lastSun){
-    localStorage.setItem('dm_weight_last_sunday',currentSun);
+    saveWtLS(currentSun);
   }
 }
 function renderWeightTracker(){
@@ -4909,7 +4913,7 @@ window.logWeight = function(){
   input.classList.remove('error');
   var data=getData(); var todayDs=toDateStr(new Date());
   data.weightEntries[todayDs]=val;
-  localStorage.setItem('dm_weight_entries',JSON.stringify(data.weightEntries));
+  saveWtE(data.weightEntries);
   renderWeightTracker();
 };
 window.openWeightGoalModal=function(){
@@ -4921,8 +4925,8 @@ window.openWeightGoalModal=function(){
 window.saveWeightGoal=function(){
   var raw=document.getElementById('wtGoalInput').value.trim();
   var val=parseFloat(raw);
-  if(raw===''){ localStorage.removeItem('dm_weight_goal'); }
-  else if(val>=50&&val<=600){ localStorage.setItem('dm_weight_goal',JSON.stringify(val)); }
+  if(raw===''){ saveWtG(null); }
+  else if(val>=50&&val<=600){ saveWtG(val); }
   closeModal('weightGoalModal'); renderWeightTracker();
 };
 window.openWeightHistory=function(){
@@ -4978,13 +4982,13 @@ window.saveWeightDay=function(ds){
   if(!val||val<50||val>600){inp.classList.add('error');inp.focus();return;}
   var data=getData();
   data.weightEntries[ds]=val;
-  localStorage.setItem('dm_weight_entries',JSON.stringify(data.weightEntries));
+  saveWtE(data.weightEntries);
   renderWeightTracker();
 };
 window.deleteWeightDay=function(ds){
   var data=getData();
   delete data.weightEntries[ds];
-  localStorage.setItem('dm_weight_entries',JSON.stringify(data.weightEntries));
+  saveWtE(data.weightEntries);
   renderWeightTracker();
 };
 window.toggleWtHistWeek=function(wi){
