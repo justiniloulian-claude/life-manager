@@ -2521,15 +2521,10 @@ textarea.field { resize: vertical; }
 .wt-day-actions { display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; margin-left: 8px; }
 .wt-day-row:hover .wt-day-actions { opacity: 1; }
 .wt-day-btn { font-size: 13px; padding: 2px 4px; }
-/* Weight tracker — overall progress section */
-.wt-section-hdr { font-size: 12px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
-.wt-week-range { font-size: 11px; color: #bbb; font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 4px; }
-.wt-progress-stats { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-.wt-pstat { flex: 1; min-width: 60px; background: #f9f9f9; border-radius: 8px; padding: 10px 6px; text-align: center; }
-.wt-pstat-label { font-size: 10px; color: #aaa; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
-.wt-pstat-val { font-size: 15px; font-weight: 700; color: #1a1a1a; }
-.wt-alltime-wrap { background: #fafafa; border-radius: 10px; padding: 8px 8px 2px; margin-bottom: 4px; }
-.wt-alltime-svg { width: 100%; height: 90px; display: block; overflow: visible; }
+/* Weight tracker — section headers & inline history */
+.wt-section-hdr { font-size: 11px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; }
+.wt-week-range { font-size: 11px; color: #bbb; font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 6px; }
+.wt-hist-inline { margin-top: 4px; }
 
 /* Dynamic reminder rows in cal event modal */
 .cal-reminder-row { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
