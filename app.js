@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v137 …';
+  b.textContent = 'v139 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v137 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v139 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -2412,7 +2412,7 @@ window.openCheshbonWeekHistory = function(){
   if(!data.cheshbonWeekHistory.length){
     body.innerHTML='<div style="padding:24px;color:#aaa;font-size:14px;text-align:center">No past weeks yet.</div>';
   } else {
-    body.innerHTML=data.cheshbonWeekHistory.map(function(week){
+    body.innerHTML=data.cheshbonWeekHistory.map(function(week,wi){
       var rows=week.items.map(function(item){
         var dayCells=CHESHBON_DAYS.map(function(d){
           var raw=item.checks[d];
@@ -2428,10 +2428,24 @@ window.openCheshbonWeekHistory = function(){
           '<div class="week-hist-days">'+dayCells+'</div>'+
         '</div>';
       }).join('');
-      return '<div class="week-hist-entry"><div class="week-hist-date">Week of '+escHtml(week.weekOf)+'</div>'+rows+'</div>';
+      var entryId='chWkHist-'+wi;
+      return '<div class="week-hist-entry">'+
+        '<div class="week-hist-toggle" onclick="toggleChWkHist(\''+entryId+'\',this)">'+
+          '<span>Week of '+escHtml(week.weekOf)+'</span>'+
+          '<span class="week-hist-arrow">▼</span>'+
+        '</div>'+
+        '<div class="week-hist-rows-wrap" id="'+entryId+'">'+rows+'</div>'+
+      '</div>';
     }).join('');
   }
   openModal('cheshbonWeekHistModal');
+};
+window.toggleChWkHist=function(id,hdr){
+  var wrap=document.getElementById(id); if(!wrap)return;
+  var open=wrap.style.display!=='none'&&wrap.style.display!=='';
+  wrap.style.display=open?'none':'block';
+  var arrow=hdr.querySelector('.week-hist-arrow');
+  if(arrow)arrow.textContent=open?'▶':'▼';
 };
 
 // ============================================================
@@ -3814,7 +3828,10 @@ window.taskDrop=function(e,ds,toId){
       tIds.splice(insertBefore?newTo2:newTo2+1,0,newId);
     }
     var orderData2=JSON.parse(localStorage.getItem('dm_task_order')||'{}');
-    delete orderData2[fromDs]; orderData2[ds]=tIds;
+    // Only remove the moved task from source day's order — don't wipe the whole entry
+    var srcOrder2=orderData2[fromDs]||[];
+    orderData2[fromDs]=srcOrder2.filter(function(oid){return oid!==fromId;});
+    orderData2[ds]=tIds;
     saveTOrd(orderData2);
     _dragTaskInfo=null; refresh(); refreshDashDayModal();
   }
@@ -4296,7 +4313,10 @@ window.dayCardDrop=function(e,ds){
   data.tasks[ds].push(Object.assign({},task,{id:uid(),done:false}));
   saveT(data.tasks);
   var orderData=JSON.parse(localStorage.getItem('dm_task_order')||'{}');
-  delete orderData[fromDs]; delete orderData[ds];
+  // Remove only the moved task from source day's order; clear target day so new task appends cleanly
+  var srcOrder=orderData[fromDs]||[];
+  orderData[fromDs]=srcOrder.filter(function(oid){return oid!==taskId;});
+  delete orderData[ds];
   saveTOrd(orderData);
   _dragTaskInfo=null; refresh();
 };
@@ -5641,6 +5661,9 @@ function initListeners() {
       var bulletM=lt2.match(/^(\s*)-/); var numM=lt2.match(/^(\s*)(\d+)\./);
       if(bulletM){var pfx=bulletM[1]+'- ';setTimeout(function(){document.execCommand('insertText',false,pfx);},0);}
       else if(numM){
+        // If the current line is just the bare number prefix (e.g. "3." or "3. "),
+        // the user wants to exit the list — let the browser create a plain new line.
+        if(lt2.trim()===numM[2]+'.'){return;}
         var newNum=parseInt(numM[2])+1;
         var pfx2=numM[1]+newNum+'. ';
         setTimeout(function(){
