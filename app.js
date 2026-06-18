@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v136 …';
+  b.textContent = 'v137 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v136 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v137 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -2414,11 +2414,19 @@ window.openCheshbonWeekHistory = function(){
   } else {
     body.innerHTML=data.cheshbonWeekHistory.map(function(week){
       var rows=week.items.map(function(item){
-        var days=CHESHBON_DAYS.map(function(d){
-          return '<span class="week-hist-day'+(item.checks[d]?' checked':'')+'">'+CHESHBON_DAY_LABELS[d]+'</span>';
+        var dayCells=CHESHBON_DAYS.map(function(d){
+          var raw=item.checks[d];
+          var sc=(raw===true||raw===false)?(raw?1:0):(Number(raw)||0);
+          var cls=sc?('score-'+sc):'score-empty';
+          return '<div class="week-hist-day-cell">'+
+            '<div class="week-hist-day-lbl">'+CHESHBON_DAY_LABELS[d]+'</div>'+
+            '<div class="week-hist-score '+cls+'">'+(sc?sc:'–')+'</div>'+
+          '</div>';
         }).join('');
-        return '<div class="week-hist-row"><div class="week-hist-item">'+escHtml(item.text)+'</div>'+
-          '<div class="week-hist-days">'+days+'</div></div>';
+        return '<div class="week-hist-row">'+
+          '<div class="week-hist-item">'+escHtml(item.text)+'</div>'+
+          '<div class="week-hist-days">'+dayCells+'</div>'+
+        '</div>';
       }).join('');
       return '<div class="week-hist-entry"><div class="week-hist-date">Week of '+escHtml(week.weekOf)+'</div>'+rows+'</div>';
     }).join('');

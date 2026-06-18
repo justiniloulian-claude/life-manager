@@ -1835,16 +1835,18 @@ textarea.field { resize: vertical; }
 .week-hist-date    { font-size: 13px; font-weight: 600; color: #1a1a1a; margin-bottom: 10px; }
 .week-hist-row {
   display: flex; align-items: center; gap: 8px;
-  padding: 6px 0; border-bottom: 1px solid #fafafa; font-size: 13px;
+  padding: 8px 0; border-bottom: 1px solid #fafafa; font-size: 13px;
 }
 .week-hist-row:last-child { border-bottom: none; }
-.week-hist-item    { flex: 1; color: #555; }
-.week-hist-days    { display: flex; gap: 4px; flex-shrink: 0; }
-.week-hist-day {
-  font-size: 10px; font-weight: 600; padding: 2px 5px;
-  border-radius: 4px; background: #f3f4f6; color: #bbb;
+.week-hist-item { flex: 1; color: #444; font-weight: 500; min-width: 0; padding-right: 8px; }
+.week-hist-days { display: flex; gap: 5px; flex-shrink: 0; }
+.week-hist-day-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.week-hist-day-lbl { font-size: 9px; font-weight: 700; color: #bbb; text-transform: uppercase; letter-spacing: 0.3px; }
+.week-hist-score {
+  width: 28px; height: 28px; border-radius: 6px;
+  font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
 }
-.week-hist-day.checked { background: #1a1a1a; color: #fff; }
 
 @media (max-width: 900px) {
   .cheshbon-layout { grid-template-columns: 1fr; }
