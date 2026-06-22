@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Life Manager">
-  <title>Dashboard v139</title>
+  <title>Dashboard v140</title>
   <link rel="stylesheet" href="style.css?v=139">
 </head>
 <body>
@@ -257,9 +257,13 @@
             <button id="btnPauseRecord" class="btn-record-pause" onclick="pauseRecording()" style="display:none">⏸ Pause</button>
             <button id="btnStopRecord" class="btn-record-stop" onclick="stopRecording()" style="display:none">⏹ Stop</button>
             <span id="recordTimer" class="record-timer" style="display:none">0:00</span>
+            <label class="btn-upload-audio" title="Upload an audio file from your device">
+              ⬆ Upload
+              <input type="file" id="audioFileInput" accept="audio/*" style="display:none" onchange="uploadAudioFile(this)">
+            </label>
           </div>
           <div id="audioPlayback" style="margin-bottom:6px"></div>
-          <button id="btnDiscardRecording" class="btn-record-discard" onclick="discardRecording()" style="display:none">✕ Discard Recording</button>
+          <button id="btnDiscardRecording" class="btn-record-discard" onclick="discardRecording()" style="display:none">✕ Discard</button>
           <button class="btn-primary" style="font-size:13px;padding:7px 16px" onclick="storeJewishMonth()">Store Entry</button>
           <div class="hist-section">
             <div class="hist-section-hdr">

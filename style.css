@@ -2419,6 +2419,8 @@ textarea.field { resize: vertical; }
 .btn-record-pause:hover { background:#d97706; }
 .btn-record-discard { padding:6px 14px; background:none; color:#e53e3e; border:1.5px solid #e53e3e; border-radius:8px; cursor:pointer; font-size:12px; font-weight:500; margin-bottom:8px; display:block; }
 .btn-record-discard:hover { background:#fff5f5; }
+.btn-upload-audio { padding:8px 14px; background:#6366f1; color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:500; display:inline-flex; align-items:center; gap:4px; }
+.btn-upload-audio:hover { background:#4f46e5; }
 .audio-player-wrap { margin-top: 8px; }
 .audio-speed-row { display:flex; align-items:center; gap:8px; margin-top:6px; }
 .audio-speed-label { font-size:12px; color:#888; }

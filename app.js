@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v139 …';
+  b.textContent = 'v140 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v139 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v140 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -2003,6 +2003,18 @@ window.discardRecording = function() {
   _audioChunks = [];
   var ap = document.getElementById('audioPlayback'); if (ap) ap.innerHTML = '';
   var db = document.getElementById('btnDiscardRecording'); if (db) db.style.display = 'none';
+  var fi = document.getElementById('audioFileInput'); if (fi) fi.value = '';
+};
+
+window.uploadAudioFile = function(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  _currentAudioBlob = file;
+  var url = URL.createObjectURL(file);
+  var ap = document.getElementById('audioPlayback');
+  if (ap) ap.innerHTML = buildAudioPlayerHTML(url, 'preview-player');
+  var db = document.getElementById('btnDiscardRecording');
+  if (db) db.style.display = '';
 };
 
 window.storeJewishMonth = function() {
