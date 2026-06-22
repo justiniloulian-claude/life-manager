@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v140 …';
+  b.textContent = 'v141 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v140 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v141 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -2076,18 +2076,83 @@ function renderJewishHist() {
   if (!entries.length) { list.innerHTML='<div style="color:#aaa;font-size:13px;margin-top:8px">No entries yet.</div>'; return; }
   list.innerHTML = entries.map(function(e) {
     var dt = new Date(e.storedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-    return '<div class="jewish-hist-entry">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'+
-        '<span class="jewish-hist-month">'+escHtml(e.month)+'</span>'+
-        '<span style="display:flex;align-items:center;gap:6px;flex-shrink:0">'+
-          '<span class="jewish-hist-date">'+escHtml(dt)+'</span>'+
-          '<button class="btn-icon" style="color:#e53e3e;font-size:14px" title="Delete entry" onclick="deleteJewishEntry(\''+e.id+'\',\''+e.audioKey+'\')">🗑</button>'+
-        '</span>'+
+    var eid = 'jhe-'+e.id;
+    return '<div class="jewish-hist-entry" id="'+eid+'" draggable="true" '+
+        'ondragstart="jewishDragStart(event,\''+e.id+'\')" '+
+        'ondragover="jewishDragOver(event,\''+e.id+'\')" '+
+        'ondrop="jewishDrop(event,\''+e.id+'\')" '+
+        'ondragleave="jewishDragLeave(event)" ondragend="jewishDragEnd(event)">'+
+      '<div style="display:flex;align-items:center;gap:6px">'+
+        '<span class="jewish-drag-handle" title="Drag to reorder">⠿</span>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'+
+            '<span class="jewish-hist-month" id="jhm-'+e.id+'">'+escHtml(e.month)+'</span>'+
+            '<span style="display:flex;align-items:center;gap:4px;flex-shrink:0">'+
+              '<span class="jewish-hist-date">'+escHtml(dt)+'</span>'+
+              '<button class="btn-icon" title="Rename" onclick="startRenameJewish(\''+e.id+'\')">✏️</button>'+
+              '<button class="btn-icon" style="color:#e53e3e;font-size:14px" title="Delete" onclick="deleteJewishEntry(\''+e.id+'\',\''+e.audioKey+'\')">🗑</button>'+
+            '</span>'+
+          '</div>'+
+          (e.audioKey ? '<button class="btn-secondary" style="font-size:12px;padding:4px 10px;margin-top:6px" onclick="playJewishAudio(\''+e.audioKey+'\',this)">▶ Play</button>' : '')+
+        '</div>'+
       '</div>'+
-      (e.audioKey ? '<button class="btn-secondary" style="font-size:12px;padding:4px 10px;margin-top:6px" onclick="playJewishAudio(\''+e.audioKey+'\',this)">▶ Play</button>' : '')+
     '</div>';
   }).join('');
 }
+
+window.startRenameJewish = function(id) {
+  var span = document.getElementById('jhm-'+id); if (!span) return;
+  var cur = span.textContent;
+  span.innerHTML = '<input class="jewish-rename-input" value="'+escHtml(cur)+'" '+
+    'onblur="commitRenameJewish(\''+id+'\',this)" '+
+    'onkeydown="if(event.key===\'Enter\')this.blur();if(event.key===\'Escape\'){this.dataset.cancel=\'1\';this.blur();}">';
+  var inp = span.querySelector('input'); if (inp){ inp.focus(); inp.select(); }
+};
+
+window.commitRenameJewish = function(id, inp) {
+  if (inp.dataset.cancel) { renderJewishHist(); return; }
+  var newName = inp.value.trim();
+  if (!newName) { renderJewishHist(); return; }
+  var data = getData();
+  var entry = data.monthlyJewishHistory.find(function(e){ return e.id===id; });
+  if (entry) { entry.month = newName; saveMJH(data.monthlyJewishHistory); }
+  renderJewishHist();
+};
+
+var _jewishDragId = null;
+window.jewishDragStart = function(e, id) {
+  _jewishDragId = id;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(function(){ var el=document.getElementById('jhe-'+id); if(el)el.classList.add('jewish-entry-dragging'); },0);
+};
+window.jewishDragOver = function(e, id) {
+  e.preventDefault(); e.dataTransfer.dropEffect='move';
+  if (id === _jewishDragId) return;
+  document.querySelectorAll('.jewish-hist-entry').forEach(function(el){ el.classList.remove('jewish-entry-over'); });
+  var el = document.getElementById('jhe-'+id); if (el) el.classList.add('jewish-entry-over');
+};
+window.jewishDragLeave = function(e) {
+  if (e.currentTarget) e.currentTarget.classList.remove('jewish-entry-over');
+};
+window.jewishDragEnd = function(e) {
+  document.querySelectorAll('.jewish-hist-entry').forEach(function(el){
+    el.classList.remove('jewish-entry-dragging','jewish-entry-over');
+  });
+  _jewishDragId = null;
+};
+window.jewishDrop = function(e, targetId) {
+  e.preventDefault();
+  if (!_jewishDragId || _jewishDragId === targetId) return;
+  var data = getData();
+  var hist = data.monthlyJewishHistory;
+  var fromIdx = hist.findIndex(function(x){ return x.id===_jewishDragId; });
+  var toIdx   = hist.findIndex(function(x){ return x.id===targetId; });
+  if (fromIdx===-1||toIdx===-1) return;
+  var item = hist.splice(fromIdx, 1)[0];
+  hist.splice(toIdx, 0, item);
+  saveMJH(hist);
+  renderJewishHist();
+};
 
 window.deleteJewishEntry = function(id, audioKey) {
   if (!confirm('Delete this entry?')) return;
