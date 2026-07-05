@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v142 …';
+  b.textContent = 'v143 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v142 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v143 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -719,13 +719,24 @@ function zmanimFullHTML(times) {
 // ============================================================
 // HEBREW DATE
 // ============================================================
+var _HMONTH_NAMES={
+  'Nisan':'Nisan','Iyyar':'Iyar','Sivan':'Sivan','Tamuz':'Tammuz','Av':'Av','Elul':'Elul',
+  'Tishrei':'Tishrei','Cheshvan':'Cheshvan','Kislev':'Kislev','Tevet':'Tevet',
+  'Shvat':'Shevat','Adar':'Adar','Adar II':'Adar II','Adar I':'Adar I'
+};
+function _hebrewOrdinal(n){
+  var s=['th','st','nd','rd'];
+  var v=n%100;
+  return n+(s[(v-20)%10]||s[v]||s[0]);
+}
 async function fetchHebrewDate(ds) {
   if (state.hebrewCache[ds]) return state.hebrewCache[ds];
   var p=ds.split('-');
   try {
-    var url='https://www.hebcal.com/converter?cfg=json&gy='+p[0]+'&gm='+p[1]+'&gd='+p[2]+'&g2h=1';
+    var url='https://www.hebcal.com/converter?cfg=json&gy='+p[0]+'&gm='+Number(p[1])+'&gd='+Number(p[2])+'&g2h=1';
     var res=await fetch(url); var json=await res.json();
-    var result=json.hd+' '+json.hm+' '+json.hy;
+    var monthName=_HMONTH_NAMES[json.hm]||json.hm;
+    var result=_hebrewOrdinal(json.hd)+' of '+monthName+', '+json.hy;
     state.hebrewCache[ds]=result; return result;
   } catch(e){ return null; }
 }
