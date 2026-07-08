@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v149 …';
+  b.textContent = 'v150 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v149 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v150 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -298,6 +298,7 @@ function _pollForUpdates(){
 document.addEventListener('visibilitychange', function(){
   if(!document.hidden) _pollForUpdates();
 });
+window._esavSync = function(cb){ _pollForUpdates(); if(cb) setTimeout(cb, 1500); };
 
 // ============================================================
 // COLOR OPTIONS
@@ -6284,7 +6285,9 @@ function _doLogin() {
       if(data.transcript) addBubble(data.transcript, 'user');
       addBubble(data.response || 'Done!', 'esav');
       setStatus('Ready');
-      setTimeout(function(){ try{ refresh(); renderCalendar(); }catch(e){} }, 1200);
+      // Pull fresh data from Firestore then re-render
+      if(window._esavSync){ window._esavSync(function(){ try{ refresh(); renderCalendar(); }catch(e){} }); }
+      else { setTimeout(function(){ try{ refresh(); renderCalendar(); }catch(e){} }, 1500); }
     } catch(e){
       thinking.remove();
       addBubble('Could not reach Esav. Check your connection.', 'esav');
