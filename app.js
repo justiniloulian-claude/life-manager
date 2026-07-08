@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v156 …';
+  b.textContent = 'v157 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v156 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v157 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -6346,27 +6346,45 @@ function _doLogin() {
 
   // ── Push notification subscription ─────────────────────────
   async function registerPush(){
-    if(!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if(!('serviceWorker' in navigator)){
+      addBubble('[Push] serviceWorker not supported', 'esav'); return;
+    }
+    if(!('PushManager' in window)){
+      addBubble('[Push] PushManager not supported — iOS 16.4+ required, must be installed to homescreen', 'esav'); return;
+    }
     try {
+      addBubble('[Push] Registering…', 'esav');
       var reg = await navigator.serviceWorker.ready;
       var existing = await reg.pushManager.getSubscription();
-      if(existing){ sendSubToServer(existing); return; }
+      if(existing){
+        addBubble('[Push] Existing subscription found — sending to server', 'esav');
+        sendSubToServer(existing); return;
+      }
       var keyRes  = await fetch(ESAV_URL + '/push/vapid-key');
       var keyData = await keyRes.json();
       var sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(keyData.key)
       });
+      addBubble('[Push] New subscription created — sending to server', 'esav');
       sendSubToServer(sub);
-    } catch(e){ /* push not available */ }
+    } catch(e){
+      addBubble('[Push] Error: ' + e.name + ' — ' + e.message, 'esav');
+    }
   }
 
-  function sendSubToServer(sub){
-    fetch(ESAV_URL + '/push/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(sub)
-    }).catch(function(){});
+  async function sendSubToServer(sub){
+    try {
+      var res = await fetch(ESAV_URL + '/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sub)
+      });
+      var data = await res.json();
+      addBubble('[Push] Server response: ' + JSON.stringify(data), 'esav');
+    } catch(e){
+      addBubble('[Push] Failed to reach server: ' + e.message, 'esav');
+    }
   }
 
   function urlBase64ToUint8Array(base64String){
