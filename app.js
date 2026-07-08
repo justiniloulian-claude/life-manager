@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v152 …';
+  b.textContent = 'v153 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v152 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v153 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -6182,6 +6182,7 @@ function _doLogin() {
   var chat       = document.getElementById('esavChat');
   var messages   = document.getElementById('esavMessages');
   var statusEl   = document.getElementById('esavStatus');
+  var newMsgBtn  = document.getElementById('esavNewMsgBtn');
   var pauseBtn   = document.getElementById('esavPauseBtn');
   var stopBtn    = document.getElementById('esavStopBtn');
   var cancelBtn  = document.getElementById('esavCancelBtn');
@@ -6189,7 +6190,7 @@ function _doLogin() {
   var closeBtn   = document.getElementById('esavCloseBtn');
 
   // ── Chat helpers ────────────────────────────────────────────
-  function addBubble(text, role){ // role: 'user' | 'esav' | 'thinking'
+  function addBubble(text, role){
     var el = document.createElement('div');
     el.className = 'esav-bubble ' + role;
     el.textContent = text;
@@ -6199,8 +6200,19 @@ function _doLogin() {
   }
   function setStatus(msg){ if(statusEl) statusEl.textContent = msg; }
 
+  function setRecordingUI(active){
+    newMsgBtn.style.display   = active ? 'none' : '';
+    recordLabel.style.display = active ? '' : 'none';
+    pauseBtn.style.display    = active ? '' : 'none';
+    stopBtn.style.display     = active ? '' : 'none';
+    cancelBtn.style.display   = active ? '' : 'none';
+  }
+
   function showChat(){ chat.style.display = 'flex'; }
-  function hideChat(){ chat.style.display = 'none'; stopRecording(); }
+  function hideChat(){
+    chat.style.display = 'none';
+    if(isRecording) cancelRecording();
+  }
 
   fab.addEventListener('click', function(){
     if(chat.style.display === 'none' || !chat.style.display){ showChat(); startRecording(); }
@@ -6226,8 +6238,9 @@ function _doLogin() {
       mediaRecorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
       mediaRecorder.ondataavailable = function(e){ if(e.data && e.data.size>0) audioChunks.push(e.data); };
       mediaRecorder.onstop = sendAudio;
-      mediaRecorder.start(250); // collect chunks every 250ms so pause works reliably
+      mediaRecorder.start(250);
       isRecording = true; isPaused = false;
+      setRecordingUI(true);
       recordLabel.textContent = '● Recording';
       setStatus('Recording…');
     } catch(e){
@@ -6254,17 +6267,18 @@ function _doLogin() {
 
   function stopRecording(){
     if(mediaRecorder && isRecording){
-      if(isPaused) mediaRecorder.resume(); // must resume before stop
+      if(isPaused) mediaRecorder.resume();
       mediaRecorder.stop();
       mediaRecorder.stream.getTracks().forEach(function(t){ t.stop(); });
       isRecording = false; isPaused = false;
+      setRecordingUI(false);
       setStatus('Thinking…');
     }
   }
 
   function cancelRecording(){
     if(mediaRecorder && isRecording){
-      mediaRecorder.onstop = null; // prevent sendAudio from firing
+      mediaRecorder.onstop = null;
       if(isPaused) mediaRecorder.resume();
       mediaRecorder.stop();
       mediaRecorder.stream.getTracks().forEach(function(t){ t.stop(); });
@@ -6273,6 +6287,7 @@ function _doLogin() {
     audioChunks = [];
     pauseBtn.textContent = '⏸';
     recordLabel.textContent = '● Recording';
+    setRecordingUI(false);
     setStatus('Ready');
     hideChat();
   }
@@ -6307,6 +6322,7 @@ function _doLogin() {
     }
   }
 
+  newMsgBtn.addEventListener('click',  startRecording);
   pauseBtn.addEventListener('click',  togglePause);
   stopBtn.addEventListener('click',   stopRecording);
   cancelBtn.addEventListener('click', cancelRecording);

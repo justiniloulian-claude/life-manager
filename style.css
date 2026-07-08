@@ -3426,6 +3426,8 @@ body.dark-mode .mob-folder-overlay { background: rgba(0,0,0,0.6); }
 .esav-stop-btn:hover { background: #6d28d9; }
 .esav-cancel-btn { background: #dc2626; color: #fff; font-size: 13px; font-weight: 600; padding: 6px 10px; }
 .esav-cancel-btn:hover { background: #b91c1c; }
+.esav-new-msg-btn { flex: 1; background: #7c3aed; color: #fff; border: none; border-radius: 8px; padding: 10px; font-size: 15px; font-weight: 600; cursor: pointer; letter-spacing: 0.01em; }
+.esav-new-msg-btn:hover { background: #6d28d9; }
 
 body.dark-mode .esav-chat { background: #1e1e1e; }
 body.dark-mode .esav-messages { background: #1e1e1e; }
