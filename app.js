@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v157 …';
+  b.textContent = 'v158 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v157 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v158 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -6350,14 +6350,22 @@ function _doLogin() {
       addBubble('[Push] serviceWorker not supported', 'esav'); return;
     }
     if(!('PushManager' in window)){
-      addBubble('[Push] PushManager not supported — iOS 16.4+ required, must be installed to homescreen', 'esav'); return;
+      addBubble('[Push] PushManager not supported — requires iOS 16.4+ installed to homescreen', 'esav'); return;
     }
+    var ua = navigator.userAgent;
+    var iosMatch = ua.match(/OS (\d+)_/);
+    var iosVer = iosMatch ? parseInt(iosMatch[1]) : '?';
+    addBubble('[Push] iOS ' + iosVer + ' | permission: ' + (Notification.permission||'?'), 'esav');
     try {
-      addBubble('[Push] Registering…', 'esav');
+      // Always request permission explicitly — re-syncs iOS Settings vs web layer
+      var perm = await Notification.requestPermission();
+      addBubble('[Push] After requestPermission: ' + perm, 'esav');
+      if(perm !== 'granted'){ addBubble('[Push] Permission not granted — cannot subscribe', 'esav'); return; }
       var reg = await navigator.serviceWorker.ready;
+      addBubble('[Push] Service worker ready', 'esav');
       var existing = await reg.pushManager.getSubscription();
       if(existing){
-        addBubble('[Push] Existing subscription found — sending to server', 'esav');
+        addBubble('[Push] Existing subscription — sending to server', 'esav');
         sendSubToServer(existing); return;
       }
       var keyRes  = await fetch(ESAV_URL + '/push/vapid-key');
