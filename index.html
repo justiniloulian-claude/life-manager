@@ -8,8 +8,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Life Manager">
-  <title>Dashboard v148</title>
-  <link rel="stylesheet" href="style.css?v=148">
+  <title>Dashboard v149</title>
+  <link rel="stylesheet" href="style.css?v=149">
 </head>
 <body>
 
@@ -45,19 +45,27 @@
       <button class="header-nav-tab" data-page="financial">Financial</button>
     </nav>
     <button id="darkModeToggle" class="btn-nav header-dark-toggle" title="Toggle dark mode">🌙</button>
-    <button id="assistantMicBtn" class="assistant-mic-btn" title="Voice assistant">🎙</button>
   </div>
 </header>
 
-<!-- ===== ASSISTANT UI ===== -->
-<div id="assistantPanel" class="assistant-panel" style="display:none">
-  <div class="assistant-inner">
-    <div id="assistantStatus" class="assistant-status">Tap the mic and speak</div>
-    <div id="assistantTranscript" class="assistant-transcript"></div>
-    <div id="assistantResponse" class="assistant-response"></div>
-    <button id="assistantCloseBtn" class="assistant-close-btn">✕</button>
+<!-- ===== ESAV CHAT UI ===== -->
+<div id="esavChat" class="esav-chat" style="display:none">
+  <div class="esav-chat-header">
+    <span class="esav-chat-name">Esav</span>
+    <span id="esavStatus" class="esav-chat-status">Ready</span>
+    <button id="esavCloseBtn" class="esav-close-btn" title="Close">✕</button>
+  </div>
+  <div id="esavMessages" class="esav-messages"></div>
+  <div class="esav-input-bar">
+    <div id="esavRecordState" class="esav-record-state" style="display:none">
+      <span id="esavRecordLabel" class="esav-record-label">● Recording</span>
+      <button id="esavPauseBtn" class="esav-ctrl-btn" title="Pause">⏸</button>
+      <button id="esavStopBtn"  class="esav-ctrl-btn esav-stop-btn" title="Send">⏹ Send</button>
+    </div>
+    <button id="esavMicBtn" class="esav-mic-btn" title="Hold to record">🎙 Speak to Esav</button>
   </div>
 </div>
+<button id="esavFab" class="esav-fab" title="Esav — your personal assistant">E</button>
 
 <!-- ===== DASHBOARD PAGE ===== -->
 <div id="page-dashboard" class="page active">
@@ -1493,6 +1501,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="app.js?v=148"></script>
+<script src="app.js?v=149"></script>
 </body>
 </html>

@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v148 …';
+  b.textContent = 'v149 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v148 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v149 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -6171,114 +6171,172 @@ function _doLogin() {
 }
 
 // ============================================================
-// VOICE ASSISTANT
+// ESAV — PERSONAL ASSISTANT
 // ============================================================
 (function(){
-  var ASSISTANT_URL = 'https://life-assistant-production-f813.up.railway.app';
-  var mediaRecorder, audioChunks = [], isRecording = false;
+  var ESAV_URL = 'https://life-assistant-production-f813.up.railway.app';
+  var mediaRecorder, audioChunks = [], isRecording = false, isPaused = false;
 
-  var micBtn       = document.getElementById('assistantMicBtn');
-  var panel        = document.getElementById('assistantPanel');
-  var statusEl     = document.getElementById('assistantStatus');
-  var transcriptEl = document.getElementById('assistantTranscript');
-  var responseEl   = document.getElementById('assistantResponse');
-  var closeBtn     = document.getElementById('assistantCloseBtn');
+  var fab        = document.getElementById('esavFab');
+  var chat       = document.getElementById('esavChat');
+  var messages   = document.getElementById('esavMessages');
+  var statusEl   = document.getElementById('esavStatus');
+  var micBtn     = document.getElementById('esavMicBtn');
+  var pauseBtn   = document.getElementById('esavPauseBtn');
+  var stopBtn    = document.getElementById('esavStopBtn');
+  var recordState= document.getElementById('esavRecordState');
+  var recordLabel= document.getElementById('esavRecordLabel');
+  var closeBtn   = document.getElementById('esavCloseBtn');
 
-  function setStatus(msg){ if(statusEl) statusEl.textContent = msg; }
-  function setTranscript(msg){ if(transcriptEl) transcriptEl.textContent = msg; }
-  function setResponse(msg){ if(responseEl) responseEl.textContent = msg; }
-
-  function speak(text){
-    if(!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    var utt = new SpeechSynthesisUtterance(text);
-    utt.rate = 1; utt.pitch = 1;
-    window.speechSynthesis.speak(utt);
+  // ── Chat helpers ────────────────────────────────────────────
+  function addBubble(text, role){ // role: 'user' | 'esav' | 'thinking'
+    var el = document.createElement('div');
+    el.className = 'esav-bubble ' + role;
+    el.textContent = text;
+    messages.appendChild(el);
+    messages.scrollTop = messages.scrollHeight;
+    return el;
   }
+  function setStatus(msg){ if(statusEl) statusEl.textContent = msg; }
 
-  function showPanel(){ if(panel) panel.style.display = 'block'; }
-  function hidePanel(){ if(panel) panel.style.display = 'none'; window.speechSynthesis && window.speechSynthesis.cancel(); }
+  function showChat(){ chat.style.display = 'flex'; }
+  function hideChat(){ chat.style.display = 'none'; stopRecording(); }
 
+  fab.addEventListener('click', function(){
+    if(chat.style.display === 'none' || !chat.style.display){ showChat(); }
+    else { hideChat(); }
+  });
+  closeBtn.addEventListener('click', hideChat);
+
+  // ── Audio MIME detection ────────────────────────────────────
   function getAudioMime(){
-    var types=['audio/mp4','audio/mpeg','audio/webm;codecs=opus','audio/webm','audio/ogg'];
+    var types = ['audio/mp4','audio/mpeg','audio/webm;codecs=opus','audio/webm','audio/ogg'];
     for(var i=0;i<types.length;i++){
-      if(typeof MediaRecorder!=='undefined'&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(types[i])) return types[i];
+      if(typeof MediaRecorder!=='undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(types[i])) return types[i];
     }
     return '';
   }
 
+  // ── Recording ───────────────────────────────────────────────
   async function startRecording(){
     try {
       var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunks = [];
-      var mimeType = getAudioMime();
-      mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType: mimeType }) : new MediaRecorder(stream);
-      mediaRecorder.ondataavailable = function(e){ if(e.data.size>0) audioChunks.push(e.data); };
+      var mime = getAudioMime();
+      mediaRecorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = function(e){ if(e.data && e.data.size>0) audioChunks.push(e.data); };
       mediaRecorder.onstop = sendAudio;
-      mediaRecorder.start();
-      isRecording = true;
-      micBtn.classList.add('recording');
-      showPanel();
-      setStatus('Recording… tap again to stop');
-      setTranscript('');
-      setResponse('');
+      mediaRecorder.start(250); // collect chunks every 250ms so pause works reliably
+      isRecording = true; isPaused = false;
+      micBtn.style.display = 'none';
+      recordState.style.display = 'flex';
+      recordLabel.textContent = '● Recording';
+      setStatus('Recording…');
+      showChat();
     } catch(e){
-      alert('Mic error: ' + e.name + ' — ' + e.message);
+      addBubble('Mic error: ' + e.name + ' — ' + e.message, 'esav');
+    }
+  }
+
+  function togglePause(){
+    if(!mediaRecorder || !isRecording) return;
+    if(isPaused){
+      mediaRecorder.resume();
+      isPaused = false;
+      pauseBtn.textContent = '⏸';
+      recordLabel.textContent = '● Recording';
+      setStatus('Recording…');
+    } else {
+      mediaRecorder.pause();
+      isPaused = true;
+      pauseBtn.textContent = '▶';
+      recordLabel.textContent = '⏸ Paused';
+      setStatus('Paused');
     }
   }
 
   function stopRecording(){
     if(mediaRecorder && isRecording){
+      if(isPaused) mediaRecorder.resume(); // must resume before stop
       mediaRecorder.stop();
       mediaRecorder.stream.getTracks().forEach(function(t){ t.stop(); });
-      isRecording = false;
-      micBtn.classList.remove('recording');
-      setStatus('Processing…');
+      isRecording = false; isPaused = false;
+      micBtn.style.display = '';
+      recordState.style.display = 'none';
+      setStatus('Thinking…');
     }
   }
 
+  // ── Send to Esav ────────────────────────────────────────────
   async function sendAudio(){
-    var mimeType = (mediaRecorder && mediaRecorder.mimeType) || getSupportedMimeType() || 'audio/webm';
-    var ext = mimeType.includes('mp4') ? 'mp4' : mimeType.includes('ogg') ? 'ogg' : 'webm';
-    var blob = new Blob(audioChunks, { type: mimeType });
-    var formData = new FormData();
-    formData.append('audio', blob, 'voice.' + ext);
+    var mime = (mediaRecorder && mediaRecorder.mimeType) || getAudioMime() || 'audio/webm';
+    var ext  = mime.includes('mp4') ? 'mp4' : mime.includes('ogg') ? 'ogg' : 'webm';
+    var blob = new Blob(audioChunks, { type: mime });
+    var form = new FormData();
+    form.append('audio', blob, 'voice.' + ext);
+
+    var thinking = addBubble('Esav is thinking…', 'thinking');
     try {
-      var res  = await fetch(ASSISTANT_URL + '/assistant', { method: 'POST', body: formData });
+      var res  = await fetch(ESAV_URL + '/assistant', { method: 'POST', body: form });
       var data = await res.json();
-      if(data.error){ setStatus('Error'); setResponse(data.error); return; }
-      setStatus('Done');
-      setTranscript('"' + data.transcript + '"');
-      setResponse(data.response);
-      speak(data.response);
-      // Refresh the page data so changes appear immediately
-      setTimeout(function(){ refresh(); renderCalendar(); }, 1500);
+      thinking.remove();
+      if(data.error){ addBubble('Error: ' + data.error, 'esav'); setStatus('Error'); return; }
+      if(data.transcript) addBubble(data.transcript, 'user');
+      addBubble(data.response || 'Done!', 'esav');
+      setStatus('Ready');
+      setTimeout(function(){ try{ refresh(); renderCalendar(); }catch(e){} }, 1200);
     } catch(e){
-      setStatus('Could not reach assistant');
-      setResponse('Make sure you are connected to the internet.');
+      thinking.remove();
+      addBubble('Could not reach Esav. Check your connection.', 'esav');
+      setStatus('Offline');
     }
   }
 
-  if(!micBtn){ console.error('assistantMicBtn not found'); }
-  else {
-    micBtn.addEventListener('click', function(){
-      console.log('mic clicked, isRecording=', isRecording);
-      if(isRecording){ stopRecording(); }
-      else { startRecording(); }
-    });
-  }
+  micBtn.addEventListener('click',  startRecording);
+  pauseBtn.addEventListener('click', togglePause);
+  stopBtn.addEventListener('click',  stopRecording);
 
-  closeBtn.addEventListener('click', hidePanel);
-
-  // Proactive greeting on load
-  async function loadGreeting(){
+  // ── Push notification subscription ─────────────────────────
+  async function registerPush(){
+    if(!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     try {
-      var res  = await fetch(ASSISTANT_URL + '/greeting');
-      var data = await res.json();
-      if(data.greeting && window.speechSynthesis){
-        setTimeout(function(){ speak(data.greeting); }, 2000);
-      }
-    } catch(e){ /* silent fail */ }
+      var reg = await navigator.serviceWorker.ready;
+      var existing = await reg.pushManager.getSubscription();
+      if(existing){ sendSubToServer(existing); return; }
+      var keyRes  = await fetch(ESAV_URL + '/push/vapid-key');
+      var keyData = await keyRes.json();
+      var sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyData.key)
+      });
+      sendSubToServer(sub);
+    } catch(e){ /* push not available */ }
   }
-  loadGreeting();
+
+  function sendSubToServer(sub){
+    fetch(ESAV_URL + '/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sub)
+    }).catch(function(){});
+  }
+
+  function urlBase64ToUint8Array(base64String){
+    var padding = '='.repeat((4 - base64String.length % 4) % 4);
+    var base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    var raw     = atob(base64);
+    var output  = new Uint8Array(raw.length);
+    for(var i=0; i<raw.length; i++) output[i] = raw.charCodeAt(i);
+    return output;
+  }
+
+  // Request notification permission and subscribe
+  if('Notification' in window && Notification.permission === 'default'){
+    Notification.requestPermission().then(function(p){
+      if(p === 'granted') registerPush();
+    });
+  } else if('Notification' in window && Notification.permission === 'granted'){
+    registerPush();
+  }
+
 })();
