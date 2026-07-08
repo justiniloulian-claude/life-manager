@@ -3429,6 +3429,18 @@ body.dark-mode .mob-folder-overlay { background: rgba(0,0,0,0.6); }
 .esav-new-msg-btn { flex: 1; background: #7c3aed; color: #fff; border: none; border-radius: 8px; padding: 10px; font-size: 15px; font-weight: 600; cursor: pointer; letter-spacing: 0.01em; }
 .esav-new-msg-btn:hover { background: #6d28d9; }
 
+/* ── Esav Log Tab ─────────────────────────────────────────── */
+.esav-log-list { display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }
+.esav-log-item { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; padding: 14px 16px; }
+.esav-log-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.esav-log-type { font-size: 11px; font-weight: 600; color: #7c3aed; text-transform: uppercase; letter-spacing: 0.04em; }
+.esav-log-date { font-size: 11px; color: #999; }
+.esav-log-title { font-size: 14px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px; }
+.esav-log-body { font-size: 13px; color: #555; white-space: pre-line; line-height: 1.5; }
+body.dark-mode .esav-log-item { background: #1e1e2e; border-color: #2e2e3e; }
+body.dark-mode .esav-log-title { color: #e0e0e0; }
+body.dark-mode .esav-log-body { color: #aaa; }
+
 body.dark-mode .esav-chat { background: #1e1e1e; }
 body.dark-mode .esav-messages { background: #1e1e1e; }
 body.dark-mode .esav-bubble.esav { background: #2a2a3a; color: #e0e0e0; }

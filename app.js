@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v153 …';
+  b.textContent = 'v154 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v153 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v154 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -2692,18 +2692,27 @@ window.removeHealthActivity = function(ds, id){
 // RENDER — REMINDERS
 // ============================================================
 function renderReminders() {
-  var data=getData(); var el=document.getElementById('remindersList'); if(!el)return;
-  if (!data.reminders.length){ el.innerHTML='<div class="stl-empty">No reminders yet. Add life principles and behavioral reminders here.</div>'; return; }
-  el.innerHTML=data.reminders.map(function(r){
-    return '<div class="reminder-item">' +
-      '<div class="reminder-item-body">' +
-        '<div class="reminder-item-text">'+escHtml(r.text)+'</div>'+
-        (r.category?'<div class="reminder-item-category">'+escHtml(r.category)+'</div>':'')+
-      '</div>' +
-      '<div class="reminder-actions">'+
-        '<button class="btn-icon" onclick="openEditReminder(\''+r.id+'\')">✏️</button>'+
-        '<button class="btn-icon" onclick="deleteRem(\''+r.id+'\')">🗑</button>'+
-      '</div></div>';
+  var el=document.getElementById('remindersList'); if(!el)return;
+  var raw=localStorage.getItem('esav_log');
+  var log=raw?JSON.parse(raw):[];
+  if(!log.length){
+    el.innerHTML='<div class="stl-empty">No messages from Esav yet. Esav\'s proactive updates, morning briefings, and reminders will appear here.</div>';
+    return;
+  }
+  el.innerHTML=log.map(function(entry){
+    var d=new Date(entry.sentAt);
+    var dateStr=d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' · '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    var typeLabel={
+      'morning-briefing':'☀️ Morning Briefing',
+      'reminder':'🔔 Reminder',
+      'proactive':'💬 Esav',
+      'notification':'🔔 Notification'
+    }[entry.type]||'💬 Esav';
+    return '<div class="esav-log-item">'+
+      '<div class="esav-log-meta"><span class="esav-log-type">'+typeLabel+'</span><span class="esav-log-date">'+escHtml(dateStr)+'</span></div>'+
+      '<div class="esav-log-title">'+escHtml(entry.title)+'</div>'+
+      '<div class="esav-log-body">'+escHtml(entry.body)+'</div>'+
+    '</div>';
   }).join('');
 }
 
