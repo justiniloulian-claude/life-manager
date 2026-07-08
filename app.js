@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v155 …';
+  b.textContent = 'v156 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v155 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v156 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -6225,9 +6225,12 @@ function _doLogin() {
 
   fab.addEventListener('click', function(){
     if(chat.style.display === 'none' || !chat.style.display){
-      // Request push permission on first tap (iOS requires a user gesture)
-      if('Notification' in window && Notification.permission === 'default'){
-        Notification.requestPermission().then(function(p){ if(p==='granted') registerPush(); });
+      if('Notification' in window){
+        if(Notification.permission === 'default'){
+          Notification.requestPermission().then(function(p){ if(p==='granted') registerPush(); });
+        } else if(Notification.permission === 'granted'){
+          registerPush(); // re-send subscription on every open (server deduplicates)
+        }
       }
       showChat(); startRecording();
     } else { hideChat(); }
