@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v150 …';
+  b.textContent = 'v151 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v150 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v151 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -6182,10 +6182,9 @@ function _doLogin() {
   var chat       = document.getElementById('esavChat');
   var messages   = document.getElementById('esavMessages');
   var statusEl   = document.getElementById('esavStatus');
-  var micBtn     = document.getElementById('esavMicBtn');
   var pauseBtn   = document.getElementById('esavPauseBtn');
   var stopBtn    = document.getElementById('esavStopBtn');
-  var recordState= document.getElementById('esavRecordState');
+  var cancelBtn  = document.getElementById('esavCancelBtn');
   var recordLabel= document.getElementById('esavRecordLabel');
   var closeBtn   = document.getElementById('esavCloseBtn');
 
@@ -6204,7 +6203,7 @@ function _doLogin() {
   function hideChat(){ chat.style.display = 'none'; stopRecording(); }
 
   fab.addEventListener('click', function(){
-    if(chat.style.display === 'none' || !chat.style.display){ showChat(); }
+    if(chat.style.display === 'none' || !chat.style.display){ showChat(); startRecording(); }
     else { hideChat(); }
   });
   closeBtn.addEventListener('click', hideChat);
@@ -6229,11 +6228,8 @@ function _doLogin() {
       mediaRecorder.onstop = sendAudio;
       mediaRecorder.start(250); // collect chunks every 250ms so pause works reliably
       isRecording = true; isPaused = false;
-      micBtn.style.display = 'none';
-      recordState.style.display = 'flex';
       recordLabel.textContent = '● Recording';
       setStatus('Recording…');
-      showChat();
     } catch(e){
       addBubble('Mic error: ' + e.name + ' — ' + e.message, 'esav');
     }
@@ -6262,10 +6258,23 @@ function _doLogin() {
       mediaRecorder.stop();
       mediaRecorder.stream.getTracks().forEach(function(t){ t.stop(); });
       isRecording = false; isPaused = false;
-      micBtn.style.display = '';
-      recordState.style.display = 'none';
       setStatus('Thinking…');
     }
+  }
+
+  function cancelRecording(){
+    if(mediaRecorder && isRecording){
+      mediaRecorder.onstop = null; // prevent sendAudio from firing
+      if(isPaused) mediaRecorder.resume();
+      mediaRecorder.stop();
+      mediaRecorder.stream.getTracks().forEach(function(t){ t.stop(); });
+    }
+    isRecording = false; isPaused = false;
+    audioChunks = [];
+    pauseBtn.textContent = '⏸';
+    recordLabel.textContent = '● Recording';
+    setStatus('Ready');
+    hideChat();
   }
 
   // ── Send to Esav ────────────────────────────────────────────
@@ -6295,9 +6304,9 @@ function _doLogin() {
     }
   }
 
-  micBtn.addEventListener('click',  startRecording);
-  pauseBtn.addEventListener('click', togglePause);
-  stopBtn.addEventListener('click',  stopRecording);
+  pauseBtn.addEventListener('click',  togglePause);
+  stopBtn.addEventListener('click',   stopRecording);
+  cancelBtn.addEventListener('click', cancelRecording);
 
   // ── Push notification subscription ─────────────────────────
   async function registerPush(){
