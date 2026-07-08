@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v144 …';
+  b.textContent = 'v145 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v144 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v145 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -6203,7 +6203,8 @@ function _doLogin() {
     try {
       var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunks = [];
-      mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      var mimeType = getSupportedMimeType();
+      mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType: mimeType }) : new MediaRecorder(stream);
       mediaRecorder.ondataavailable = function(e){ if(e.data.size>0) audioChunks.push(e.data); };
       mediaRecorder.onstop = sendAudio;
       mediaRecorder.start();
@@ -6229,9 +6230,11 @@ function _doLogin() {
   }
 
   async function sendAudio(){
-    var blob = new Blob(audioChunks, { type: 'audio/webm' });
+    var mimeType = (mediaRecorder && mediaRecorder.mimeType) || getSupportedMimeType() || 'audio/webm';
+    var ext = mimeType.includes('mp4') ? 'mp4' : mimeType.includes('ogg') ? 'ogg' : 'webm';
+    var blob = new Blob(audioChunks, { type: mimeType });
     var formData = new FormData();
-    formData.append('audio', blob, 'voice.webm');
+    formData.append('audio', blob, 'voice.' + ext);
     try {
       var res  = await fetch(ASSISTANT_URL + '/assistant', { method: 'POST', body: formData });
       var data = await res.json();
