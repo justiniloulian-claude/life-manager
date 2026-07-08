@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v147 …';
+  b.textContent = 'v148 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v147 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v148 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -6199,11 +6199,19 @@ function _doLogin() {
   function showPanel(){ if(panel) panel.style.display = 'block'; }
   function hidePanel(){ if(panel) panel.style.display = 'none'; window.speechSynthesis && window.speechSynthesis.cancel(); }
 
+  function getAudioMime(){
+    var types=['audio/mp4','audio/mpeg','audio/webm;codecs=opus','audio/webm','audio/ogg'];
+    for(var i=0;i<types.length;i++){
+      if(typeof MediaRecorder!=='undefined'&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(types[i])) return types[i];
+    }
+    return '';
+  }
+
   async function startRecording(){
     try {
       var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunks = [];
-      var mimeType = getSupportedMimeType();
+      var mimeType = getAudioMime();
       mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType: mimeType }) : new MediaRecorder(stream);
       mediaRecorder.ondataavailable = function(e){ if(e.data.size>0) audioChunks.push(e.data); };
       mediaRecorder.onstop = sendAudio;
