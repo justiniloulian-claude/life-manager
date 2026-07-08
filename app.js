@@ -6293,6 +6293,9 @@ function _doLogin() {
       if(data.error){ addBubble('Error: ' + data.error, 'esav'); setStatus('Error'); return; }
       if(data.transcript) addBubble(data.transcript, 'user');
       addBubble(data.response || 'Done!', 'esav');
+      if(data.results && data.results.length){
+        addBubble('Actions: ' + data.results.join(' | '), 'thinking');
+      }
       setStatus('Ready');
       // Pull fresh data from Firestore then re-render
       if(window._esavSync){ window._esavSync(function(){ try{ refresh(); renderCalendar(); }catch(e){} }); }
