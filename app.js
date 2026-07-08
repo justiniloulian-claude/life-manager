@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v143 …';
+  b.textContent = 'v144 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v143 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v144 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -6169,3 +6169,101 @@ function _doLogin() {
       errEl.textContent = 'Incorrect email or password. Try again.';
     });
 }
+
+// ============================================================
+// VOICE ASSISTANT
+// ============================================================
+(function(){
+  var ASSISTANT_URL = 'https://life-assistant-production-f813.up.railway.app';
+  var mediaRecorder, audioChunks = [], isRecording = false;
+
+  var micBtn       = document.getElementById('assistantMicBtn');
+  var panel        = document.getElementById('assistantPanel');
+  var statusEl     = document.getElementById('assistantStatus');
+  var transcriptEl = document.getElementById('assistantTranscript');
+  var responseEl   = document.getElementById('assistantResponse');
+  var closeBtn     = document.getElementById('assistantCloseBtn');
+
+  function setStatus(msg){ if(statusEl) statusEl.textContent = msg; }
+  function setTranscript(msg){ if(transcriptEl) transcriptEl.textContent = msg; }
+  function setResponse(msg){ if(responseEl) responseEl.textContent = msg; }
+
+  function speak(text){
+    if(!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    var utt = new SpeechSynthesisUtterance(text);
+    utt.rate = 1; utt.pitch = 1;
+    window.speechSynthesis.speak(utt);
+  }
+
+  function showPanel(){ if(panel) panel.style.display = 'block'; }
+  function hidePanel(){ if(panel) panel.style.display = 'none'; window.speechSynthesis && window.speechSynthesis.cancel(); }
+
+  async function startRecording(){
+    try {
+      var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunks = [];
+      mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      mediaRecorder.ondataavailable = function(e){ if(e.data.size>0) audioChunks.push(e.data); };
+      mediaRecorder.onstop = sendAudio;
+      mediaRecorder.start();
+      isRecording = true;
+      micBtn.classList.add('recording');
+      showPanel();
+      setStatus('Recording… tap again to stop');
+      setTranscript('');
+      setResponse('');
+    } catch(e){
+      alert('Microphone access denied. Please allow microphone in your browser settings.');
+    }
+  }
+
+  function stopRecording(){
+    if(mediaRecorder && isRecording){
+      mediaRecorder.stop();
+      mediaRecorder.stream.getTracks().forEach(function(t){ t.stop(); });
+      isRecording = false;
+      micBtn.classList.remove('recording');
+      setStatus('Processing…');
+    }
+  }
+
+  async function sendAudio(){
+    var blob = new Blob(audioChunks, { type: 'audio/webm' });
+    var formData = new FormData();
+    formData.append('audio', blob, 'voice.webm');
+    try {
+      var res  = await fetch(ASSISTANT_URL + '/assistant', { method: 'POST', body: formData });
+      var data = await res.json();
+      if(data.error){ setStatus('Error'); setResponse(data.error); return; }
+      setStatus('Done');
+      setTranscript('"' + data.transcript + '"');
+      setResponse(data.response);
+      speak(data.response);
+      // Refresh the page data so changes appear immediately
+      setTimeout(function(){ refresh(); renderCalendar(); }, 1500);
+    } catch(e){
+      setStatus('Could not reach assistant');
+      setResponse('Make sure you are connected to the internet.');
+    }
+  }
+
+  micBtn.addEventListener('click', function(){
+    if(isRecording){ stopRecording(); }
+    else { startRecording(); }
+  });
+
+  closeBtn.addEventListener('click', hidePanel);
+
+  // Proactive greeting on load
+  async function loadGreeting(){
+    try {
+      var res  = await fetch(ASSISTANT_URL + '/greeting');
+      var data = await res.json();
+      if(data.greeting && window.speechSynthesis){
+        setTimeout(function(){ speak(data.greeting); }, 2000);
+      }
+    } catch(e){ /* silent fail */ }
+  }
+  loadGreeting();
+})();

@@ -8,8 +8,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Life Manager">
-  <title>Dashboard v143</title>
-  <link rel="stylesheet" href="style.css?v=142">
+  <title>Dashboard v144</title>
+  <link rel="stylesheet" href="style.css?v=144">
 </head>
 <body>
 
@@ -45,8 +45,19 @@
       <button class="header-nav-tab" data-page="financial">Financial</button>
     </nav>
     <button id="darkModeToggle" class="btn-nav header-dark-toggle" title="Toggle dark mode">🌙</button>
+    <button id="assistantMicBtn" class="assistant-mic-btn" title="Voice assistant">🎙</button>
   </div>
 </header>
+
+<!-- ===== ASSISTANT UI ===== -->
+<div id="assistantPanel" class="assistant-panel" style="display:none">
+  <div class="assistant-inner">
+    <div id="assistantStatus" class="assistant-status">Tap the mic and speak</div>
+    <div id="assistantTranscript" class="assistant-transcript"></div>
+    <div id="assistantResponse" class="assistant-response"></div>
+    <button id="assistantCloseBtn" class="assistant-close-btn">✕</button>
+  </div>
+</div>
 
 <!-- ===== DASHBOARD PAGE ===== -->
 <div id="page-dashboard" class="page active">
