@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v146 …';
+  b.textContent = 'v147 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v146 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v147 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -6251,10 +6251,14 @@ function _doLogin() {
     }
   }
 
-  micBtn.addEventListener('click', function(){
-    if(isRecording){ stopRecording(); }
-    else { startRecording(); }
-  });
+  if(!micBtn){ console.error('assistantMicBtn not found'); }
+  else {
+    micBtn.addEventListener('click', function(){
+      console.log('mic clicked, isRecording=', isRecording);
+      if(isRecording){ stopRecording(); }
+      else { startRecording(); }
+    });
+  }
 
   closeBtn.addEventListener('click', hidePanel);
 
