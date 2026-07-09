@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v172 …';
+  b.textContent = 'v173 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v172 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v173 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -6421,20 +6421,24 @@ function _doLogin() {
       // because the Settings permission can be ON even while the API reports 'denied'
       var perm = await Notification.requestPermission();
       addBubble('[Push] After requestPermission: ' + perm, 'esav');
-      var reg = await navigator.serviceWorker.ready;
-      addBubble('[Push] Service worker ready', 'esav');
+      var swCtrl = navigator.serviceWorker.controller ? navigator.serviceWorker.controller.state : 'no-controller';
+      addBubble('[Push] SW controller: ' + swCtrl, 'esav');
+      var reg = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('SW ready timeout')); }, 5000); })
+      ]);
+      addBubble('[Push] SW ready, scope: ' + reg.scope, 'esav');
       var existing = await reg.pushManager.getSubscription();
-      if(existing){
-        addBubble('[Push] Existing subscription — sending to server', 'esav');
-        sendSubToServer(existing); return;
-      }
+      addBubble('[Push] Existing sub: ' + (existing ? 'yes' : 'none'), 'esav');
+      if(existing){ sendSubToServer(existing); return; }
       var keyRes  = await fetch(ESAV_URL + '/push/vapid-key');
       var keyData = await keyRes.json();
+      addBubble('[Push] Got VAPID key, subscribing…', 'esav');
       var sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(keyData.key)
       });
-      addBubble('[Push] New subscription created — sending to server', 'esav');
+      addBubble('[Push] Subscribed — sending to server', 'esav');
       sendSubToServer(sub);
     } catch(e){
       addBubble('[Push] Error: ' + e.name + ' — ' + e.message, 'esav');
