@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v163 …';
+  b.textContent = 'v164 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v163 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v164 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -1425,7 +1425,9 @@ function renderSeven() {
   for (var i=s;i<s+7;i++){
     var d=dateFromOffset(i); dates.push(d); html+=dayCardHTML(d,true);
   }
-  document.getElementById('sevenDayGrid').innerHTML=html;
+  var grid=document.getElementById('sevenDayGrid');
+  grid.innerHTML=html;
+  void grid.offsetHeight; // force repaint — iOS/Safari skips painting CSS Grid until this
   var coEl=document.getElementById('sevenCarryOver');
   if(coEl) coEl.innerHTML=renderCarryOverBanner();
   // Show today's reminder banner in 7-day view
