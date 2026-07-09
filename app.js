@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v165 …';
+  b.textContent = 'v166 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v165 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v166 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -1422,11 +1422,16 @@ function renderSingle() {
 function renderSeven() {
   var s=state.weekStart;
   var dates=[]; var html='';
-  for (var i=s;i<s+7;i++){
-    var d=dateFromOffset(i); dates.push(d); html+=dayCardHTML(d,true);
+  try {
+    for (var i=s;i<s+7;i++){
+      var d=dateFromOffset(i); dates.push(d); html+=dayCardHTML(d,true);
+    }
+  } catch(err) {
+    html='<div style="color:red;padding:20px">renderSeven error: '+String(err)+'</div>';
   }
   var grid=document.getElementById('sevenDayGrid');
-  grid.innerHTML=html;
+  if(!grid){ console.error('sevenDayGrid missing'); return; }
+  grid.innerHTML = html || '<div style="padding:20px;color:orange">renderSeven: html empty, tasks='+JSON.stringify(Object.keys(getData().tasks||{})).slice(0,100)+'</div>';
   void grid.offsetHeight; // force repaint — iOS/Safari skips painting CSS Grid until this
   var coEl=document.getElementById('sevenCarryOver');
   if(coEl) coEl.innerHTML=renderCarryOverBanner();
