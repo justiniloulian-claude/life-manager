@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v173 …';
+  b.textContent = 'v174 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v173 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v174 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -6421,13 +6421,27 @@ function _doLogin() {
       // because the Settings permission can be ON even while the API reports 'denied'
       var perm = await Notification.requestPermission();
       addBubble('[Push] After requestPermission: ' + perm, 'esav');
-      var swCtrl = navigator.serviceWorker.controller ? navigator.serviceWorker.controller.state : 'no-controller';
-      addBubble('[Push] SW controller: ' + swCtrl, 'esav');
-      var reg = await Promise.race([
-        navigator.serviceWorker.ready,
-        new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('SW ready timeout')); }, 5000); })
-      ]);
-      addBubble('[Push] SW ready, scope: ' + reg.scope, 'esav');
+
+      // Register SW explicitly — .ready hangs when no SW is controlling the page yet
+      var reg = await navigator.serviceWorker.register('./sw.js');
+      var swState = reg.active ? 'active' : reg.waiting ? 'waiting' : reg.installing ? 'installing' : 'none';
+      addBubble('[Push] SW reg state: ' + swState, 'esav');
+
+      if(!reg.active){
+        var sw = reg.installing || reg.waiting;
+        if(sw){
+          await new Promise(function(resolve, reject){
+            sw.addEventListener('statechange', function(e){
+              if(e.target.state==='activated') resolve();
+              if(e.target.state==='redundant') reject(new Error('SW redundant'));
+            });
+            setTimeout(function(){ reject(new Error('SW activation timeout')); }, 6000);
+          });
+          reg = (await navigator.serviceWorker.getRegistration()) || reg;
+        }
+      }
+
+      addBubble('[Push] SW active, getting sub…', 'esav');
       var existing = await reg.pushManager.getSubscription();
       addBubble('[Push] Existing sub: ' + (existing ? 'yes' : 'none'), 'esav');
       if(existing){ sendSubToServer(existing); return; }
