@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v171 …';
+  b.textContent = 'v172 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v171 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v172 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -6417,10 +6417,10 @@ function _doLogin() {
     var standalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
     addBubble('[Push] iOS ' + iosVer + ' | standalone: ' + standalone + ' | permission: ' + (Notification.permission||'?'), 'esav');
     try {
-      // Always request permission explicitly — re-syncs iOS Settings vs web layer
+      // Request permission — if already denied, iOS won't re-prompt but we proceed anyway
+      // because the Settings permission can be ON even while the API reports 'denied'
       var perm = await Notification.requestPermission();
       addBubble('[Push] After requestPermission: ' + perm, 'esav');
-      if(perm !== 'granted'){ addBubble('[Push] Permission not granted — cannot subscribe', 'esav'); return; }
       var reg = await navigator.serviceWorker.ready;
       addBubble('[Push] Service worker ready', 'esav');
       var existing = await reg.pushManager.getSubscription();
@@ -6464,13 +6464,7 @@ function _doLogin() {
     return output;
   }
 
-  // Request notification permission and subscribe
-  if('Notification' in window && Notification.permission === 'default'){
-    Notification.requestPermission().then(function(p){
-      if(p === 'granted') registerPush();
-    });
-  } else if('Notification' in window && Notification.permission === 'granted'){
-    registerPush();
-  }
+  // Always try to subscribe — iOS Settings permission can be ON even when API reports 'denied'
+  if('Notification' in window) registerPush();
 
 })();
