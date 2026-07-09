@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v166 …';
+  b.textContent = 'v167 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v166 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v167 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -1433,6 +1433,16 @@ function renderSeven() {
   if(!grid){ console.error('sevenDayGrid missing'); return; }
   grid.innerHTML = html || '<div style="padding:20px;color:orange">renderSeven: html empty, tasks='+JSON.stringify(Object.keys(getData().tasks||{})).slice(0,100)+'</div>';
   void grid.offsetHeight; // force repaint — iOS/Safari skips painting CSS Grid until this
+  // DEBUG OVERLAY — shows grid state after render
+  (function(){
+    var prev=document.getElementById('_dbgOverlay'); if(prev) prev.remove();
+    var dbg=document.createElement('div');
+    dbg.id='_dbgOverlay';
+    dbg.style.cssText='position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.85);color:#fff;padding:20px 28px;z-index:999999;font-size:14px;border-radius:12px;text-align:left;';
+    dbg.innerHTML='<b>renderSeven debug</b><br>children: '+grid.children.length+'<br>grid size: '+grid.offsetWidth+'×'+grid.offsetHeight+'<br>grid display: '+getComputedStyle(grid).display+'<br>parent display: '+getComputedStyle(grid.parentElement).display;
+    document.body.appendChild(dbg);
+    setTimeout(function(){ dbg.remove(); }, 8000);
+  })();
   var coEl=document.getElementById('sevenCarryOver');
   if(coEl) coEl.innerHTML=renderCarryOverBanner();
   // Show today's reminder banner in 7-day view
