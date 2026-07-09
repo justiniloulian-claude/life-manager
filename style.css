@@ -3428,6 +3428,12 @@ body.dark-mode .mob-folder-overlay { background: rgba(0,0,0,0.6); }
 .esav-cancel-btn:hover { background: #b91c1c; }
 .esav-new-msg-btn { flex: 1; background: #7c3aed; color: #fff; border: none; border-radius: 8px; padding: 10px; font-size: 15px; font-weight: 600; cursor: pointer; letter-spacing: 0.01em; }
 .esav-new-msg-btn:hover { background: #6d28d9; }
+.esav-text-row { display: flex; align-items: flex-end; gap: 6px; margin-bottom: 8px; }
+.esav-text-input { flex: 1; border: 1.5px solid #ddd; border-radius: 12px; padding: 8px 12px; font-size: 15px; font-family: inherit; resize: none; line-height: 1.4; max-height: 120px; overflow-y: auto; outline: none; transition: border-color 0.15s; }
+.esav-text-input:focus { border-color: #7c3aed; }
+.esav-send-text-btn { background: #7c3aed; color: #fff; border: none; border-radius: 50%; width: 36px; height: 36px; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.esav-send-text-btn:hover { background: #6d28d9; }
+.esav-voice-row { display: flex; align-items: center; gap: 6px; }
 
 /* ── Esav Log Tab ─────────────────────────────────────────── */
 .esav-log-list { display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }

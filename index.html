@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Life Manager">
   <title>Dashboard v150</title>
-  <link rel="stylesheet" href="style.css?v=158">
+  <link rel="stylesheet" href="style.css?v=159">
 </head>
 <body>
 
@@ -57,11 +57,17 @@
   </div>
   <div id="esavMessages" class="esav-messages"></div>
   <div class="esav-input-bar">
-    <button id="esavNewMsgBtn" class="esav-new-msg-btn">🎤 Tap to speak</button>
-    <span id="esavRecordLabel" class="esav-record-label" style="display:none">● Recording</span>
-    <button id="esavPauseBtn"  class="esav-ctrl-btn" style="display:none" title="Pause">⏸</button>
-    <button id="esavStopBtn"   class="esav-ctrl-btn esav-stop-btn" style="display:none" title="Send">⏹ Send</button>
-    <button id="esavCancelBtn" class="esav-ctrl-btn esav-cancel-btn" style="display:none" title="Cancel">✕</button>
+    <div class="esav-text-row">
+      <textarea id="esavTextInput" class="esav-text-input" placeholder="Type a message…" rows="1"></textarea>
+      <button id="esavSendTextBtn" class="esav-send-text-btn" title="Send">↑</button>
+    </div>
+    <div class="esav-voice-row">
+      <button id="esavNewMsgBtn" class="esav-new-msg-btn">🎤 Tap to speak</button>
+      <span id="esavRecordLabel" class="esav-record-label" style="display:none">● Recording</span>
+      <button id="esavPauseBtn"  class="esav-ctrl-btn" style="display:none" title="Pause">⏸</button>
+      <button id="esavStopBtn"   class="esav-ctrl-btn esav-stop-btn" style="display:none" title="Send">⏹ Send</button>
+      <button id="esavCancelBtn" class="esav-ctrl-btn esav-cancel-btn" style="display:none" title="Cancel">✕</button>
+    </div>
   </div>
 </div>
 <button id="esavFab" class="esav-fab" title="Esav — your personal assistant">E</button>
@@ -1499,6 +1505,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="app.js?v=158"></script>
+<script src="app.js?v=159"></script>
 </body>
 </html>

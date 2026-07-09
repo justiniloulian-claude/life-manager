@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v158 …';
+  b.textContent = 'v159 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v158 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v159 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -657,7 +657,7 @@ async function getUserLoc() {
       navigator.geolocation.getCurrentPosition(function(p){
         var fresh={lat:p.coords.latitude,lng:p.coords.longitude,tz:Intl.DateTimeFormat().resolvedOptions().timeZone};
         state.location=fresh;
-        localStorage.setItem('dm_userLocation',JSON.stringify(fresh));
+        _syncSave('dm_userLocation',JSON.stringify(fresh));
       }, function(){}, {timeout:7000});
     }
     return state.location;
@@ -669,7 +669,7 @@ async function getUserLoc() {
       function(p){
         var loc={lat:p.coords.latitude,lng:p.coords.longitude,tz:Intl.DateTimeFormat().resolvedOptions().timeZone};
         state.location=loc;
-        localStorage.setItem('dm_userLocation',JSON.stringify(loc));
+        _syncSave('dm_userLocation',JSON.stringify(loc));
         resolve(loc);
       },
       function(){ state.location=fallback; resolve(fallback); },
@@ -6187,16 +6187,18 @@ function _doLogin() {
   var ESAV_URL = 'https://life-assistant-production-f813.up.railway.app';
   var mediaRecorder, audioChunks = [], isRecording = false, isPaused = false;
 
-  var fab        = document.getElementById('esavFab');
-  var chat       = document.getElementById('esavChat');
-  var messages   = document.getElementById('esavMessages');
-  var statusEl   = document.getElementById('esavStatus');
-  var newMsgBtn  = document.getElementById('esavNewMsgBtn');
-  var pauseBtn   = document.getElementById('esavPauseBtn');
-  var stopBtn    = document.getElementById('esavStopBtn');
-  var cancelBtn  = document.getElementById('esavCancelBtn');
-  var recordLabel= document.getElementById('esavRecordLabel');
-  var closeBtn   = document.getElementById('esavCloseBtn');
+  var fab          = document.getElementById('esavFab');
+  var chat         = document.getElementById('esavChat');
+  var messages     = document.getElementById('esavMessages');
+  var statusEl     = document.getElementById('esavStatus');
+  var newMsgBtn    = document.getElementById('esavNewMsgBtn');
+  var pauseBtn     = document.getElementById('esavPauseBtn');
+  var stopBtn      = document.getElementById('esavStopBtn');
+  var cancelBtn    = document.getElementById('esavCancelBtn');
+  var recordLabel  = document.getElementById('esavRecordLabel');
+  var closeBtn     = document.getElementById('esavCloseBtn');
+  var textInput    = document.getElementById('esavTextInput');
+  var sendTextBtn  = document.getElementById('esavSendTextBtn');
 
   // ── Chat helpers ────────────────────────────────────────────
   function addBubble(text, role){
@@ -6339,10 +6341,48 @@ function _doLogin() {
     }
   }
 
+  // ── Send text to Esav ───────────────────────────────────────
+  async function sendText(){
+    var text = textInput.value.trim();
+    if(!text) return;
+    textInput.value = '';
+    textInput.style.height = 'auto';
+    addBubble(text, 'user');
+    var thinking = addBubble('Esav is thinking…', 'thinking');
+    try {
+      var res  = await fetch(ESAV_URL + '/assistant/text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text })
+      });
+      var data = await res.json();
+      thinking.remove();
+      if(data.error){ addBubble('Error: ' + data.error, 'esav'); setStatus('Error'); return; }
+      addBubble(data.response || 'Done!', 'esav');
+      if(data.results && data.results.length) addBubble('Actions: ' + data.results.join(' | '), 'thinking');
+      setStatus('Ready');
+      if(window._esavSync){ window._esavSync(function(){ try{ refresh(); renderCalendar(); }catch(e){} }); }
+      else { setTimeout(function(){ try{ refresh(); renderCalendar(); }catch(e){} }, 1500); }
+    } catch(e){
+      thinking.remove();
+      addBubble('Could not reach Esav. Check your connection.', 'esav');
+      setStatus('Offline');
+    }
+  }
+
+  textInput.addEventListener('input', function(){
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+  });
+  textInput.addEventListener('keydown', function(e){
+    if(e.key === 'Enter' && !e.shiftKey){ /* Enter = new line, Shift+Enter also fine */ }
+  });
+  sendTextBtn.addEventListener('click', sendText);
+
   newMsgBtn.addEventListener('click',  startRecording);
-  pauseBtn.addEventListener('click',  togglePause);
-  stopBtn.addEventListener('click',   stopRecording);
-  cancelBtn.addEventListener('click', cancelRecording);
+  pauseBtn.addEventListener('click',   togglePause);
+  stopBtn.addEventListener('click',    stopRecording);
+  cancelBtn.addEventListener('click',  cancelRecording);
 
   // ── Push notification subscription ─────────────────────────
   async function registerPush(){
