@@ -9,16 +9,16 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Life Manager">
   <title>Dashboard v150</title>
-  <link rel="stylesheet" href="style.css?v=168">
+  <link rel="stylesheet" href="style.css?v=169">
 </head>
 <body>
 
 <!-- ===== LOGIN OVERLAY ===== -->
-<div id="loginOverlay" style="display:none">
+<div id="loginOverlay" style="display:flex">
   <div class="login-box">
     <div class="login-logo">📋</div>
     <h1 class="login-title">Life Manager</h1>
-    <p class="login-sub">Sign in to access your dashboard</p>
+    <p class="login-sub" id="loginSub">Sign in to access your dashboard</p>
     <input type="email" id="loginEmail" class="login-input" placeholder="Email address" autocomplete="email">
     <input type="password" id="loginPassword" class="login-input" placeholder="Password" autocomplete="current-password">
     <button id="loginBtn" class="login-btn">Sign In</button>
@@ -1505,6 +1505,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="app.js?v=168"></script>
+<script src="app.js?v=169"></script>
 </body>
 </html>

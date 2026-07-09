@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v168 …';
+  b.textContent = 'v169 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v168 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v169 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -1419,26 +1419,15 @@ function renderSingle() {
   loadHebrewDate(ds);
   document.getElementById('backToTodayBtn').style.display=state.dayOffset===0?'none':'';
 }
-function _showDbg(msg){
-  var prev=document.getElementById('_dbgOverlay'); if(prev) prev.remove();
-  var dbg=document.createElement('div');
-  dbg.id='_dbgOverlay';
-  dbg.style.cssText='position:fixed;top:50px;left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:14px 20px;z-index:999999;font-size:13px;border-radius:10px;max-width:90vw;word-break:break-all;';
-  dbg.textContent=msg;
-  document.body.appendChild(dbg);
-  setTimeout(function(){ dbg.remove(); },12000);
-}
 function renderSeven() {
-  try {
   var s=state.weekStart;
   var dates=[]; var html='';
   for (var i=s;i<s+7;i++){
     var d=dateFromOffset(i); dates.push(d); html+=dayCardHTML(d,true);
   }
   var grid=document.getElementById('sevenDayGrid');
-  if(!grid){ _showDbg('sevenDayGrid element missing from DOM'); return; }
-  grid.innerHTML = html;
-  void grid.offsetHeight;
+  if(!grid) return;
+  grid.innerHTML=html;
   var coEl=document.getElementById('sevenCarryOver');
   if(coEl) coEl.innerHTML=renderCarryOverBanner();
   var remEl=document.getElementById('sevenRemBanner');
@@ -1451,8 +1440,6 @@ function renderSeven() {
   }
   if(remEl) remEl.innerHTML=renderReminderBanner();
   dates.forEach(function(d){ loadHebrewDate(toDateStr(d)); });
-  _showDbg('OK — '+grid.children.length+' cards, '+grid.offsetWidth+'×'+grid.offsetHeight+'px, tasks='+JSON.stringify(Object.keys(getData().tasks)).slice(0,80));
-  } catch(e){ _showDbg('EXCEPTION: '+String(e)); }
 }
 function refresh() {
   if (state.dashView==='single') renderSingle();
@@ -6151,6 +6138,14 @@ function updateDarkToggleIcon(){
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+  // Overlay starts visible — immediately switch to loading state for returning users.
+  // The login form only appears if Firebase says the user is logged out.
+  document.getElementById('loginEmail').style.display = 'none';
+  document.getElementById('loginPassword').style.display = 'none';
+  document.getElementById('loginBtn').style.display = 'none';
+  document.getElementById('loginLoading').style.display = 'block';
+  document.getElementById('loginSub').textContent = 'Loading your data…';
+
   // Login button
   document.getElementById('loginBtn').addEventListener('click', _doLogin);
   document.getElementById('loginPassword').addEventListener('keydown', function(e){
@@ -6181,6 +6176,12 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     } else {
       _uid = null;
+      // Show the full login form
+      document.getElementById('loginEmail').style.display = '';
+      document.getElementById('loginPassword').style.display = '';
+      document.getElementById('loginBtn').style.display = '';
+      document.getElementById('loginLoading').style.display = 'none';
+      document.getElementById('loginSub').textContent = 'Sign in to access your dashboard';
       document.getElementById('loginOverlay').style.display = 'flex';
     }
   });
