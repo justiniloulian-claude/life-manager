@@ -3353,6 +3353,10 @@ body.dark-mode .mob-folder-overlay { background: rgba(0,0,0,0.6); }
   display: flex; align-items: center; justify-content: center;
   transition: transform 0.15s, box-shadow 0.15s;
 }
+@media (max-width: 768px) {
+  .esav-fab { bottom: 88px; }
+  .esav-chat { bottom: 152px !important; }
+}
 .esav-fab:hover { transform: scale(1.08); box-shadow: 0 6px 20px rgba(124,58,237,0.5); }
 
 .esav-chat {

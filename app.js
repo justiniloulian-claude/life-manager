@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v159 …';
+  b.textContent = 'v160 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v159 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v160 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -3659,8 +3659,7 @@ function showPage(pageId) {
   }
   state.currentPage=pageId;
   if (pageId==='dashboard') {
-    if(isMobile()) setDashView('single');
-    else setDashView('seven');
+    setDashView('seven');
     checkMissedTasks();
   }
   if (pageId==='calendar')  renderCalendar();
@@ -6375,7 +6374,7 @@ function _doLogin() {
     this.style.height = Math.min(this.scrollHeight, 120) + 'px';
   });
   textInput.addEventListener('keydown', function(e){
-    if(e.key === 'Enter' && !e.shiftKey){ /* Enter = new line, Shift+Enter also fine */ }
+    if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendText(); }
   });
   sendTextBtn.addEventListener('click', sendText);
 
