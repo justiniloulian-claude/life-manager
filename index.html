@@ -63,10 +63,14 @@
     </div>
     <div class="esav-voice-row">
       <button id="esavNewMsgBtn" class="esav-new-msg-btn">🎤 Tap to speak</button>
-      <span id="esavRecordLabel" class="esav-record-label" style="display:none">● Recording</span>
-      <button id="esavPauseBtn"  class="esav-ctrl-btn" style="display:none" title="Pause">⏸</button>
-      <button id="esavStopBtn"   class="esav-ctrl-btn esav-stop-btn" style="display:none" title="Send">⏹ Send</button>
-      <button id="esavCancelBtn" class="esav-ctrl-btn esav-cancel-btn" style="display:none" title="Cancel">✕</button>
+      <div id="esavRecordLabel" class="esav-record-label" style="display:none">
+        <span id="esavRecDot" class="esav-rec-dot"></span>
+        <span id="esavRecText" class="esav-rec-text">Recording</span>
+        <span id="esavRecTimer" class="esav-rec-timer">0:00</span>
+      </div>
+      <button id="esavPauseBtn"  class="esav-ctrl-btn" style="display:none">⏸ Pause</button>
+      <button id="esavStopBtn"   class="esav-ctrl-btn esav-stop-btn" style="display:none">⏹ Stop &amp; send</button>
+      <button id="esavCancelBtn" class="esav-ctrl-btn esav-cancel-btn" style="display:none" aria-label="Cancel">✕</button>
     </div>
   </div>
 </div>

@@ -3417,19 +3417,26 @@ body.dark-mode .mob-folder-overlay { background: rgba(0,0,0,0.6); }
   flex: 1; display: flex; align-items: center; gap: 6px;
 }
 .esav-record-label {
-  flex: 1; font-size: 12px; font-weight: 600; color: #dc2626;
+  flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0;
+}
+.esav-rec-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #dc2626; flex-shrink: 0;
   animation: mic-pulse 1s ease-in-out infinite;
 }
+.esav-rec-dot.paused { background: #f59e0b; animation: none; }
+.esav-rec-text { font-size: 13px; font-weight: 600; color: #dc2626; white-space: nowrap; }
+.esav-rec-text.paused { color: #f59e0b; }
+.esav-rec-timer { font-size: 12px; font-weight: 500; color: #888; font-variant-numeric: tabular-nums; }
 .esav-ctrl-btn {
   background: #f5f5f5; border: none; border-radius: 8px;
-  padding: 6px 10px; font-size: 16px; cursor: pointer;
-  transition: background 0.15s;
+  padding: 8px 12px; font-size: 13px; font-weight: 500; cursor: pointer;
+  transition: background 0.15s; white-space: nowrap; flex-shrink: 0;
 }
 .esav-ctrl-btn:hover { background: #e8e8e8; }
-.esav-stop-btn { background: #7c3aed; color: #fff; font-size: 12px; font-weight: 600; padding: 6px 12px; }
+.esav-stop-btn { background: #7c3aed; color: #fff; font-weight: 600; }
 .esav-stop-btn:hover { background: #6d28d9; }
-.esav-cancel-btn { background: #dc2626; color: #fff; font-size: 13px; font-weight: 600; padding: 6px 10px; }
-.esav-cancel-btn:hover { background: #b91c1c; }
+.esav-cancel-btn { color: #888; padding: 8px 10px; }
+.esav-cancel-btn:hover { background: #fee2e2; color: #dc2626; }
 .esav-new-msg-btn { flex: 1; background: #7c3aed; color: #fff; border: none; border-radius: 8px; padding: 10px; font-size: 15px; font-weight: 600; cursor: pointer; letter-spacing: 0.01em; }
 .esav-new-msg-btn:hover { background: #6d28d9; }
 .esav-text-row { display: flex; align-items: flex-end; gap: 6px; margin-bottom: 8px; }

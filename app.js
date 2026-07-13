@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v176 …';
+  b.textContent = 'v177 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v176 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v177 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -6219,6 +6219,14 @@ function _doLogin() {
   var stopBtn      = document.getElementById('esavStopBtn');
   var cancelBtn    = document.getElementById('esavCancelBtn');
   var recordLabel  = document.getElementById('esavRecordLabel');
+  var recDot       = document.getElementById('esavRecDot');
+  var recText      = document.getElementById('esavRecText');
+  var recTimerEl   = document.getElementById('esavRecTimer');
+  var _recSeconds  = 0;
+  var _recInterval = null;
+  function _startTimer(){ _recSeconds=0; _updateTimer(); _recInterval=setInterval(function(){ _recSeconds++; _updateTimer(); },1000); }
+  function _stopTimer(){ clearInterval(_recInterval); _recInterval=null; _recSeconds=0; if(recTimerEl) recTimerEl.textContent='0:00'; }
+  function _updateTimer(){ if(!recTimerEl) return; var m=Math.floor(_recSeconds/60); var s=_recSeconds%60; recTimerEl.textContent=m+':'+(s<10?'0':'')+s; }
   var closeBtn     = document.getElementById('esavCloseBtn');
   var textInput    = document.getElementById('esavTextInput');
   var sendTextBtn  = document.getElementById('esavSendTextBtn');
@@ -6236,10 +6244,11 @@ function _doLogin() {
 
   function setRecordingUI(active){
     newMsgBtn.style.display   = active ? 'none' : '';
-    recordLabel.style.display = active ? '' : 'none';
+    recordLabel.style.display = active ? 'flex' : 'none';
     pauseBtn.style.display    = active ? '' : 'none';
     stopBtn.style.display     = active ? '' : 'none';
     cancelBtn.style.display   = active ? '' : 'none';
+    if(active){ _startTimer(); } else { _stopTimer(); }
   }
 
   function showChat(){ chat.style.display = 'flex'; }
@@ -6282,8 +6291,9 @@ function _doLogin() {
       mediaRecorder.onstop = sendAudio;
       mediaRecorder.start(250);
       isRecording = true; isPaused = false;
+      if(recDot)  recDot.classList.remove('paused');
+      if(recText) { recText.textContent='Recording'; recText.classList.remove('paused'); }
       setRecordingUI(true);
-      recordLabel.textContent = '● Recording';
       setStatus('Recording…');
     } catch(e){
       addBubble('Mic error: ' + e.name + ' — ' + e.message, 'esav');
@@ -6295,14 +6305,18 @@ function _doLogin() {
     if(isPaused){
       mediaRecorder.resume();
       isPaused = false;
-      pauseBtn.textContent = '⏸';
-      recordLabel.textContent = '● Recording';
+      pauseBtn.textContent = '⏸ Pause';
+      if(recDot)  { recDot.classList.remove('paused'); }
+      if(recText) { recText.textContent='Recording'; recText.classList.remove('paused'); }
+      _recInterval = setInterval(function(){ _recSeconds++; _updateTimer(); }, 1000);
       setStatus('Recording…');
     } else {
       mediaRecorder.pause();
       isPaused = true;
-      pauseBtn.textContent = '▶';
-      recordLabel.textContent = '⏸ Paused';
+      pauseBtn.textContent = '▶ Resume';
+      if(recDot)  { recDot.classList.add('paused'); }
+      if(recText) { recText.textContent='Paused'; recText.classList.add('paused'); }
+      clearInterval(_recInterval); _recInterval = null;
       setStatus('Paused');
     }
   }
@@ -6327,8 +6341,9 @@ function _doLogin() {
     }
     isRecording = false; isPaused = false;
     audioChunks = [];
-    pauseBtn.textContent = '⏸';
-    recordLabel.textContent = '● Recording';
+    pauseBtn.textContent = '⏸ Pause';
+    if(recDot)  recDot.classList.remove('paused');
+    if(recText) { recText.textContent='Recording'; recText.classList.remove('paused'); }
     setRecordingUI(false);
     setStatus('Ready');
     hideChat();
