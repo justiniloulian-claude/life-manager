@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v174 …';
+  b.textContent = 'v175 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v174 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v175 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -3644,9 +3644,12 @@ function showPage(pageId) {
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
   document.querySelectorAll('.header-nav-tab').forEach(function(t){t.classList.remove('active');});
   document.querySelectorAll('.mob-nav-btn').forEach(function(b){b.classList.remove('active');});
-  // Close More menu whenever we navigate
+  // Close More menu and task context menu whenever we navigate
   var moreMenu=document.getElementById('mobileMoreMenu');
   if(moreMenu) moreMenu.style.display='none';
+  var ctxMenu=document.getElementById('taskContextMenu');
+  if(ctxMenu) ctxMenu.style.display='none';
+  _ctxTask=null;
   document.getElementById('page-'+pageId).classList.add('active');
   var activeTab=document.querySelector('.header-nav-tab[data-page="'+pageId+'"]');
   if (activeTab) activeTab.classList.add('active');
@@ -5662,14 +5665,15 @@ function initListeners() {
       calPicker.style.display='none';
   });
   document.getElementById('taskCtxDuplicate').addEventListener('click',function(){
-    if(!_ctxTask)return;
+    document.getElementById('taskContextMenu').style.display='none';
+    var ctx=_ctxTask; _ctxTask=null;
+    if(!ctx)return;
     var data=getData();
-    var task=(data.tasks[_ctxTask.ds]||[]).find(function(t){return t.id===_ctxTask.id;});
+    if(!data.tasks[ctx.ds])data.tasks[ctx.ds]=[];
+    var task=data.tasks[ctx.ds].find(function(t){return t.id===ctx.id;});
     if(!task)return;
-    if(!data.tasks[_ctxTask.ds])data.tasks[_ctxTask.ds]=[];
-    data.tasks[_ctxTask.ds].push(Object.assign({},task,{id:uid(),done:false,createdAt:new Date().toISOString()}));
+    data.tasks[ctx.ds].push(Object.assign({},task,{id:uid(),done:false,createdAt:new Date().toISOString()}));
     saveT(data.tasks); refresh();
-    document.getElementById('taskContextMenu').style.display='none'; _ctxTask=null;
   });
 
   // Calendar
