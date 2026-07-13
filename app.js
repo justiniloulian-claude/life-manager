@@ -6125,7 +6125,7 @@ function init() {
   initMobile();
   setDashView('seven');
   checkMissedTasks();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(function(){});
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(function(){});
   // Dark mode — restore saved preference
   if(localStorage.getItem('dm_darkMode')==='1') document.body.classList.add('dark-mode');
   updateDarkToggleIcon();
@@ -6442,7 +6442,7 @@ function _doLogin() {
       addBubble('[Push] After requestPermission: ' + perm, 'esav');
 
       // Register SW explicitly — .ready hangs when no SW is controlling the page yet
-      var reg = await navigator.serviceWorker.register('./sw.js');
+      var reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
       var swState = reg.active ? 'active' : reg.waiting ? 'waiting' : reg.installing ? 'installing' : 'none';
       addBubble('[Push] SW reg state: ' + swState, 'esav');
 
