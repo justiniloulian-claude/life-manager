@@ -6501,7 +6501,6 @@ function _doLogin() {
     return output;
   }
 
-  // Always try to subscribe — iOS Settings permission can be ON even when API reports 'denied'
-  if('Notification' in window) registerPush();
+  // Push notifications parked — iOS permission stuck at denied
 
 })();
