@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v175 …';
+  b.textContent = 'v176 …';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v175 '+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v176 '+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -5437,7 +5437,7 @@ function initListeners() {
   if(document.getElementById('closeWeightHistoryModal'))
     document.getElementById('closeWeightHistoryModal').addEventListener('click',function(){closeModal('weightHistoryModal');});
 
-  document.getElementById('addReminderBtn').addEventListener('click', function(){ state.editReminderId=null; document.getElementById('reminderModalTitle').textContent='Add Reminder'; document.getElementById('reminderText').value=''; document.getElementById('reminderCategory').value=''; openModal('reminderModal'); setTimeout(function(){document.getElementById('reminderText').focus();},80); });
+  var _addRemBtn=document.getElementById('addReminderBtn'); if(_addRemBtn) _addRemBtn.addEventListener('click', function(){ state.editReminderId=null; document.getElementById('reminderModalTitle').textContent='Add Reminder'; document.getElementById('reminderText').value=''; document.getElementById('reminderCategory').value=''; openModal('reminderModal'); setTimeout(function(){document.getElementById('reminderText').focus();},80); });
   document.getElementById('closeReminderModal').addEventListener('click', function(){ closeModal('reminderModal'); });
   document.getElementById('cancelReminder').addEventListener('click',     function(){ closeModal('reminderModal'); });
   document.getElementById('saveReminder').addEventListener('click', function(){
