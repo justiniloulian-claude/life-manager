@@ -6219,6 +6219,7 @@ function _doLogin() {
   var stopBtn      = document.getElementById('esavStopBtn');
   var cancelBtn    = document.getElementById('esavCancelBtn');
   var recordLabel  = document.getElementById('esavRecordLabel');
+  var textRow      = document.querySelector('.esav-text-row');
   var recDot       = document.getElementById('esavRecDot');
   var recText      = document.getElementById('esavRecText');
   var recTimerEl   = document.getElementById('esavRecTimer');
@@ -6243,6 +6244,7 @@ function _doLogin() {
   function setStatus(msg){ if(statusEl) statusEl.textContent = msg; }
 
   function setRecordingUI(active){
+    if(textRow) textRow.style.display = active ? 'none' : '';
     newMsgBtn.style.display   = active ? 'none' : '';
     recordLabel.style.display = active ? 'flex' : 'none';
     pauseBtn.style.display    = active ? '' : 'none';
