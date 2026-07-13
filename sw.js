@@ -1,4 +1,4 @@
-// v149: push notification support added (Esav assistant)
+// v176: always fetch index.html fresh — bypasses GitHub Pages 10-min HTTP cache
 self.addEventListener('install', function() { self.skipWaiting(); });
 
 self.addEventListener('activate', function(e) {
@@ -10,7 +10,12 @@ self.addEventListener('activate', function(e) {
 });
 
 self.addEventListener('fetch', function(e) {
-  e.respondWith(fetch(e.request));
+  // Navigation requests (index.html) always bypass HTTP cache so version updates load immediately
+  if(e.request.mode === 'navigate') {
+    e.respondWith(fetch(e.request, { cache: 'no-cache' }));
+  } else {
+    e.respondWith(fetch(e.request));
+  }
 });
 
 // Push notification handler
