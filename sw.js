@@ -1,4 +1,4 @@
-// v176: always fetch index.html fresh — bypasses GitHub Pages 10-min HTTP cache
+// v178: force SW update to push recording controls to all devices
 self.addEventListener('install', function() { self.skipWaiting(); });
 
 self.addEventListener('activate', function(e) {
