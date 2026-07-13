@@ -6125,7 +6125,7 @@ function init() {
   initMobile();
   setDashView('seven');
   checkMissedTasks();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(function(){});
+  if('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(function(regs){ regs.forEach(function(r){ r.unregister(); }); });
   // Dark mode — restore saved preference
   if(localStorage.getItem('dm_darkMode')==='1') document.body.classList.add('dark-mode');
   updateDarkToggleIcon();
