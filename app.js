@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v185…';
+  b.textContent = 'v186…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v185'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v186'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -498,6 +498,7 @@ function uid()      { return Date.now().toString(36) + Math.random().toString(36
 
 // Module-level media recorder state
 var _mediaRecorder=null, _audioChunks=[], _recordTimerInt=null, _recordSecs=0, _currentAudioBlob=null, _recordMime='';
+var _activeAudioEl = null; // currently playing audio element (for single-playback enforcement)
 
 // Note editor undo/redo (contenteditable — use browser execCommand)
 var _noteUndoTimer=null;
@@ -2283,24 +2284,48 @@ window.setAudioSpeed = function(playerId, speed) {
 window.playJewishAudio = function(key, btnEl) {
   var entry = btnEl ? btnEl.closest('.jewish-hist-entry') : null;
   var existingPlayer = entry ? entry.querySelector('.audio-player-wrap') : null;
-  if (existingPlayer) { existingPlayer.remove(); if(btnEl) btnEl.textContent='▶ Play'; return; }
+  if (existingPlayer) {
+    existingPlayer.remove();
+    if (btnEl) btnEl.textContent = '▶ Play';
+    if (_activeAudioEl) { _activeAudioEl.pause(); _activeAudioEl = null; }
+    return;
+  }
 
   function _showPlayer(url) {
+    // Pause and close any currently playing entry
+    if (_activeAudioEl) {
+      _activeAudioEl.pause();
+      _activeAudioEl = null;
+      document.querySelectorAll('.audio-player-wrap').forEach(function(p) { p.remove(); });
+      document.querySelectorAll('.jewish-hist-entry .btn-secondary').forEach(function(b) {
+        if (b.textContent === '⏹ Close') b.textContent = '▶ Play';
+      });
+    }
     var playerId = 'jp-'+key.slice(-8);
     var html = buildAudioPlayerHTML(url, playerId);
     if (entry) {
       entry.insertAdjacentHTML('beforeend', html);
       if (btnEl) btnEl.textContent = '⏹ Close';
-      setTimeout(function(){ var el=document.getElementById(playerId+'-el'); if(el) el.play(); }, 50);
+      setTimeout(function() {
+        var el = document.getElementById(playerId+'-el');
+        if (el) { _activeAudioEl = el; el.play(); el.onended = function() { _activeAudioEl = null; }; }
+      }, 50);
     }
   }
 
-  // Try Firestore first, fall back to local IndexedDB for legacy recordings
+  // Try Firestore first; if found in local IndexedDB, auto-migrate to Firestore
   loadAudioFromFirestore(key).then(function(blob) {
     if (blob) { _showPlayer(URL.createObjectURL(blob)); return; }
     return _loadLocalAudioBlob(key).then(function(localBlob) {
-      if (localBlob) { _showPlayer(URL.createObjectURL(localBlob)); }
-      else { alert('Audio not found. This recording was saved on another device before cloud sync was enabled.'); }
+      if (!localBlob) { alert('Audio not found.'); return; }
+      _showPlayer(URL.createObjectURL(localBlob));
+      // Auto-migrate to Firestore so it becomes available on all devices
+      uploadAudioToFirestore(localBlob).then(function(newKey) {
+        var data = getData();
+        var entry = data.monthlyJewishHistory.find(function(e) { return e.audioKey === key; });
+        if (entry) { entry.audioKey = newKey; saveMJH(data.monthlyJewishHistory); }
+        _deleteLocalAudioBlob(key);
+      }).catch(function(){});
     });
   }).catch(function() {
     _loadLocalAudioBlob(key).then(function(localBlob) {
