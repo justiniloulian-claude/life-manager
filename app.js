@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v186…';
+  b.textContent = 'v187…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v186'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v187'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -3811,7 +3811,8 @@ window.folderDrop = function(e) {
 function renderCarryOverBanner() {
   var todayDs = toDateStr(dateFromOffset(0));
   var yesterDs = toDateStr(dateFromOffset(-1));
-  var tasks = getTasksForDate(yesterDs).filter(function(t){ return !t.done && t.type !== 'routine'; });
+  var dismissed = state.coDismissed || {};
+  var tasks = getTasksForDate(yesterDs).filter(function(t){ return !t.done && t.type !== 'routine' && !dismissed[t.id]; });
   if (!tasks.length) return '';
   var rows = tasks.map(function(t){
     return '<div class="co-item">' +
@@ -3820,6 +3821,7 @@ function renderCarryOverBanner() {
         '<button class="co-btn co-today" onclick="executeMoveTask(\''+yesterDs+'\',\''+t.id+'\',false,\''+todayDs+'\')">→ Today</button>' +
         '<button class="co-btn co-other" onclick="openMoveTaskModal(\''+yesterDs+'\',\''+t.id+'\',false)">→ Other day</button>' +
         '<button class="co-btn co-done" onclick="markCarryOverDone(\''+yesterDs+'\',\''+t.id+'\')">✓ Done</button>' +
+        '<button class="co-btn co-leave" onclick="leaveCarryOverTask(\''+t.id+'\')">Leave it</button>' +
       '</div></div>';
   }).join('');
   return '<div class="co-banner">' +
@@ -3833,6 +3835,11 @@ function renderCarryOverBanner() {
 window.checkTask = function(ds,id,isR){ toggleDone(ds,id,isR); refresh(); refreshDashDayModal(); };
 window.removeTask = function(ds,id){ if(confirm('Delete this task?')){ deleteTask(ds,id); refresh(); refreshDashDayModal(); } };
 window.markCarryOverDone = function(ds,id){ toggleDone(ds,id,false); refresh(); };
+window.leaveCarryOverTask = function(id){
+  state.coDismissed = state.coDismissed || {};
+  state.coDismissed[id] = true;
+  refresh();
+};
 window.skipRoutineDay = function(ds, routineId) {
   var data=getData(); var key=ds+'_'+routineId;
   data.routineOverrides[key]=data.routineOverrides[key]||{};

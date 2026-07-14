@@ -378,6 +378,8 @@ body {
 .co-other:hover { background: #e8e8e4; }
 .co-done  { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
 .co-done:hover { background: #a7f3d0; }
+.co-leave { background: #f9f9f9; color: #999; border-color: #e0e0e0; }
+.co-leave:hover { background: #f0f0f0; }
 
 /* Move day modal grid */
 .move-day-grid {
