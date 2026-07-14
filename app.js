@@ -39,9 +39,8 @@ var _fbConfig = {
   appId: "1:233340003395:web:e1697b61e9edc3899e20f6"
 };
 firebase.initializeApp(_fbConfig);
-var _db      = firebase.firestore();
-var _auth    = firebase.auth();
-var _storage = firebase.storage();
+var _db   = firebase.firestore();
+var _auth = firebase.auth();
 var _uid  = null;
 var _appInited = false;
 var _fsUnsubscribe = null;
@@ -90,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v184…';
+  b.textContent = 'v185…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v184'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v185'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -566,22 +565,44 @@ var _draggingNoteId=null;
 // ============================================================
 // INDEXEDDB FOR AUDIO
 // ============================================================
-// Upload blob to Firebase Storage; returns Promise<downloadURL>
-function uploadAudioToStorage(blob) {
-  var key = uid();
-  var ext = blob.type.indexOf('ogg') !== -1 ? 'ogg' : blob.type.indexOf('mp4') !== -1 ? 'mp4' : 'webm';
-  var path = 'audio/' + _uid + '/' + key + '.' + ext;
-  var ref = _storage.ref(path);
-  return ref.put(blob).then(function() { return ref.getDownloadURL(); });
+// AUDIO — stored in Firestore so it syncs across all devices (free plan)
+// audioKey in history entries is a plain UID used as the Firestore doc id.
+// Legacy entries (recorded before this version) have the same UID format
+// but only exist in IndexedDB on the original device.
+
+function uploadAudioToFirestore(blob) {
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function() {
+      var key = uid();
+      _db.collection('users').doc(_uid).collection('audio').doc(key)
+        .set({ data: reader.result, mime: blob.type, ts: Date.now() })
+        .then(function() { resolve(key); })
+        .catch(reject);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 }
 
-// Delete from Firebase Storage by download URL; safe no-op if URL invalid
-function deleteAudioFromStorage(url) {
-  try { return _storage.refFromURL(url).delete().catch(function(){}); }
-  catch(e) { return Promise.resolve(); }
+function loadAudioFromFirestore(key) {
+  return _db.collection('users').doc(_uid).collection('audio').doc(key).get()
+    .then(function(doc) {
+      if (!doc.exists) return null;
+      var d = doc.data();
+      // Convert data URI back to Blob
+      var arr = d.data.split(','), mime = arr[0].match(/:(.*?);/)[1];
+      var bstr = atob(arr[1]), n = bstr.length, u8 = new Uint8Array(n);
+      while (n--) u8[n] = bstr.charCodeAt(n);
+      return new Blob([u8], { type: mime });
+    });
 }
 
-// Legacy IndexedDB helpers (kept for backward-compat with old local recordings)
+function deleteAudioFromFirestore(key) {
+  return _db.collection('users').doc(_uid).collection('audio').doc(key).delete().catch(function(){});
+}
+
+// Legacy IndexedDB fallback for recordings made before Firestore audio
 function _openAudioDB() {
   return new Promise(function(resolve, reject) {
     var req = indexedDB.open('dm_audio_db', 1);
@@ -2055,8 +2076,8 @@ window.storeJewishMonth = function() {
     renderJewishHist();
   };
   if (_currentAudioBlob) {
-    uploadAudioToStorage(_currentAudioBlob).then(function(url){ doSave(url); }).catch(function(err){
-      alert('Upload failed: ' + (err.message || err));
+    uploadAudioToFirestore(_currentAudioBlob).then(function(key){ doSave(key); }).catch(function(err){
+      alert('Save failed: ' + (err.message || err));
     });
   } else {
     doSave('');
@@ -2180,10 +2201,7 @@ window.deleteJewishEntry = function(id, audioKey) {
   var data = getData();
   data.monthlyJewishHistory = data.monthlyJewishHistory.filter(function(e){ return e.id !== id; });
   saveMJH(data.monthlyJewishHistory);
-  if (audioKey) {
-    if (audioKey.indexOf('https://') === 0) { deleteAudioFromStorage(audioKey); }
-    else { _deleteLocalAudioBlob(audioKey); }
-  }
+  if (audioKey) { deleteAudioFromFirestore(audioKey); _deleteLocalAudioBlob(audioKey); }
   renderJewishHist();
 };
 
@@ -2277,16 +2295,19 @@ window.playJewishAudio = function(key, btnEl) {
     }
   }
 
-  // New recordings: audioKey is a Firebase Storage download URL
-  if (key.indexOf('https://') === 0) {
-    _showPlayer(key);
-  } else {
-    // Legacy: local IndexedDB blob
-    _loadLocalAudioBlob(key).then(function(blob) {
-      if (!blob) { alert('Audio not found. This recording was saved on another device and cannot be played here.'); return; }
-      _showPlayer(URL.createObjectURL(blob));
+  // Try Firestore first, fall back to local IndexedDB for legacy recordings
+  loadAudioFromFirestore(key).then(function(blob) {
+    if (blob) { _showPlayer(URL.createObjectURL(blob)); return; }
+    return _loadLocalAudioBlob(key).then(function(localBlob) {
+      if (localBlob) { _showPlayer(URL.createObjectURL(localBlob)); }
+      else { alert('Audio not found. This recording was saved on another device before cloud sync was enabled.'); }
     });
-  }
+  }).catch(function() {
+    _loadLocalAudioBlob(key).then(function(localBlob) {
+      if (localBlob) { _showPlayer(URL.createObjectURL(localBlob)); }
+      else { alert('Audio not found.'); }
+    });
+  });
 };
 
 // ============================================================
