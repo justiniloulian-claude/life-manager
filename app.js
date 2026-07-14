@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v187…';
+  b.textContent = 'v188…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v187'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v188'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -3811,7 +3811,7 @@ window.folderDrop = function(e) {
 function renderCarryOverBanner() {
   var todayDs = toDateStr(dateFromOffset(0));
   var yesterDs = toDateStr(dateFromOffset(-1));
-  var dismissed = state.coDismissed || {};
+  var dismissed = JSON.parse(localStorage.getItem('dm_co_dismissed_' + yesterDs) || '{}');
   var tasks = getTasksForDate(yesterDs).filter(function(t){ return !t.done && t.type !== 'routine' && !dismissed[t.id]; });
   if (!tasks.length) return '';
   var rows = tasks.map(function(t){
@@ -3836,8 +3836,11 @@ window.checkTask = function(ds,id,isR){ toggleDone(ds,id,isR); refresh(); refres
 window.removeTask = function(ds,id){ if(confirm('Delete this task?')){ deleteTask(ds,id); refresh(); refreshDashDayModal(); } };
 window.markCarryOverDone = function(ds,id){ toggleDone(ds,id,false); refresh(); };
 window.leaveCarryOverTask = function(id){
-  state.coDismissed = state.coDismissed || {};
-  state.coDismissed[id] = true;
+  var yesterDs = toDateStr(dateFromOffset(-1));
+  var key = 'dm_co_dismissed_' + yesterDs;
+  var dismissed = JSON.parse(localStorage.getItem(key) || '{}');
+  dismissed[id] = true;
+  localStorage.setItem(key, JSON.stringify(dismissed));
   refresh();
 };
 window.skipRoutineDay = function(ds, routineId) {
