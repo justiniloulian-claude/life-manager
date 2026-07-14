@@ -39,8 +39,9 @@ var _fbConfig = {
   appId: "1:233340003395:web:e1697b61e9edc3899e20f6"
 };
 firebase.initializeApp(_fbConfig);
-var _db   = firebase.firestore();
-var _auth = firebase.auth();
+var _db      = firebase.firestore();
+var _auth    = firebase.auth();
+var _storage = firebase.storage();
 var _uid  = null;
 var _appInited = false;
 var _fsUnsubscribe = null;
@@ -89,14 +90,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v181…';
+  b.textContent = 'v184…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v181'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v184'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -565,7 +566,23 @@ var _draggingNoteId=null;
 // ============================================================
 // INDEXEDDB FOR AUDIO
 // ============================================================
-function openAudioDB() {
+// Upload blob to Firebase Storage; returns Promise<downloadURL>
+function uploadAudioToStorage(blob) {
+  var key = uid();
+  var ext = blob.type.indexOf('ogg') !== -1 ? 'ogg' : blob.type.indexOf('mp4') !== -1 ? 'mp4' : 'webm';
+  var path = 'audio/' + _uid + '/' + key + '.' + ext;
+  var ref = _storage.ref(path);
+  return ref.put(blob).then(function() { return ref.getDownloadURL(); });
+}
+
+// Delete from Firebase Storage by download URL; safe no-op if URL invalid
+function deleteAudioFromStorage(url) {
+  try { return _storage.refFromURL(url).delete().catch(function(){}); }
+  catch(e) { return Promise.resolve(); }
+}
+
+// Legacy IndexedDB helpers (kept for backward-compat with old local recordings)
+function _openAudioDB() {
   return new Promise(function(resolve, reject) {
     var req = indexedDB.open('dm_audio_db', 1);
     req.onupgradeneeded = function(e) { e.target.result.createObjectStore('recordings'); };
@@ -573,17 +590,8 @@ function openAudioDB() {
     req.onerror   = function(e) { reject(e); };
   });
 }
-function saveAudioBlob(key, blob) {
-  return openAudioDB().then(function(db) {
-    return new Promise(function(resolve, reject) {
-      var tx = db.transaction('recordings', 'readwrite');
-      tx.objectStore('recordings').put(blob, key);
-      tx.oncomplete = resolve; tx.onerror = reject;
-    });
-  });
-}
-function loadAudioBlob(key) {
-  return openAudioDB().then(function(db) {
+function _loadLocalAudioBlob(key) {
+  return _openAudioDB().then(function(db) {
     return new Promise(function(resolve, reject) {
       var tx = db.transaction('recordings', 'readonly');
       var req = tx.objectStore('recordings').get(key);
@@ -592,8 +600,8 @@ function loadAudioBlob(key) {
     });
   });
 }
-function deleteAudioBlob(key) {
-  return openAudioDB().then(function(db) {
+function _deleteLocalAudioBlob(key) {
+  return _openAudioDB().then(function(db) {
     return new Promise(function(resolve) {
       var tx = db.transaction('recordings', 'readwrite');
       tx.objectStore('recordings').delete(key);
@@ -2047,8 +2055,9 @@ window.storeJewishMonth = function() {
     renderJewishHist();
   };
   if (_currentAudioBlob) {
-    var key = uid();
-    saveAudioBlob(key, _currentAudioBlob).then(function(){ doSave(key); });
+    uploadAudioToStorage(_currentAudioBlob).then(function(url){ doSave(url); }).catch(function(err){
+      alert('Upload failed: ' + (err.message || err));
+    });
   } else {
     doSave('');
   }
@@ -2171,7 +2180,10 @@ window.deleteJewishEntry = function(id, audioKey) {
   var data = getData();
   data.monthlyJewishHistory = data.monthlyJewishHistory.filter(function(e){ return e.id !== id; });
   saveMJH(data.monthlyJewishHistory);
-  if (audioKey) deleteAudioBlob(audioKey);
+  if (audioKey) {
+    if (audioKey.indexOf('https://') === 0) { deleteAudioFromStorage(audioKey); }
+    else { _deleteLocalAudioBlob(audioKey); }
+  }
   renderJewishHist();
 };
 
@@ -2251,23 +2263,30 @@ window.setAudioSpeed = function(playerId, speed) {
 };
 
 window.playJewishAudio = function(key, btnEl) {
-  // Toggle inline player in the entry row
   var entry = btnEl ? btnEl.closest('.jewish-hist-entry') : null;
   var existingPlayer = entry ? entry.querySelector('.audio-player-wrap') : null;
-  if (existingPlayer) { existingPlayer.remove(); btnEl.textContent='▶ Play'; return; }
+  if (existingPlayer) { existingPlayer.remove(); if(btnEl) btnEl.textContent='▶ Play'; return; }
 
-  loadAudioBlob(key).then(function(blob) {
-    if (!blob) { alert('Audio not found.'); return; }
-    var url = URL.createObjectURL(blob);
-    var playerId = 'jp-'+key.slice(0,8);
+  function _showPlayer(url) {
+    var playerId = 'jp-'+key.slice(-8);
     var html = buildAudioPlayerHTML(url, playerId);
     if (entry) {
       entry.insertAdjacentHTML('beforeend', html);
       if (btnEl) btnEl.textContent = '⏹ Close';
-      // Auto-play
       setTimeout(function(){ var el=document.getElementById(playerId+'-el'); if(el) el.play(); }, 50);
     }
-  });
+  }
+
+  // New recordings: audioKey is a Firebase Storage download URL
+  if (key.indexOf('https://') === 0) {
+    _showPlayer(key);
+  } else {
+    // Legacy: local IndexedDB blob
+    _loadLocalAudioBlob(key).then(function(blob) {
+      if (!blob) { alert('Audio not found. This recording was saved on another device and cannot be played here.'); return; }
+      _showPlayer(URL.createObjectURL(blob));
+    });
+  }
 };
 
 // ============================================================
