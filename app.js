@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v193…';
+  b.textContent = 'v194…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v193'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v194'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -553,7 +553,7 @@ document.addEventListener('keydown',function(e){
   else if(k==='7')    {showPage('dashboard');setDashView('seven');}         // 7 → 7-Day
   else if(k==='c'||k==='C'){showPage('dashboard');setDashView('cheshbon');} // C → Cheshbon
   else if(k==='h'||k==='H'){showPage('dashboard');setDashView('health');}   // H → Health
-  else if(k==='r'||k==='R'){showPage('dashboard');setDashView('reminders');}// R → Reminders
+  else if(k==='r'||k==='R'||k==='e'||k==='E'){showPage('dashboard');setDashView('reminders');}// R/E → Esav
   else if(k==='u'||k==='U'){showPage('dashboard');setDashView('future');}   // U → Future (Upcoming)
   // Main pages
   else if(k==='n'||k==='N'){showPage('notes');}                             // N → Notes
