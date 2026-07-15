@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v192…';
+  b.textContent = 'v193…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v192'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v193'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -192,6 +192,7 @@ function _rerender(){
     if(state.currentPage==='financial') renderFinancial();
     if(state.currentPage==='learning')  renderLearning();
   }catch(e){}
+  try{ updateEsavBadge(); }catch(e){}
 }
 
 function _loadFromFS(uid, cb){
@@ -1532,6 +1533,7 @@ function renderSeven() {
 function refresh() {
   if (state.dashView==='single') renderSingle();
   else if (state.dashView==='seven') renderSeven();
+  try { updateEsavBadge(); } catch(e) {}
 }
 function refreshDashDayModal() {
   if (!state.dashDayModalDs) return;
@@ -2812,16 +2814,57 @@ window.removeHealthActivity = function(ds, id){
 };
 
 // ============================================================
+// ── Esav unread tracking ────────────────────────────────────────────────────
+function _getKeptUnread() {
+  try { return JSON.parse(localStorage.getItem('esav_kept_unread')||'[]'); } catch(e){ return []; }
+}
+function _setKeptUnread(arr) { localStorage.setItem('esav_kept_unread', JSON.stringify(arr)); }
+
+function _getLastReadTs() { return Number(localStorage.getItem('esav_last_read_ts')||'0'); }
+function _setLastReadTs(ts) { localStorage.setItem('esav_last_read_ts', String(ts)); }
+
+function _isUnread(entry) {
+  var kept = _getKeptUnread();
+  if (kept.indexOf(entry.id) !== -1) return true;
+  return new Date(entry.sentAt).getTime() > _getLastReadTs();
+}
+
+function updateEsavBadge() {
+  var badge = document.getElementById('esavBadge');
+  if (!badge) return;
+  try {
+    var raw = localStorage.getItem('esav_log');
+    var log = raw ? JSON.parse(raw) : [];
+    var count = log.filter(function(e){ return _isUnread(e); }).length;
+    if (count > 0) {
+      badge.textContent = count > 99 ? '99+' : String(count);
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch(e) { badge.style.display = 'none'; }
+}
+window.updateEsavBadge = updateEsavBadge;
+
 // RENDER — REMINDERS
 // ============================================================
 function renderReminders() {
   var el=document.getElementById('remindersList'); if(!el)return;
+
+  // Mark all current messages as read (clear badge) — kept-unread overrides this
+  _setLastReadTs(Date.now());
+  updateEsavBadge();
+
   var raw=localStorage.getItem('esav_log');
   var log=raw?JSON.parse(raw):[];
+
   if(!log.length){
     el.innerHTML='<div class="stl-empty">No messages from Esav yet. Esav\'s proactive updates, morning briefings, and reminders will appear here.</div>';
     return;
   }
+
+  var kept = _getKeptUnread();
+
   el.innerHTML=log.map(function(entry){
     var d=new Date(entry.sentAt);
     var dateStr=d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' · '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
@@ -2829,15 +2872,34 @@ function renderReminders() {
       'morning-briefing':'☀️ Morning Briefing',
       'reminder':'🔔 Reminder',
       'proactive':'💬 Esav',
-      'notification':'🔔 Notification'
+      'notification':'🔔 Notification',
+      'reply':'💬 You',
+      'esav-reply':'💬 Esav'
     }[entry.type]||'💬 Esav';
-    return '<div class="esav-log-item">'+
-      '<div class="esav-log-meta"><span class="esav-log-type">'+typeLabel+'</span><span class="esav-log-date">'+escHtml(dateStr)+'</span></div>'+
-      '<div class="esav-log-title">'+escHtml(entry.title)+'</div>'+
-      '<div class="esav-log-body">'+escHtml(entry.body)+'</div>'+
+
+    var isKeptUnread = kept.indexOf(entry.id) !== -1;
+    var unreadCls = isKeptUnread ? ' unread' : '';
+    var keepBtn = '<button class="esav-keep-unread-btn" onclick="window.esavToggleUnread(\''+escHtml(entry.id)+'\')">'+(isKeptUnread?'Mark read':'Keep unread')+'</button>';
+
+    return '<div class="esav-log-item'+unreadCls+'" data-id="'+escHtml(entry.id)+'">'+
+      '<div class="esav-log-meta">'+
+        '<span class="esav-log-type">'+typeLabel+'</span>'+
+        '<span class="esav-log-date">'+escHtml(dateStr)+'</span>'+
+      '</div>'+
+      '<div class="esav-log-body">'+escHtml(entry.body||entry.title||'')+'</div>'+
+      '<div class="esav-log-actions">'+keepBtn+'</div>'+
     '</div>';
   }).join('');
 }
+
+window.esavToggleUnread = function(id) {
+  var kept = _getKeptUnread();
+  var idx = kept.indexOf(id);
+  if (idx === -1) { kept.push(id); } else { kept.splice(idx, 1); }
+  _setKeptUnread(kept);
+  renderReminders();
+  updateEsavBadge();
+};
 
 // ============================================================
 // RENDER — ESAV GOALS
@@ -5353,6 +5415,35 @@ function initListeners() {
   document.getElementById('pillHealth').addEventListener('click',   function(){ setDashView('health'); });
   document.getElementById('pillReminders').addEventListener('click', function(){ setDashView('reminders'); });
 
+  // Esav tab reply bar
+  (function(){
+    var input = document.getElementById('esavTabInput');
+    var btn   = document.getElementById('esavTabSend');
+    if (!input || !btn) return;
+
+    function sendTabReply() {
+      var text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+      input.style.height = 'auto';
+      btn.disabled = true;
+      btn.textContent = '…';
+      window._esavSendText(text).finally(function(){
+        btn.disabled = false;
+        btn.textContent = '↑';
+      });
+    }
+
+    btn.addEventListener('click', sendTabReply);
+    input.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTabReply(); }
+    });
+    input.addEventListener('input', function(){
+      this.style.height = 'auto';
+      this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+    });
+  })();
+
   // Date jump
   document.getElementById('dateJumpInput').addEventListener('change', function(e){
     var val=e.target.value; if(!val)return;
@@ -6525,11 +6616,49 @@ function _doLogin() {
   }
 
   function _afterResponse(userText, esavResponse) {
-    // Append to conversation history (keep last 20 turns to avoid token overload)
     _history.push({ role: 'user',      content: userText });
     _history.push({ role: 'assistant', content: esavResponse });
     if (_history.length > 40) _history = _history.slice(_history.length - 40);
   }
+
+  function _logToTab(type, body) {
+    try {
+      var raw = localStorage.getItem('esav_log');
+      var log = raw ? JSON.parse(raw) : [];
+      log.unshift({ id: 'local_' + Date.now(), type: type, title: type === 'reply' ? 'You' : 'Esav', body: body, sentAt: new Date().toISOString() });
+      if (log.length > 100) log.splice(100);
+      localStorage.setItem('esav_log', JSON.stringify(log));
+    } catch(e) {}
+  }
+
+  // Exposed so the Esav tab reply bar can call it
+  window._esavSendText = async function(text) {
+    _logToTab('reply', text);
+    renderReminders && renderReminders();
+
+    try {
+      var res  = await fetch(ESAV_URL + '/assistant/text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text, history: _history })
+      });
+      var data = await res.json();
+      if (data.error) { _logToTab('esav-reply', 'Error: ' + data.error); }
+      else {
+        var reply = data.response || 'Done!';
+        _logToTab('esav-reply', reply);
+        _afterResponse(text, reply);
+        if (data.results && data.results.length) {
+          if(window._esavSync){ window._esavSync(function(){ try{ refresh(); renderCalendar(); renderEsavGoals(); renderReminders(); updateEsavBadge(); }catch(e){} }); }
+          else { setTimeout(function(){ try{ refresh(); renderCalendar(); renderEsavGoals(); }catch(e){} }, 1500); }
+        }
+      }
+    } catch(e) {
+      _logToTab('esav-reply', 'Could not reach Esav. Check your connection.');
+    }
+    renderReminders && renderReminders();
+    updateEsavBadge && updateEsavBadge();
+  };
 
   // ── Send to Esav ────────────────────────────────────────────
   async function sendAudio(){

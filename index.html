@@ -91,7 +91,7 @@
         <button class="dash-pill" id="pillFuture">Future</button>
         <button class="dash-pill" id="pillCheshbon">Cheshbon</button>
         <button class="dash-pill" id="pillHealth">Physical Health</button>
-        <button class="dash-pill" id="pillReminders">Esav</button>
+        <button class="dash-pill" id="pillReminders">Esav<span id="esavBadge" class="esav-badge" style="display:none"></span></button>
       </div>
     </div>
     <div class="dash-subnav-right">
@@ -389,7 +389,7 @@
   </div>
 
   <!-- Esav Log View -->
-  <div id="remindersView" class="view">
+  <div id="remindersView" class="view" style="display:flex;flex-direction:column;height:100%">
     <div class="list-page-header">
       <div>
         <h2 class="list-page-title">Esav</h2>
@@ -398,8 +398,13 @@
     </div>
     <div class="esav-section-label">Goals</div>
     <div id="esavGoalsList" class="esav-goals-list"></div>
-    <div class="esav-section-label" style="margin-top:20px">Messages from Esav</div>
-    <div id="remindersList" class="esav-log-list"></div>
+    <div class="esav-section-label" style="margin-top:20px">Messages</div>
+    <div id="remindersList" class="esav-log-list" style="flex:1"></div>
+    <!-- Reply bar -->
+    <div class="esav-tab-reply-bar">
+      <textarea id="esavTabInput" class="esav-tab-input" placeholder="Reply to Esav…" rows="1"></textarea>
+      <button id="esavTabSend" class="esav-tab-send-btn" title="Send">↑</button>
+    </div>
   </div>
 
 </div>
@@ -1512,6 +1517,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="app.js?v=192"></script>
+<script src="app.js?v=193"></script>
 </body>
 </html>

@@ -3449,16 +3449,35 @@ body.dark-mode .mob-folder-overlay { background: rgba(0,0,0,0.6); }
 .esav-voice-row { display: flex; align-items: center; gap: 6px; }
 
 /* ── Esav Log Tab ─────────────────────────────────────────── */
-.esav-log-list { display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }
-.esav-log-item { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; padding: 14px 16px; }
-.esav-log-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+/* Esav badge on pill */
+.esav-badge { display: inline-flex; align-items: center; justify-content: center; background: #ef4444; color: #fff; font-size: 10px; font-weight: 700; min-width: 16px; height: 16px; border-radius: 99px; padding: 0 4px; margin-left: 5px; vertical-align: middle; line-height: 1; }
+
+/* Esav message log */
+.esav-log-list { display: flex; flex-direction: column; gap: 8px; padding: 4px 0 12px; }
+.esav-log-item { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; padding: 12px 14px; transition: border-color 0.15s; }
+.esav-log-item.unread { border-color: #7c3aed; border-left: 3px solid #7c3aed; background: #faf5ff; }
+.esav-log-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .esav-log-type { font-size: 11px; font-weight: 600; color: #7c3aed; text-transform: uppercase; letter-spacing: 0.04em; }
 .esav-log-date { font-size: 11px; color: #999; }
+.esav-log-body { font-size: 13px; color: #333; white-space: pre-line; line-height: 1.55; }
+.esav-log-actions { margin-top: 8px; }
+.esav-keep-unread-btn { font-size: 11px; color: #7c3aed; background: none; border: none; padding: 0; cursor: pointer; font-weight: 600; opacity: 0.7; }
+.esav-keep-unread-btn:hover { opacity: 1; }
+
+/* Esav tab reply bar */
+.esav-tab-reply-bar { display: flex; align-items: flex-end; gap: 8px; padding: 10px 0 4px; border-top: 1px solid #e8e8e8; margin-top: 8px; flex-shrink: 0; }
+.esav-tab-input { flex: 1; border: 1.5px solid #e0e0e0; border-radius: 20px; padding: 9px 14px; font-size: 14px; font-family: inherit; resize: none; outline: none; background: #fafafa; max-height: 100px; line-height: 1.4; }
+.esav-tab-input:focus { border-color: #7c3aed; background: #fff; }
+.esav-tab-send-btn { width: 36px; height: 36px; border-radius: 50%; background: #7c3aed; color: #fff; border: none; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.esav-tab-send-btn:disabled { opacity: 0.5; cursor: default; }
 .esav-log-title { font-size: 14px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px; }
 .esav-log-body { font-size: 13px; color: #555; white-space: pre-line; line-height: 1.5; }
 body.dark-mode .esav-log-item { background: #1e1e2e; border-color: #2e2e3e; }
-body.dark-mode .esav-log-title { color: #e0e0e0; }
-body.dark-mode .esav-log-body { color: #aaa; }
+body.dark-mode .esav-log-item.unread { background: #1e1530; border-color: #7c3aed; }
+body.dark-mode .esav-log-body { color: #ccc; }
+body.dark-mode .esav-tab-reply-bar { border-top-color: #2e2e3e; }
+body.dark-mode .esav-tab-input { background: #1e1e2e; border-color: #3e3e4e; color: #e0e0e0; }
+body.dark-mode .esav-tab-input:focus { border-color: #a78bfa; background: #232333; }
 
 /* Esav Goals */
 .esav-section-label { font-size: 11px; font-weight: 700; color: #7c3aed; text-transform: uppercase; letter-spacing: 0.06em; padding: 4px 2px 8px; }
