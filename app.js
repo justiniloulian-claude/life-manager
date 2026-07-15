@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v195…';
+  b.textContent = 'v196…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v195'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v196'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -393,6 +393,7 @@ const state = {
   noteCheckItems: [],
   notesSearchQuery: '',
   taskModalLinkedNotes: [],
+  priorityFilter: false,
   zmanimCache: {},
   hebrewCache: {},
   location: null,
@@ -877,6 +878,7 @@ function getTasksForDate(ds) {
     all=ordered;
   }
   var inc=all.filter(function(t){return !t.done;});
+  if (state.priorityFilter) inc=inc.filter(function(t){return t.priority==='urgent'||t.priority==='high';});
   var don=all.filter(function(t){return t.done;});
   // Partial sort: timed tasks enforce time order among themselves;
   // untimed tasks stay exactly where drag placed them.
@@ -1498,6 +1500,38 @@ function dayCardHTML(date, compact) {
 // ============================================================
 // RENDER — DASHBOARD VIEWS
 // ============================================================
+function updateShabbatCountdown() {
+  var el=document.getElementById('shabbatCountdown');
+  if(!el) return;
+  var now=new Date();
+  var dow=now.getDay(); // 0=Sun, 5=Fri, 6=Sat
+  var todayDs=toDateStr(now);
+  var zmToday=state.zmanimCache[todayDs];
+  if(dow===5 && zmToday && zmToday.sunset) {
+    // It's Friday — show countdown to sunset
+    var sunset=new Date(zmToday.sunset);
+    var diff=sunset-now;
+    if(diff>0) {
+      var h=Math.floor(diff/3600000);
+      var m=Math.floor((diff%3600000)/60000);
+      var s=Math.floor((diff%60000)/1000);
+      el.style.display='';
+      el.innerHTML='<span class="sc-icon">🕯️</span><span class="sc-text">Shabbat in '+h+'h '+m+'m '+s+'s — '+
+        sunset.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'</span>';
+    } else {
+      // After sunset on Friday — Shabbat started
+      el.style.display='';
+      el.innerHTML='<span class="sc-icon">✡️</span><span class="sc-text">Shabbat Shalom! Good Shabbos.</span>';
+    }
+  } else if(dow===6) {
+    el.style.display='';
+    el.innerHTML='<span class="sc-icon">✡️</span><span class="sc-text">Shabbat Shalom!</span>';
+  } else {
+    el.style.display='none';
+  }
+}
+
+var _shabbatTimer=null;
 function renderSingle() {
   var date=dateFromOffset(state.dayOffset);
   var ds=toDateStr(date);
@@ -1507,6 +1541,16 @@ function renderSingle() {
   loadZstrip(ds);
   loadHebrewDate(ds);
   document.getElementById('backToTodayBtn').style.display=state.dayOffset===0?'none':'';
+  // Shabbat countdown: run on today's view, update every second
+  if(_shabbatTimer){clearInterval(_shabbatTimer);_shabbatTimer=null;}
+  if(state.dayOffset===0){
+    updateShabbatCountdown();
+    var dow=new Date().getDay();
+    if(dow===5||dow===6) _shabbatTimer=setInterval(updateShabbatCountdown,1000);
+  } else {
+    var el=document.getElementById('shabbatCountdown');
+    if(el) el.style.display='none';
+  }
 }
 function renderSeven() {
   var s=state.weekStart;
@@ -2938,6 +2982,53 @@ function renderEsavGoals() {
 window.renderEsavGoals = renderEsavGoals;
 
 // ============================================================
+// RENDER — PEOPLE / RELATIONSHIP CRM
+// ============================================================
+function renderCRM() {
+  var el = document.getElementById('peopleList');
+  if (!el) return;
+  var raw = localStorage.getItem('esav_contacts');
+  var contacts = raw ? JSON.parse(raw) : [];
+
+  if (!contacts.length) {
+    el.innerHTML = '<div class="stl-empty">No contacts yet. Tell Esav: "Add a contact — Bob, every 2 months" and they\'ll appear here.</div>';
+    return;
+  }
+
+  var today = new Date();
+
+  function getStatus(c) {
+    if (!c.lastContactDate) return { cls: 'overdue', label: 'Never logged', days: Infinity };
+    var daysSince = Math.floor((today - new Date(c.lastContactDate)) / 86400000);
+    var freq = c.frequencyDays || 30;
+    if (daysSince > freq)            return { cls: 'overdue',  label: 'Overdue by ' + (daysSince - freq) + ' days', days: daysSince - freq };
+    if (daysSince > freq * 0.8)      return { cls: 'due-soon', label: (freq - daysSince) + ' days left', days: -(freq - daysSince) };
+    return                                  { cls: 'good',     label: 'Last seen ' + daysSince + ' d ago', days: -(freq - daysSince) };
+  }
+
+  contacts.sort(function(a, b) { return getStatus(b).days - getStatus(a).days; });
+
+  el.innerHTML = contacts.map(function(c) {
+    var st = getStatus(c);
+    var initials = c.name.split(' ').map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase();
+    var lastSeen = c.lastContactDate ? 'Last: ' + c.lastContactDate : 'Never logged';
+    return '<div class="crm-card">'+
+      '<div class="crm-avatar crm-avatar-'+st.cls+'">'+escHtml(initials)+'</div>'+
+      '<div class="crm-info">'+
+        '<div class="crm-name">'+escHtml(c.name)+'</div>'+
+        '<div class="crm-freq">'+escHtml(c.frequency || 'every '+(c.frequencyDays||30)+' days')+'</div>'+
+        (c.notes ? '<div class="crm-notes">'+escHtml(c.notes)+'</div>' : '')+
+      '</div>'+
+      '<div class="crm-status">'+
+        '<span class="crm-status-badge crm-'+st.cls+'">'+escHtml(st.label)+'</span>'+
+        '<div class="crm-last">'+escHtml(lastSeen)+'</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+window.renderCRM = renderCRM;
+
+// ============================================================
 // RENDER — LEARNING SEDER
 // ============================================================
 function getLearningSection(item) {
@@ -3841,8 +3932,8 @@ window.setCheshTab = function(tab) {
 // DASHBOARD VIEW SWITCHING
 // ============================================================
 function setDashView(viewName) {
-  var viewMap = {single:'singleDayView',seven:'sevenDayView',future:'futureView',cheshbon:'cheshbonView',health:'healthView',reminders:'remindersView'};
-  var pillMap = {single:'pillDay',seven:'pillSeven',future:'pillFuture',cheshbon:'pillCheshbon',health:'pillHealth',reminders:'pillReminders'};
+  var viewMap = {single:'singleDayView',seven:'sevenDayView',future:'futureView',cheshbon:'cheshbonView',health:'healthView',people:'peopleView',reminders:'remindersView'};
+  var pillMap = {single:'pillDay',seven:'pillSeven',future:'pillFuture',cheshbon:'pillCheshbon',health:'pillHealth',people:'pillPeople',reminders:'pillReminders'};
   Object.values(viewMap).forEach(function(v){ var el=document.getElementById(v); if(el)el.classList.remove('active'); });
   Object.values(pillMap).forEach(function(p){ var el=document.getElementById(p); if(el)el.classList.remove('active'); });
   state.dashView=viewName;
@@ -3853,6 +3944,7 @@ function setDashView(viewName) {
   if (viewName==='future')    renderFuture();
   if (viewName==='cheshbon')  { setCheshTab('daily'); }
   if (viewName==='health')    renderHealth();
+  if (viewName==='people')    renderCRM();
   if (viewName==='reminders') { renderReminders(); renderEsavGoals(); }
 }
 
@@ -5414,6 +5506,17 @@ function initListeners() {
   document.getElementById('pillCheshbon').addEventListener('click', function(){ setDashView('cheshbon'); });
   document.getElementById('pillHealth').addEventListener('click',   function(){ setDashView('health'); });
   document.getElementById('pillReminders').addEventListener('click', function(){ setDashView('reminders'); });
+  var pillPeopleEl=document.getElementById('pillPeople');
+  if(pillPeopleEl) pillPeopleEl.addEventListener('click', function(){ setDashView('people'); });
+
+  // Priority filter button
+  var pfBtn=document.getElementById('priorityFilterBtn');
+  if(pfBtn) pfBtn.addEventListener('click', function(){
+    state.priorityFilter=!state.priorityFilter;
+    pfBtn.classList.toggle('active', state.priorityFilter);
+    if(state.dashView==='single') renderSingle();
+    else if(state.dashView==='seven') renderSeven();
+  });
 
   // Esav tab reply bar
   (function(){

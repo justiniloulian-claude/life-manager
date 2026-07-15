@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Life Manager">
   <title>Dashboard v150</title>
-  <link rel="stylesheet" href="style.css?v=183">
+  <link rel="stylesheet" href="style.css?v=196">
 </head>
 <body>
 
@@ -91,14 +91,19 @@
         <button class="dash-pill" id="pillFuture">Future</button>
         <button class="dash-pill" id="pillCheshbon">Cheshbon</button>
         <button class="dash-pill" id="pillHealth">Physical Health</button>
+        <button class="dash-pill" id="pillPeople">People</button>
         <button class="dash-pill" id="pillReminders">Esav<span id="esavBadge" class="esav-badge" style="display:none"></span></button>
       </div>
     </div>
     <div class="dash-subnav-right">
+      <button id="priorityFilterBtn" class="priority-filter-btn" title="Show urgent/high priority tasks only">⚡ Priority</button>
       <label class="date-jump-label">Jump to:</label>
       <input type="date" id="dateJumpInput" class="date-jump-input" title="Jump to any date">
     </div>
   </div>
+
+  <!-- Shabbat countdown (Fridays only) -->
+  <div id="shabbatCountdown" class="shabbat-countdown" style="display:none"></div>
 
   <!-- Single Day View -->
   <div id="singleDayView" class="view">
@@ -386,6 +391,17 @@
       <div id="weightTrackerContent" class="wt-content"></div>
     </div>
 
+  </div>
+
+  <!-- People / Relationship CRM View -->
+  <div id="peopleView" class="view">
+    <div class="list-page-header">
+      <div>
+        <h2 class="list-page-title">People</h2>
+        <p class="list-page-subtitle">Stay in touch — tell Esav to add contacts and log when you see someone</p>
+      </div>
+    </div>
+    <div id="peopleList" class="crm-list"></div>
   </div>
 
   <!-- Esav Log View -->
@@ -1517,6 +1533,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="app.js?v=195"></script>
+<script src="app.js?v=196"></script>
 </body>
 </html>
