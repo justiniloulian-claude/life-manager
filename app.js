@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v189…';
+  b.textContent = 'v190…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v189'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v190'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -571,15 +571,36 @@ var _draggingNoteId=null;
 // Legacy entries (recorded before this version) have the same UID format
 // but only exist in IndexedDB on the original device.
 
+var AUDIO_CHUNK_SIZE = 700000; // ~700KB per chunk, well under Firestore 1MB doc limit
+
 function uploadAudioToFirestore(blob) {
   return new Promise(function(resolve, reject) {
     var reader = new FileReader();
     reader.onload = function() {
+      var dataURI = reader.result;
+      var mime = blob.type;
       var key = uid();
-      _db.collection('users').doc(_uid).collection('audio').doc(key)
-        .set({ data: reader.result, mime: blob.type, ts: Date.now() })
-        .then(function() { resolve(key); })
-        .catch(reject);
+      var audioRef = _db.collection('users').doc(_uid).collection('audio').doc(key);
+
+      if (dataURI.length <= AUDIO_CHUNK_SIZE) {
+        // Small enough for a single document
+        audioRef.set({ data: dataURI, mime: mime, ts: Date.now(), chunks: 0 })
+          .then(function() { resolve(key); }).catch(reject);
+      } else {
+        // Split into chunks stored in a subcollection
+        var chunks = [];
+        for (var i = 0; i < dataURI.length; i += AUDIO_CHUNK_SIZE) {
+          chunks.push(dataURI.slice(i, i + AUDIO_CHUNK_SIZE));
+        }
+        var chunksRef = audioRef.collection('chunks');
+        var batch = _db.batch();
+        // Store metadata on parent doc
+        batch.set(audioRef, { mime: mime, ts: Date.now(), chunks: chunks.length });
+        for (var j = 0; j < chunks.length; j++) {
+          batch.set(chunksRef.doc(String(j)), { data: chunks[j] });
+        }
+        batch.commit().then(function() { resolve(key); }).catch(reject);
+      }
     };
     reader.onerror = reject;
     reader.readAsDataURL(blob);
@@ -587,20 +608,50 @@ function uploadAudioToFirestore(blob) {
 }
 
 function loadAudioFromFirestore(key) {
-  return _db.collection('users').doc(_uid).collection('audio').doc(key).get()
-    .then(function(doc) {
-      if (!doc.exists) return null;
-      var d = doc.data();
-      // Convert data URI back to Blob
-      var arr = d.data.split(','), mime = arr[0].match(/:(.*?);/)[1];
+  var audioRef = _db.collection('users').doc(_uid).collection('audio').doc(key);
+  return audioRef.get().then(function(doc) {
+    if (!doc.exists) return null;
+    var d = doc.data();
+    var mime = d.mime;
+
+    function decodeDataURI(dataURI) {
+      var arr = dataURI.split(',');
       var bstr = atob(arr[1]), n = bstr.length, u8 = new Uint8Array(n);
       while (n--) u8[n] = bstr.charCodeAt(n);
       return new Blob([u8], { type: mime });
+    }
+
+    if (!d.chunks || d.chunks === 0) {
+      // Single-doc storage (old format or small file)
+      return decodeDataURI(d.data);
+    }
+
+    // Chunked storage — fetch all chunks in order
+    var promises = [];
+    for (var i = 0; i < d.chunks; i++) {
+      promises.push(audioRef.collection('chunks').doc(String(i)).get());
+    }
+    return Promise.all(promises).then(function(snapshots) {
+      var dataURI = snapshots.map(function(s) { return s.data().data; }).join('');
+      return decodeDataURI(dataURI);
     });
+  });
 }
 
 function deleteAudioFromFirestore(key) {
-  return _db.collection('users').doc(_uid).collection('audio').doc(key).delete().catch(function(){});
+  var audioRef = _db.collection('users').doc(_uid).collection('audio').doc(key);
+  return audioRef.get().then(function(doc) {
+    if (!doc.exists) return;
+    var d = doc.data();
+    if (d.chunks && d.chunks > 0) {
+      var promises = [];
+      for (var i = 0; i < d.chunks; i++) {
+        promises.push(audioRef.collection('chunks').doc(String(i)).delete());
+      }
+      return Promise.all(promises).then(function() { return audioRef.delete(); });
+    }
+    return audioRef.delete();
+  }).catch(function(){});
 }
 
 // Legacy IndexedDB fallback for recordings made before Firestore audio
