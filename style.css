@@ -3460,6 +3460,26 @@ body.dark-mode .esav-log-item { background: #1e1e2e; border-color: #2e2e3e; }
 body.dark-mode .esav-log-title { color: #e0e0e0; }
 body.dark-mode .esav-log-body { color: #aaa; }
 
+/* Esav Goals */
+.esav-section-label { font-size: 11px; font-weight: 700; color: #7c3aed; text-transform: uppercase; letter-spacing: 0.06em; padding: 4px 2px 8px; }
+.esav-goals-list { display: flex; flex-direction: column; gap: 8px; padding: 0 0 4px; }
+.esav-goal-item { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; padding: 12px 14px; }
+.esav-goal-item.done { opacity: 0.5; }
+.esav-goal-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.esav-goal-check { font-size: 16px; color: #7c3aed; flex-shrink: 0; }
+.esav-goal-item.done .esav-goal-check { color: #22c55e; }
+.esav-goal-title { font-size: 14px; font-weight: 600; color: #1a1a1a; flex: 1; }
+.esav-goal-item.done .esav-goal-title { text-decoration: line-through; color: #888; }
+.esav-goal-cat { font-size: 10px; font-weight: 600; background: #f3e8ff; color: #7c3aed; border-radius: 20px; padding: 2px 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+.esav-goal-date { font-size: 11px; color: #999; }
+.esav-goal-desc { font-size: 12px; color: #666; margin-top: 4px; padding-left: 24px; line-height: 1.4; }
+.esav-goals-done-label { font-size: 11px; color: #bbb; margin: 12px 0 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+body.dark-mode .esav-goal-item { background: #1e1e2e; border-color: #2e2e3e; }
+body.dark-mode .esav-goal-title { color: #e0e0e0; }
+body.dark-mode .esav-goal-desc { color: #aaa; }
+body.dark-mode .esav-goal-cat { background: #2e1e4e; color: #c084fc; }
+body.dark-mode .esav-section-label { color: #a78bfa; }
+
 body.dark-mode .esav-chat { background: #1e1e1e; }
 body.dark-mode .esav-messages { background: #1e1e1e; }
 body.dark-mode .esav-bubble.esav { background: #2a2a3a; color: #e0e0e0; }
