@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v190…';
+  b.textContent = 'v191…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v190'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v191'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -702,7 +702,14 @@ function fromDateStr(s) { var p=s.split('-').map(Number); return new Date(p[0],p
 function isToday(date)  { return date.toDateString()===new Date().toDateString(); }
 function fmt12(t) {
   if (!t) return '';
+  // Handle already-formatted 12h strings like "12:30 PM" or "12:30pm"
+  var ampm = t.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
+  if (ampm) {
+    var hh = parseInt(ampm[1]), mm = ampm[2], suf = ampm[3].toUpperCase();
+    return (hh%12||12)+':'+mm+' '+suf;
+  }
   var p=t.split(':').map(Number), h=p[0], m=p[1];
+  if (isNaN(h)||isNaN(m)) return t;
   return (h%12||12)+':'+String(m).padStart(2,'0')+' '+(h>=12?'PM':'AM');
 }
 function fmtISO(iso) {
