@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v196…';
+  b.textContent = 'v197…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v196'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v197'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -1504,31 +1504,49 @@ function updateShabbatCountdown() {
   var el=document.getElementById('shabbatCountdown');
   if(!el) return;
   var now=new Date();
-  var dow=now.getDay(); // 0=Sun, 5=Fri, 6=Sat
-  var todayDs=toDateStr(now);
-  var zmToday=state.zmanimCache[todayDs];
-  if(dow===5 && zmToday && zmToday.sunset) {
-    // It's Friday — show countdown to sunset
-    var sunset=new Date(zmToday.sunset);
-    var diff=sunset-now;
-    if(diff>0) {
-      var h=Math.floor(diff/3600000);
-      var m=Math.floor((diff%3600000)/60000);
-      var s=Math.floor((diff%60000)/1000);
-      el.style.display='';
-      el.innerHTML='<span class="sc-icon">🕯️</span><span class="sc-text">Shabbat in '+h+'h '+m+'m '+s+'s — '+
-        sunset.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'</span>';
-    } else {
-      // After sunset on Friday — Shabbat started
-      el.style.display='';
-      el.innerHTML='<span class="sc-icon">✡️</span><span class="sc-text">Shabbat Shalom! Good Shabbos.</span>';
-    }
-  } else if(dow===6) {
-    el.style.display='';
+  var dow=now.getDay(); // 0=Sun..4=Thu,5=Fri,6=Sat
+
+  // Saturday all day
+  if(dow===6){
+    el.style.display='flex';
     el.innerHTML='<span class="sc-icon">✡️</span><span class="sc-text">Shabbat Shalom!</span>';
-  } else {
-    el.style.display='none';
+    return;
   }
+
+  // Find this week's Thursday and Friday dates
+  var daysToFri=(5-dow+7)%7;
+  var fridayDate=new Date(now); fridayDate.setDate(now.getDate()+daysToFri);
+  var thursdayDate=new Date(fridayDate); thursdayDate.setDate(fridayDate.getDate()-1);
+  var thuDs=toDateStr(thursdayDate);
+  var friDs=toDateStr(fridayDate);
+
+  var thuZm=state.zmanimCache[thuDs];
+  var friZm=state.zmanimCache[friDs];
+  if(!thuZm||!thuZm.sunset||!friZm||!friZm.sunset){el.style.display='none';return;}
+
+  var thuSunset=new Date(thuZm.sunset);
+  var friSunset=new Date(friZm.sunset);
+
+  // Friday after sunset: Shabbat started
+  if(dow===5&&now>=friSunset){
+    el.style.display='flex';
+    el.innerHTML='<span class="sc-icon">✡️</span><span class="sc-text">Shabbat Shalom! Good Shabbos.</span>';
+    return;
+  }
+
+  // From Thursday shekiyah until Friday shekiyah: countdown
+  if(now>=thuSunset&&now<friSunset){
+    var diff=friSunset-now;
+    var h=Math.floor(diff/3600000);
+    var m=Math.floor((diff%3600000)/60000);
+    var s=Math.floor((diff%60000)/1000);
+    el.style.display='flex';
+    el.innerHTML='<span class="sc-icon">🕯️</span><span class="sc-text">Shabbat in '+h+'h '+m+'m '+s+'s — '+
+      friSunset.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'</span>';
+    return;
+  }
+
+  el.style.display='none';
 }
 
 var _shabbatTimer=null;
@@ -1541,16 +1559,6 @@ function renderSingle() {
   loadZstrip(ds);
   loadHebrewDate(ds);
   document.getElementById('backToTodayBtn').style.display=state.dayOffset===0?'none':'';
-  // Shabbat countdown: run on today's view, update every second
-  if(_shabbatTimer){clearInterval(_shabbatTimer);_shabbatTimer=null;}
-  if(state.dayOffset===0){
-    updateShabbatCountdown();
-    var dow=new Date().getDay();
-    if(dow===5||dow===6) _shabbatTimer=setInterval(updateShabbatCountdown,1000);
-  } else {
-    var el=document.getElementById('shabbatCountdown');
-    if(el) el.style.display='none';
-  }
 }
 function renderSeven() {
   var s=state.weekStart;
@@ -1573,6 +1581,18 @@ function renderSeven() {
   }
   if(remEl) remEl.innerHTML=renderReminderBanner();
   dates.forEach(function(d){ loadHebrewDate(toDateStr(d)); });
+  // Shabbat countdown: fetch Thu+Fri zmanim then start ticker
+  if(_shabbatTimer){clearInterval(_shabbatTimer);_shabbatTimer=null;}
+  (async function(){
+    var now=new Date(); var dow=now.getDay();
+    var daysToFri=(5-dow+7)%7;
+    var fridayDate=new Date(now); fridayDate.setDate(now.getDate()+daysToFri);
+    var thursdayDate=new Date(fridayDate); thursdayDate.setDate(fridayDate.getDate()-1);
+    await Promise.all([fetchZmanim(toDateStr(thursdayDate)),fetchZmanim(toDateStr(fridayDate))]);
+    updateShabbatCountdown();
+    // Only tick every second when countdown is active (Thu-Sat)
+    if(dow===4||dow===5||dow===6) _shabbatTimer=setInterval(updateShabbatCountdown,1000);
+  })();
 }
 function refresh() {
   if (state.dashView==='single') renderSingle();
@@ -3934,6 +3954,8 @@ window.setCheshTab = function(tab) {
 function setDashView(viewName) {
   var viewMap = {single:'singleDayView',seven:'sevenDayView',future:'futureView',cheshbon:'cheshbonView',health:'healthView',people:'peopleView',reminders:'remindersView'};
   var pillMap = {single:'pillDay',seven:'pillSeven',future:'pillFuture',cheshbon:'pillCheshbon',health:'pillHealth',people:'pillPeople',reminders:'pillReminders'};
+  // Clear Shabbat timer when leaving 7-day view
+  if(viewName!=='seven'&&_shabbatTimer){clearInterval(_shabbatTimer);_shabbatTimer=null;}
   Object.values(viewMap).forEach(function(v){ var el=document.getElementById(v); if(el)el.classList.remove('active'); });
   Object.values(pillMap).forEach(function(p){ var el=document.getElementById(p); if(el)el.classList.remove('active'); });
   state.dashView=viewName;

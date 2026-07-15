@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Life Manager">
   <title>Dashboard v150</title>
-  <link rel="stylesheet" href="style.css?v=196">
+  <link rel="stylesheet" href="style.css?v=197">
 </head>
 <body>
 
@@ -102,9 +102,6 @@
     </div>
   </div>
 
-  <!-- Shabbat countdown (Fridays only) -->
-  <div id="shabbatCountdown" class="shabbat-countdown" style="display:none"></div>
-
   <!-- Single Day View -->
   <div id="singleDayView" class="view">
     <div class="nav-bar">
@@ -118,6 +115,7 @@
 
   <!-- 7-Day View -->
   <div id="sevenDayView" class="view active">
+    <div id="shabbatCountdown" class="shabbat-countdown" style="display:none"></div>
     <div class="nav-bar">
       <button id="prevWeekBtn" class="btn-nav">&#8592; Prev Week</button>
       <button id="prevDayBtn7" class="btn-nav">&#8592; Prev Day</button>
@@ -1533,6 +1531,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="app.js?v=196"></script>
+<script src="app.js?v=197"></script>
 </body>
 </html>
