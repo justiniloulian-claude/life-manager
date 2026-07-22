@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v202…';
+  b.textContent = 'v203…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v202'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v203'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -6589,7 +6589,7 @@ function _doLogin() {
 }
 
 // ============================================================
-// ESAV — PERSONAL ASSISTANT  (v202 redesign)
+// ESAV — PERSONAL ASSISTANT  (v203 redesign)
 // ============================================================
 (function(){
   var ESAV_URL = 'https://192-241-151-231.sslip.io';
@@ -7027,7 +7027,7 @@ function _doLogin() {
   if(goalInput) goalInput.addEventListener('keydown',function(e){ if(e.key==='Enter') goalAddBtn.click(); });
 
   // ── People ─────────────────────────────────────────────────
-  var _spokeExpandId=null, _histExpandId=null;
+  var _spokeExpandId=null;
 
   async function _loadPeople(){
     var el=document.getElementById('esavPeopleList'); if(!el) return;
@@ -7039,7 +7039,6 @@ function _doLogin() {
   function _renderPeople(people){
     var el=document.getElementById('esavPeopleList'); if(!el) return;
     if(!people.length){ el.innerHTML='<div class="stl-empty">No one added yet.</div>'; return; }
-    // sort by next contact date ascending (soonest first; never-contacted → top)
     var sorted=people.slice().sort(function(a,b){
       var aNext=(a.lastContact||0)+a.frequencyDays*86400000;
       var bNext=(b.lastContact||0)+b.frequencyDays*86400000;
@@ -7053,39 +7052,35 @@ function _doLogin() {
       var statusText=!p.lastContact?'Never contacted':overdue?(p.daysOverdue+' day'+(p.daysOverdue>1?'s':'')+' overdue'):(nextDate?'Next: '+nextDate:'On track');
       var last=p.lastContact?_daysAgoStr(p.lastContact):'Never';
       var history=p.contactHistory||[];
-      var lastNote=history[0]&&history[0].note?history[0].note:'';
       var spokeExpanded=(_spokeExpandId===p.id);
-      var histExpanded=(_histExpandId===p.id);
 
-      // contact history list
-      var histHtml=history.length
-        ?'<div class="esav-contact-history">'+
-            history.map(function(h){
+      // always-visible notes section below the card header
+      var notesHtml='<div class="esav-person-notes">'+
+        '<div class="esav-person-notes-header">Notes</div>'+
+        (history.length
+          ? history.map(function(h){
               return '<div class="esav-contact-entry">'+
                 '<span class="esav-contact-entry-date">'+_tsLabel(h.ts)+'</span>'+
-                (h.note?'<span class="esav-contact-entry-note">'+escHtml(h.note)+'</span>':'<span class="esav-contact-entry-note esav-contact-entry-no-note">no note</span>')+
+                (h.note
+                  ?'<span class="esav-contact-entry-note">'+escHtml(h.note)+'</span>'
+                  :'<span class="esav-contact-entry-note esav-contact-entry-no-note">no note</span>'
+                )+
               '</div>';
-            }).join('')+
-          '</div>'
-        :'<div class="stl-empty" style="font-size:12px;padding:4px 0">No conversations logged yet.</div>';
+            }).join('')
+          : '<div class="esav-contact-entry-no-note" style="font-size:12px;padding:2px 0">No conversations logged yet</div>'
+        )+
+      '</div>';
 
-      // spoke expand (log a conversation)
+      // spoke expand (log a conversation + note)
       var spokeSection=spokeExpanded
         ?'<div class="esav-spoke-expand">'+
-            '<textarea id="esavSpokeNote_'+p.id+'" class="esav-spoke-note" placeholder="Quick note about this conversation (optional)…" rows="2"></textarea>'+
+            '<textarea id="esavSpokeNote_'+p.id+'" class="esav-spoke-note" placeholder="Note about this conversation (optional)…" rows="2"></textarea>'+
             '<div class="esav-spoke-actions">'+
-              '<button class="esav-person-btn esav-person-contact-btn" onclick="window._esavConfirmSpoke(\''+p.id+'\',\''+escHtml(p.name)+'\',false)">Save</button>'+
+              '<button class="esav-person-btn esav-person-contact-btn" onclick="window._esavConfirmSpoke(\''+p.id+'\')">Save</button>'+
               '<button class="esav-person-btn esav-spoke-cancel-btn" onclick="window._esavSpokeCancel()">Cancel</button>'+
             '</div>'+
           '</div>'
         :'';
-
-      // history expand
-      var histSection=histExpanded
-        ?'<div class="esav-spoke-expand">'+histHtml+'<button class="esav-person-btn esav-spoke-cancel-btn" style="margin-top:6px" onclick="window._esavHistCancel()">Close</button></div>'
-        :(lastNote&&!spokeExpanded?'<div class="esav-last-note">'+escHtml(lastNote)+'</div>':'');
-
-      var infoSection=(!spokeExpanded&&!histExpanded)?spokeSection+histSection:spokeSection+histSection;
 
       return '<div class="esav-person-card '+cls+'" data-pid="'+p.id+'">'+
         '<div class="esav-person-main">'+
@@ -7097,28 +7092,26 @@ function _doLogin() {
           '</div>'+
           '<div class="esav-person-actions">'+
             (!spokeExpanded?'<button class="esav-person-btn esav-person-contact-btn" onclick="window._esavSpokeExpand(\''+p.id+'\')">✓ Spoke</button>':'')+
-            (nextDate&&!spokeExpanded?'<button class="esav-person-btn esav-person-task-btn" onclick="window._esavAddTaskDirect(\''+p.id+'\',\''+escHtml(p.name)+'\',\''+escHtml(nextDate)+'\')">+ Task</button>':'')+
-            (history.length&&!spokeExpanded?'<button class="esav-person-btn esav-hist-btn" onclick="window._esavHistExpand(\''+p.id+'\')">📋 '+(history.length)+'</button>':'')+
+            (nextDate&&!spokeExpanded?'<button class="esav-person-btn esav-person-task-btn" onclick="window._esavAddTaskDirect(\''+escHtml(p.name)+'\',\''+escHtml(nextDate)+'\')">+ Task</button>':'')+
             '<button class="esav-person-btn esav-person-delete-btn" onclick="window._esavDeletePerson(\''+p.id+'\')">×</button>'+
           '</div>'+
         '</div>'+
-        infoSection+
+        notesHtml+
+        spokeSection+
       '</div>';
     }).join('');
   }
 
-  window._esavSpokeExpand=function(id){ _spokeExpandId=id; _histExpandId=null; _loadPeople(); };
+  window._esavSpokeExpand=function(id){ _spokeExpandId=id; _loadPeople(); };
   window._esavSpokeCancel=function(){ _spokeExpandId=null; _loadPeople(); };
-  window._esavHistExpand=function(id){ _histExpandId=(_histExpandId===id?null:id); _spokeExpandId=null; _loadPeople(); };
-  window._esavHistCancel=function(){ _histExpandId=null; _loadPeople(); };
 
-  window._esavAddTaskDirect=function(id,name,nextDate){
+  window._esavAddTaskDirect=function(name,nextDate){
     var chatBtn=document.querySelector('.esav-subtab[data-tab="chat"]');
     if(chatBtn) chatBtn.click();
     setTimeout(function(){ _sendText('Add a task on '+nextDate+': Reach out to '+name,'tab'); },100);
   };
 
-  window._esavConfirmSpoke=async function(id,name,addTask){
+  window._esavConfirmSpoke=async function(id){
     var noteEl=document.getElementById('esavSpokeNote_'+id);
     var note=noteEl?noteEl.value.trim():'';
     _spokeExpandId=null;

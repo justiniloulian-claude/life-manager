@@ -3671,15 +3671,13 @@ body.dark-mode .crm-good .crm-status-badge { background: #0f2b1a; color: #4ade80
 .esav-goal-item.drag-over { border-top:2px solid #7c3aed; }
 
 /* ── Contact history ───────────────────────────────────────────────────────── */
-.esav-last-note { font-size:12px; color:#888; font-style:italic; padding:4px 0 0 54px; }
-.esav-contact-history { margin-top:8px; display:flex; flex-direction:column; gap:4px; }
+.esav-person-notes { margin-top:10px; padding-top:10px; border-top:1px solid #f0f0f0; display:flex; flex-direction:column; gap:5px; }
+.esav-person-notes-header { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#bbb; margin-bottom:2px; }
 .esav-contact-entry { display:flex; gap:8px; align-items:baseline; font-size:12px; }
-.esav-contact-entry-date { color:#888; flex-shrink:0; font-weight:600; }
-.esav-contact-entry-note { color:#444; flex:1; }
+.esav-contact-entry-date { color:#888; flex-shrink:0; font-weight:600; white-space:nowrap; }
+.esav-contact-entry-note { color:#444; flex:1; line-height:1.4; }
 .esav-contact-entry-no-note { color:#bbb; font-style:italic; }
 .esav-spoke-cancel-btn { color:#888; border-color:#e0e0e0; }
-.esav-hist-btn { color:#7c3aed; border-color:#f3e8ff; font-size:11px; }
-.esav-hist-btn:hover { background:#f3e8ff; }
 
 /* ── Chat panel inside Esav tab ────────────────────────────────────────────── */
 .esav-chat-panel { display:flex; flex-direction:column; }
@@ -3724,7 +3722,7 @@ body.dark-mode .esav-spoke-hint { color:#888; }
 body.dark-mode .esav-goal-ctrl-btn:hover { background:#2e1e4e; color:#c084fc; }
 body.dark-mode .esav-goal-edit-input { background:#1e1e2e; border-color:#7c3aed; color:#e0e0e0; }
 body.dark-mode .esav-goal-drag-handle { color:#555; }
-body.dark-mode .esav-last-note { color:#888; }
+body.dark-mode .esav-person-notes { border-top-color:#2e2e3e; }
 body.dark-mode .esav-contact-entry-note { color:#bbb; }
 body.dark-mode .esav-contact-entry-date { color:#777; }
 body.dark-mode .esav-tab-messages { /* inherit */ }
