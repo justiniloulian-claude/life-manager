@@ -106,7 +106,7 @@
     </div>
   </div>
 </div>
-<button id="esavFab" class="esav-fab" title="Esav — your personal assistant">E</button>
+<button id="esavFab" class="esav-fab" style="display:flex" title="Esav — your personal assistant">E</button>
 
 <!-- ===== DASHBOARD PAGE ===== -->
 <div id="page-dashboard" class="page active">
@@ -452,8 +452,8 @@
     <!-- Goals panel -->
     <div id="esavGoalsPanel" class="esav-panel">
       <div id="esavGoalsList" class="esav-goals-list"></div>
-      <div class="esav-add-row">
-        <input id="esavGoalInput" class="esav-add-input" placeholder="Add a goal…" type="text">
+      <div class="esav-add-row esav-goal-add-row">
+        <input id="esavGoalInput" class="esav-add-input" placeholder="Add a goal…" type="text" style="flex:3">
         <select id="esavGoalCategory" class="esav-add-select">
           <option value="">Category</option>
           <option value="health">Health</option>
@@ -463,6 +463,7 @@
           <option value="work">Work</option>
           <option value="personal">Personal</option>
         </select>
+        <input id="esavGoalTargetDate" class="esav-add-input esav-date-input" type="date" title="Target date (optional)" style="flex:1.2;min-width:110px">
         <button id="esavGoalAddBtn" class="esav-add-btn">+ Add</button>
       </div>
     </div>
@@ -471,7 +472,13 @@
       <div id="esavPeopleList" class="esav-people-list"></div>
       <div class="esav-add-row">
         <input id="esavPersonName" class="esav-add-input" placeholder="Name" type="text" style="flex:2">
-        <input id="esavPersonFreq" class="esav-add-input" placeholder="Every X days" type="number" min="1" value="14" style="flex:1;min-width:80px">
+        <input id="esavPersonFreqNum" class="esav-add-input" type="number" min="1" value="2" style="flex:0.7;min-width:52px;text-align:center">
+        <select id="esavPersonFreqUnit" class="esav-add-select">
+          <option value="weeks" selected>weeks</option>
+          <option value="months">months</option>
+          <option value="days">days</option>
+          <option value="years">years</option>
+        </select>
         <button id="esavPersonAddBtn" class="esav-add-btn">+ Add</button>
       </div>
     </div>
