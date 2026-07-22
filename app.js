@@ -82,25 +82,32 @@ function _skipFS(key){
          key.startsWith('dm_wts_');
 }
 
-var _syncBadge = null;
+var _syncBadge = null, _syncHideTimer = null;
 function _initSyncBadge(){
   var b = document.createElement('div');
   b.id = 'syncBadge';
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
-    'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v207…';
+    'border-radius:12px;font-family:monospace;pointer-events:none;'+
+    'transition:opacity 0.4s;opacity:1;';
+  b.textContent = 'v208…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
+  clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v207'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v208'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
                                              'rgba(0,0,0,0.75)';
+  // fade out after 2.5s unless it's an error
+  if(st !== 'err'){
+    _syncHideTimer = setTimeout(function(){ if(_syncBadge) _syncBadge.style.opacity='0'; }, 2500);
+  }
 }
 document.addEventListener('DOMContentLoaded', _initSyncBadge);
 
@@ -6589,7 +6596,7 @@ function _doLogin() {
 }
 
 // ============================================================
-// ESAV — PERSONAL ASSISTANT  (v207 redesign)
+// ESAV — PERSONAL ASSISTANT  (v208 redesign)
 // ============================================================
 (function(){
   var ESAV_URL = 'https://192-241-151-231.sslip.io';
