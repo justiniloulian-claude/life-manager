@@ -6592,7 +6592,7 @@ function _doLogin() {
 // ESAV — PERSONAL ASSISTANT
 // ============================================================
 (function(){
-  var ESAV_URL = 'http://192.241.151.231:3000';
+  var ESAV_URL = 'https://192-241-151-231.sslip.io';
   var mediaRecorder, audioChunks = [], isRecording = false, isPaused = false;
 
   // Conversation history — persists for the page session so Esav remembers
