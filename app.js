@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v201…';
+  b.textContent = 'v202…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v201'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v202'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -6589,7 +6589,7 @@ function _doLogin() {
 }
 
 // ============================================================
-// ESAV — PERSONAL ASSISTANT  (v201 redesign)
+// ESAV — PERSONAL ASSISTANT  (v202 redesign)
 // ============================================================
 (function(){
   var ESAV_URL = 'https://192-241-151-231.sslip.io';
@@ -7027,7 +7027,7 @@ function _doLogin() {
   if(goalInput) goalInput.addEventListener('keydown',function(e){ if(e.key==='Enter') goalAddBtn.click(); });
 
   // ── People ─────────────────────────────────────────────────
-  var _spokeExpandId=null;
+  var _spokeExpandId=null, _histExpandId=null;
 
   async function _loadPeople(){
     var el=document.getElementById('esavPeopleList'); if(!el) return;
@@ -7039,40 +7039,54 @@ function _doLogin() {
   function _renderPeople(people){
     var el=document.getElementById('esavPeopleList'); if(!el) return;
     if(!people.length){ el.innerHTML='<div class="stl-empty">No one added yet.</div>'; return; }
-    el.innerHTML=people.map(function(p){
-      var urgent=!p.lastContact||p.daysOverdue>7;
+    // sort by next contact date ascending (soonest first; never-contacted → top)
+    var sorted=people.slice().sort(function(a,b){
+      var aNext=(a.lastContact||0)+a.frequencyDays*86400000;
+      var bNext=(b.lastContact||0)+b.frequencyDays*86400000;
+      return aNext-bNext;
+    });
+    el.innerHTML=sorted.map(function(p){
       var overdue=p.daysOverdue>0;
+      var urgent=!p.lastContact||p.daysOverdue>7;
       var cls=urgent?'esav-person-urgent':overdue?'esav-person-overdue':'esav-person-ok';
       var nextDate=_nextContactDate(p.lastContact,p.frequencyDays);
       var statusText=!p.lastContact?'Never contacted':overdue?(p.daysOverdue+' day'+(p.daysOverdue>1?'s':'')+' overdue'):(nextDate?'Next: '+nextDate:'On track');
       var last=p.lastContact?_daysAgoStr(p.lastContact):'Never';
-      var lastNote=p.contactHistory&&p.contactHistory[0]&&p.contactHistory[0].note?p.contactHistory[0].note:'';
+      var history=p.contactHistory||[];
+      var lastNote=history[0]&&history[0].note?history[0].note:'';
       var spokeExpanded=(_spokeExpandId===p.id);
-      // contact history entries (most recent 3)
-      var histHtml='';
-      if(p.contactHistory&&p.contactHistory.length>0){
-        var entries=p.contactHistory.slice(0,3);
-        histHtml='<div class="esav-contact-history">'+
-          entries.map(function(h){
-            return '<div class="esav-contact-entry">'+
-              '<span class="esav-contact-entry-date">'+_tsLabel(h.ts)+'</span>'+
-              (h.note?'<span class="esav-contact-entry-note">'+escHtml(h.note)+'</span>':'<span class="esav-contact-entry-note esav-contact-entry-no-note">no note</span>')+
-            '</div>';
-          }).join('')+
-        '</div>';
-      }
+      var histExpanded=(_histExpandId===p.id);
+
+      // contact history list
+      var histHtml=history.length
+        ?'<div class="esav-contact-history">'+
+            history.map(function(h){
+              return '<div class="esav-contact-entry">'+
+                '<span class="esav-contact-entry-date">'+_tsLabel(h.ts)+'</span>'+
+                (h.note?'<span class="esav-contact-entry-note">'+escHtml(h.note)+'</span>':'<span class="esav-contact-entry-note esav-contact-entry-no-note">no note</span>')+
+              '</div>';
+            }).join('')+
+          '</div>'
+        :'<div class="stl-empty" style="font-size:12px;padding:4px 0">No conversations logged yet.</div>';
+
+      // spoke expand (log a conversation)
       var spokeSection=spokeExpanded
         ?'<div class="esav-spoke-expand">'+
             '<textarea id="esavSpokeNote_'+p.id+'" class="esav-spoke-note" placeholder="Quick note about this conversation (optional)…" rows="2"></textarea>'+
             '<div class="esav-spoke-actions">'+
-              (nextDate?'<span class="esav-spoke-hint">Add follow-up on '+nextDate+'?</span>':'')+
-              '<button class="esav-person-btn esav-person-contact-btn" onclick="window._esavConfirmSpoke(\''+p.id+'\',\''+escHtml(p.name)+'\',true)">+ Task</button>'+
-              '<button class="esav-person-btn" onclick="window._esavConfirmSpoke(\''+p.id+'\',\''+escHtml(p.name)+'\',false)">Save</button>'+
+              '<button class="esav-person-btn esav-person-contact-btn" onclick="window._esavConfirmSpoke(\''+p.id+'\',\''+escHtml(p.name)+'\',false)">Save</button>'+
               '<button class="esav-person-btn esav-spoke-cancel-btn" onclick="window._esavSpokeCancel()">Cancel</button>'+
             '</div>'+
-            histHtml+
           '</div>'
-        :(lastNote?'<div class="esav-last-note">'+escHtml(lastNote)+'</div>':'');
+        :'';
+
+      // history expand
+      var histSection=histExpanded
+        ?'<div class="esav-spoke-expand">'+histHtml+'<button class="esav-person-btn esav-spoke-cancel-btn" style="margin-top:6px" onclick="window._esavHistCancel()">Close</button></div>'
+        :(lastNote&&!spokeExpanded?'<div class="esav-last-note">'+escHtml(lastNote)+'</div>':'');
+
+      var infoSection=(!spokeExpanded&&!histExpanded)?spokeSection+histSection:spokeSection+histSection;
+
       return '<div class="esav-person-card '+cls+'" data-pid="'+p.id+'">'+
         '<div class="esav-person-main">'+
           '<div class="esav-person-avatar">'+escHtml(p.name.charAt(0).toUpperCase())+'</div>'+
@@ -7083,16 +7097,26 @@ function _doLogin() {
           '</div>'+
           '<div class="esav-person-actions">'+
             (!spokeExpanded?'<button class="esav-person-btn esav-person-contact-btn" onclick="window._esavSpokeExpand(\''+p.id+'\')">✓ Spoke</button>':'')+
+            (nextDate&&!spokeExpanded?'<button class="esav-person-btn esav-person-task-btn" onclick="window._esavAddTaskDirect(\''+p.id+'\',\''+escHtml(p.name)+'\',\''+escHtml(nextDate)+'\')">+ Task</button>':'')+
+            (history.length&&!spokeExpanded?'<button class="esav-person-btn esav-hist-btn" onclick="window._esavHistExpand(\''+p.id+'\')">📋 '+(history.length)+'</button>':'')+
             '<button class="esav-person-btn esav-person-delete-btn" onclick="window._esavDeletePerson(\''+p.id+'\')">×</button>'+
           '</div>'+
         '</div>'+
-        spokeSection+
+        infoSection+
       '</div>';
     }).join('');
   }
 
-  window._esavSpokeExpand=function(id){ _spokeExpandId=id; _loadPeople(); };
+  window._esavSpokeExpand=function(id){ _spokeExpandId=id; _histExpandId=null; _loadPeople(); };
   window._esavSpokeCancel=function(){ _spokeExpandId=null; _loadPeople(); };
+  window._esavHistExpand=function(id){ _histExpandId=(_histExpandId===id?null:id); _spokeExpandId=null; _loadPeople(); };
+  window._esavHistCancel=function(){ _histExpandId=null; _loadPeople(); };
+
+  window._esavAddTaskDirect=function(id,name,nextDate){
+    var chatBtn=document.querySelector('.esav-subtab[data-tab="chat"]');
+    if(chatBtn) chatBtn.click();
+    setTimeout(function(){ _sendText('Add a task on '+nextDate+': Reach out to '+name,'tab'); },100);
+  };
 
   window._esavConfirmSpoke=async function(id,name,addTask){
     var noteEl=document.getElementById('esavSpokeNote_'+id);
@@ -7100,19 +7124,7 @@ function _doLogin() {
     _spokeExpandId=null;
     try{
       await fetch(ESAV_URL+'/esav/people/'+id+'/contact',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({note:note})});
-      if(addTask){
-        var nextDate=_nextContactDate(Date.now(),14);
-        try{
-          var r=await fetch(ESAV_URL+'/esav/people'); var arr=await r.json();
-          var found=arr.find(function(x){ return x.id===id; });
-          if(found) nextDate=_nextContactDate(Date.now(),found.frequencyDays);
-        }catch(e){}
-        var chatBtn=document.querySelector('.esav-subtab[data-tab="chat"]');
-        if(chatBtn) chatBtn.click();
-        setTimeout(function(){ _sendText('Add a task on '+(nextDate||'upcoming')+': Reach out to '+name,'tab'); },100);
-      } else {
-        _loadPeople();
-      }
+      _loadPeople();
     }catch(e){ _loadPeople(); }
   };
 
@@ -7203,8 +7215,8 @@ function _doLogin() {
   // ── FAB: hide on Esav tab, show elsewhere ─────────────────
   setInterval(function(){
     var rem=document.getElementById('remindersView');
-    var onEsav=rem&&rem.style.display!=='none'&&rem.offsetParent!==null;
-    fab.style.display=onEsav?'none':'';
+    var onEsav=rem&&rem.classList.contains('active');
+    fab.style.display=onEsav?'none':'flex';
   },400);
 
   // ── Auto-load Goals when Esav tab opens ───────────────────
@@ -7214,7 +7226,7 @@ function _doLogin() {
     var prev=false;
     setInterval(function(){
       var rem=document.getElementById('remindersView');
-      var active=rem&&rem.style.display!=='none'&&rem.offsetParent!==null;
+      var active=rem&&rem.classList.contains('active');
       if(active&&!prev){ _loadGoals(); prev=true; }
       if(!active) prev=false;
     },300);
