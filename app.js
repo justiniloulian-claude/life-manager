@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v205…';
+  b.textContent = 'v206…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v205'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v206'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -6589,7 +6589,7 @@ function _doLogin() {
 }
 
 // ============================================================
-// ESAV — PERSONAL ASSISTANT  (v205 redesign)
+// ESAV — PERSONAL ASSISTANT  (v206 redesign)
 // ============================================================
 (function(){
   var ESAV_URL = 'https://192-241-151-231.sslip.io';
@@ -7026,6 +7026,17 @@ function _doLogin() {
   });
   if(goalInput) goalInput.addEventListener('keydown',function(e){ if(e.key==='Enter') goalAddBtn.click(); });
 
+  // ── People — local note cache (works before server restart) ──
+  function _localNotes(pid){ try{ return JSON.parse(localStorage.getItem('pnotes_'+pid)||'[]'); }catch(e){ return []; } }
+  function _saveLocalNote(pid,ts,note){ var arr=_localNotes(pid); arr.unshift({ts:ts,note:note}); try{ localStorage.setItem('pnotes_'+pid,JSON.stringify(arr.slice(0,50))); }catch(e){} }
+  function _mergeHistory(serverHistory, pid){
+    var local=_localNotes(pid);
+    var all=serverHistory.concat(local);
+    var seen={};
+    return all.filter(function(h){ var k=Math.round(h.ts/1000); if(seen[k]) return false; seen[k]=true; return true; })
+              .sort(function(a,b){ return b.ts-a.ts; });
+  }
+
   // ── People ─────────────────────────────────────────────────
   async function _loadPeople(){
     var el=document.getElementById('esavPeopleList'); if(!el) return;
@@ -7049,22 +7060,21 @@ function _doLogin() {
       var nextDate=_nextContactDate(p.lastContact,p.frequencyDays);
       var statusText=!p.lastContact?'Never contacted':overdue?(p.daysOverdue+' day'+(p.daysOverdue>1?'s':'')+' overdue'):(nextDate?'Next: '+nextDate:'On track');
       var last=p.lastContact?_daysAgoStr(p.lastContact):'Never';
-      var history=p.contactHistory||[];
+      // merge server history with local cache so notes always show
+      var history=_mergeHistory(p.contactHistory||[], p.id);
 
-      // conversation log entries
       var entriesHtml=history.length
         ? history.map(function(h){
             return '<div class="esav-contact-entry">'+
               '<span class="esav-contact-entry-date">'+_tsLabel(h.ts)+'</span>'+
               (h.note
                 ?'<span class="esav-contact-entry-note">'+escHtml(h.note)+'</span>'
-                :'<span class="esav-contact-entry-note esav-contact-entry-no-note">no note</span>')+
+                :'<span class="esav-contact-entry-note esav-contact-entry-no-note">—</span>')+
             '</div>';
           }).join('')
-        : '<div class="esav-contact-entry-no-note">No conversations yet</div>';
+        : '<div class="esav-contact-entry-no-note" style="padding:2px 0">No conversations logged yet</div>';
 
       return '<div class="esav-person-card '+cls+'" data-pid="'+p.id+'">'+
-        // ── header row ──
         '<div class="esav-person-main">'+
           '<div class="esav-person-avatar">'+escHtml(p.name.charAt(0).toUpperCase())+'</div>'+
           '<div class="esav-person-info">'+
@@ -7077,18 +7087,17 @@ function _doLogin() {
             '<button class="esav-person-btn esav-person-delete-btn" onclick="window._esavDeletePerson(\''+p.id+'\')">×</button>'+
           '</div>'+
         '</div>'+
-        // ── conversation log (always visible) ──
+        // ── notes — always visible ──────────────────────────
         '<div class="esav-person-notes">'+
-          '<div class="esav-person-notes-header">Conversations</div>'+
-          '<div class="esav-convo-list">'+entriesHtml+'</div>'+
+          '<div class="esav-person-notes-label">Notes</div>'+
+          '<div class="esav-convo-list" id="esavConvoList_'+p.id+'">'+entriesHtml+'</div>'+
           '<div class="esav-convo-input-row">'+
             '<input id="esavConvoNote_'+p.id+'" class="esav-convo-input" type="text" placeholder="Spoke with '+escHtml(p.name)+'… add a note" />'+
-            '<button class="esav-convo-log-btn" onclick="window._esavLogConvo(\''+p.id+'\')">Log</button>'+
+            '<button class="esav-convo-log-btn" onclick="window._esavLogConvo(\''+p.id+'\')">✓ Spoke</button>'+
           '</div>'+
         '</div>'+
       '</div>';
     }).join('');
-    // focus-to-submit on Enter for each input
     sorted.forEach(function(p){
       var inp=document.getElementById('esavConvoNote_'+p.id);
       if(inp) inp.addEventListener('keydown',function(e){ if(e.key==='Enter') window._esavLogConvo(p.id); });
@@ -7098,11 +7107,22 @@ function _doLogin() {
   window._esavLogConvo=async function(id){
     var inp=document.getElementById('esavConvoNote_'+id);
     var note=inp?inp.value.trim():'';
+    var ts=Date.now();
+    // save locally immediately so it shows right away
+    _saveLocalNote(id, ts, note);
     if(inp) inp.value='';
-    try{
-      await fetch(ESAV_URL+'/esav/people/'+id+'/contact',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({note:note})});
-      _loadPeople();
-    }catch(e){ _loadPeople(); }
+    // update the list in place without waiting for server
+    var listEl=document.getElementById('esavConvoList_'+id);
+    if(listEl){
+      var newEntry='<div class="esav-contact-entry">'+
+        '<span class="esav-contact-entry-date">'+_tsLabel(ts)+'</span>'+
+        (note?'<span class="esav-contact-entry-note">'+escHtml(note)+'</span>':'<span class="esav-contact-entry-note esav-contact-entry-no-note">—</span>')+
+      '</div>';
+      if(listEl.querySelector('.esav-contact-entry-no-note')) listEl.innerHTML='';
+      listEl.insertAdjacentHTML('afterbegin', newEntry);
+    }
+    // also save to server in background
+    try{ await fetch(ESAV_URL+'/esav/people/'+id+'/contact',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({note:note})}); }catch(e){}
   };
 
   window._esavAddTaskDirect=function(name,nextDate){

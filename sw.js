@@ -1,4 +1,4 @@
-// v205: force reload all clients on SW activation so updates apply immediately
+// v206: force reload all clients on SW activation so updates apply immediately
 self.addEventListener('install', function() { self.skipWaiting(); });
 
 self.addEventListener('activate', function(e) {
