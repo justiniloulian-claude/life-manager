@@ -48,29 +48,61 @@
   </div>
 </header>
 
-<!-- ===== ESAV CHAT UI ===== -->
-<div id="esavChat" class="esav-chat" style="display:none">
-  <div class="esav-chat-header">
-    <span class="esav-chat-name">Esav</span>
-    <span id="esavStatus" class="esav-chat-status">Ready</span>
-    <button id="esavCloseBtn" class="esav-close-btn" title="Close">✕</button>
-  </div>
-  <div id="esavMessages" class="esav-messages"></div>
-  <div class="esav-input-bar">
-    <div class="esav-text-row">
-      <textarea id="esavTextInput" class="esav-text-input" placeholder="Type a message…" rows="1"></textarea>
-      <button id="esavSendTextBtn" class="esav-send-text-btn" title="Send">↑</button>
+<!-- ===== ESAV BOTTOM SHEET ===== -->
+<div id="esavSheetBackdrop" class="esav-sheet-backdrop"></div>
+<div id="esavSheet" class="esav-sheet">
+  <div class="esav-sheet-handle"></div>
+  <div class="esav-sheet-body">
+    <!-- Idle: mic button -->
+    <div id="esavSheetIdle" class="esav-sheet-state">
+      <button id="esavSheetMicBtn" class="esav-sheet-mic-btn" title="Tap to speak">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="9" y1="22" x2="15" y2="22"/></svg>
+      </button>
+      <p class="esav-sheet-hint">Tap to speak</p>
     </div>
-    <div class="esav-voice-row">
-      <button id="esavNewMsgBtn" class="esav-new-msg-btn">🎤 Tap to speak</button>
-      <div id="esavRecordLabel" class="esav-record-label" style="display:none">
-        <span id="esavRecDot" class="esav-rec-dot"></span>
-        <span id="esavRecText" class="esav-rec-text">Recording</span>
-        <span id="esavRecTimer" class="esav-rec-timer">0:00</span>
+    <!-- Recording state -->
+    <div id="esavSheetRecState" class="esav-sheet-state" style="display:none">
+      <div class="esav-sheet-rec-row">
+        <span class="esav-sheet-rec-dot"></span>
+        <span id="esavSheetTimer" class="esav-sheet-rec-timer">0:00</span>
+        <span id="esavSheetRecLabel" class="esav-sheet-rec-label">Recording</span>
       </div>
-      <button id="esavPauseBtn"  class="esav-ctrl-btn" style="display:none">⏸ Pause</button>
-      <button id="esavStopBtn"   class="esav-ctrl-btn esav-stop-btn" style="display:none">⏹ Stop &amp; send</button>
-      <button id="esavCancelBtn" class="esav-ctrl-btn esav-cancel-btn" style="display:none" aria-label="Cancel">✕</button>
+      <div class="esav-sheet-ctrl-row">
+        <button id="esavSheetPauseBtn" class="esav-sheet-ctrl-btn">⏸ Pause</button>
+        <button id="esavSheetStopBtn" class="esav-sheet-ctrl-btn esav-sheet-stop-btn">⏹ Stop</button>
+        <button id="esavSheetCancelRec" class="esav-sheet-ctrl-btn esav-sheet-cancel-btn">✕ Cancel</button>
+      </div>
+    </div>
+    <!-- Playback: review before sending -->
+    <div id="esavSheetPlaybackState" class="esav-sheet-state" style="display:none">
+      <div class="esav-sheet-playback-bar">
+        <button id="esavSheetPlayBtn" class="esav-sheet-play-btn">▶</button>
+        <div class="esav-sheet-waveform">
+          <div id="esavSheetProgressBar" class="esav-sheet-progress-bar"></div>
+        </div>
+        <span id="esavSheetDuration" class="esav-sheet-duration">0:00</span>
+      </div>
+      <div class="esav-sheet-ctrl-row">
+        <button id="esavSheetRerecordBtn" class="esav-sheet-ctrl-btn">🔄 Re-record</button>
+        <button id="esavSheetSendVoiceBtn" class="esav-sheet-ctrl-btn esav-sheet-stop-btn">Send ↑</button>
+      </div>
+      <audio id="esavSheetAudio" style="display:none"></audio>
+    </div>
+    <!-- Thinking -->
+    <div id="esavSheetThinkingState" class="esav-sheet-state" style="display:none">
+      <div class="esav-sheet-dots">
+        <span></span><span></span><span></span>
+      </div>
+      <p class="esav-sheet-hint">Esav is thinking…</p>
+    </div>
+    <!-- Response -->
+    <div id="esavSheetResponseState" class="esav-sheet-state" style="display:none">
+      <p id="esavSheetResponseText" class="esav-sheet-response-text"></p>
+    </div>
+    <!-- Text input — always visible except thinking/response -->
+    <div id="esavSheetTextRow" class="esav-sheet-text-row">
+      <textarea id="esavSheetTextInput" class="esav-sheet-text-input" placeholder="Or type a message…" rows="1"></textarea>
+      <button id="esavSheetSendTextBtn" class="esav-sheet-send-text-btn">↑</button>
     </div>
   </div>
 </div>
@@ -402,22 +434,59 @@
     <div id="peopleList" class="crm-list"></div>
   </div>
 
-  <!-- Esav Log View -->
+  <!-- Esav Tab -->
   <div id="remindersView" class="view" style="display:flex;flex-direction:column;height:100%">
     <div class="list-page-header">
       <div>
         <h2 class="list-page-title">Esav</h2>
-        <p class="list-page-subtitle">Your personal assistant — goals, messages &amp; reminders</p>
+        <p class="list-page-subtitle">Your personal assistant</p>
       </div>
     </div>
-    <div class="esav-section-label">Goals</div>
-    <div id="esavGoalsList" class="esav-goals-list"></div>
-    <div class="esav-section-label" style="margin-top:20px">Messages</div>
-    <div id="remindersList" class="esav-log-list" style="flex:1"></div>
-    <!-- Reply bar -->
-    <div class="esav-tab-reply-bar">
-      <textarea id="esavTabInput" class="esav-tab-input" placeholder="Reply to Esav…" rows="1"></textarea>
-      <button id="esavTabSend" class="esav-tab-send-btn" title="Send">↑</button>
+    <!-- Sub-tab bar -->
+    <div class="esav-subtab-bar">
+      <button class="esav-subtab active" data-tab="goals">Goals</button>
+      <button class="esav-subtab" data-tab="people">People</button>
+      <button class="esav-subtab" data-tab="messages">Messages<span id="esavMsgBadge" class="esav-msg-badge" style="display:none"></span></button>
+      <button class="esav-subtab" data-tab="chat">Chat</button>
+    </div>
+    <!-- Goals panel -->
+    <div id="esavGoalsPanel" class="esav-panel">
+      <div id="esavGoalsList" class="esav-goals-list"></div>
+      <div class="esav-add-row">
+        <input id="esavGoalInput" class="esav-add-input" placeholder="Add a goal…" type="text">
+        <select id="esavGoalCategory" class="esav-add-select">
+          <option value="">Category</option>
+          <option value="health">Health</option>
+          <option value="spiritual">Spiritual</option>
+          <option value="learning">Learning</option>
+          <option value="relationships">Relationships</option>
+          <option value="work">Work</option>
+          <option value="personal">Personal</option>
+        </select>
+        <button id="esavGoalAddBtn" class="esav-add-btn">+ Add</button>
+      </div>
+    </div>
+    <!-- People panel -->
+    <div id="esavPeoplePanel" class="esav-panel" style="display:none">
+      <div id="esavPeopleList" class="esav-people-list"></div>
+      <div class="esav-add-row">
+        <input id="esavPersonName" class="esav-add-input" placeholder="Name" type="text" style="flex:2">
+        <input id="esavPersonFreq" class="esav-add-input" placeholder="Every X days" type="number" min="1" value="14" style="flex:1;min-width:80px">
+        <button id="esavPersonAddBtn" class="esav-add-btn">+ Add</button>
+      </div>
+    </div>
+    <!-- Messages panel -->
+    <div id="esavMessagesPanel" class="esav-panel" style="display:none">
+      <div id="remindersList" class="esav-log-list"></div>
+    </div>
+    <!-- Chat panel -->
+    <div id="esavChatPanel" class="esav-panel esav-chat-panel" style="display:none">
+      <div id="esavTabMessages" class="esav-tab-messages"></div>
+      <div class="esav-tab-reply-bar">
+        <button id="esavTabMicBtn" class="esav-tab-mic-btn" title="Tap to speak">🎤</button>
+        <textarea id="esavTabInput" class="esav-tab-input" placeholder="Message Esav…" rows="1"></textarea>
+        <button id="esavTabSend" class="esav-tab-send-btn" title="Send">↑</button>
+      </div>
     </div>
   </div>
 

@@ -6589,358 +6589,483 @@ function _doLogin() {
 }
 
 // ============================================================
-// ESAV — PERSONAL ASSISTANT
+// ESAV — PERSONAL ASSISTANT  (v199 redesign)
 // ============================================================
 (function(){
   var ESAV_URL = 'https://192-241-151-231.sslip.io';
-  var mediaRecorder, audioChunks = [], isRecording = false, isPaused = false;
-
-  // Conversation history — persists for the page session so Esav remembers
-  // what you said earlier in the same conversation
   var _history = [];
 
-  var fab          = document.getElementById('esavFab');
-  var chat         = document.getElementById('esavChat');
-  var messages     = document.getElementById('esavMessages');
-  var statusEl     = document.getElementById('esavStatus');
-  var newMsgBtn    = document.getElementById('esavNewMsgBtn');
-  var pauseBtn     = document.getElementById('esavPauseBtn');
-  var stopBtn      = document.getElementById('esavStopBtn');
-  var cancelBtn    = document.getElementById('esavCancelBtn');
-  var recordLabel  = document.getElementById('esavRecordLabel');
-  var textRow      = document.querySelector('.esav-text-row');
-  var recDot       = document.getElementById('esavRecDot');
-  var recText      = document.getElementById('esavRecText');
-  var recTimerEl   = document.getElementById('esavRecTimer');
-  var _recSeconds  = 0;
-  var _recInterval = null;
-  function _startTimer(){ _recSeconds=0; _updateTimer(); _recInterval=setInterval(function(){ _recSeconds++; _updateTimer(); },1000); }
-  function _stopTimer(){ clearInterval(_recInterval); _recInterval=null; _recSeconds=0; if(recTimerEl) recTimerEl.textContent='0:00'; }
-  function _updateTimer(){ if(!recTimerEl) return; var m=Math.floor(_recSeconds/60); var s=_recSeconds%60; recTimerEl.textContent=m+':'+(s<10?'0':'')+s; }
-  var closeBtn     = document.getElementById('esavCloseBtn');
-  var textInput    = document.getElementById('esavTextInput');
-  var sendTextBtn  = document.getElementById('esavSendTextBtn');
+  // ── DOM refs ──────────────────────────────────────────────
+  var fab              = document.getElementById('esavFab');
+  var sheet            = document.getElementById('esavSheet');
+  var backdrop         = document.getElementById('esavSheetBackdrop');
+  var sheetIdle        = document.getElementById('esavSheetIdle');
+  var sheetRec         = document.getElementById('esavSheetRecState');
+  var sheetPlayback    = document.getElementById('esavSheetPlaybackState');
+  var sheetThinking    = document.getElementById('esavSheetThinkingState');
+  var sheetResponse    = document.getElementById('esavSheetResponseState');
+  var sheetTextRow     = document.getElementById('esavSheetTextRow');
+  var sheetTimer       = document.getElementById('esavSheetTimer');
+  var sheetRecLabel    = document.getElementById('esavSheetRecLabel');
+  var sheetPauseBtn    = document.getElementById('esavSheetPauseBtn');
+  var sheetStopBtn     = document.getElementById('esavSheetStopBtn');
+  var sheetCancelRec   = document.getElementById('esavSheetCancelRec');
+  var sheetPlayBtn     = document.getElementById('esavSheetPlayBtn');
+  var sheetProgressBar = document.getElementById('esavSheetProgressBar');
+  var sheetDuration    = document.getElementById('esavSheetDuration');
+  var sheetRerecord    = document.getElementById('esavSheetRerecordBtn');
+  var sheetSendVoice   = document.getElementById('esavSheetSendVoiceBtn');
+  var sheetAudio       = document.getElementById('esavSheetAudio');
+  var sheetMicBtn      = document.getElementById('esavSheetMicBtn');
+  var sheetTextInput   = document.getElementById('esavSheetTextInput');
+  var sheetSendText    = document.getElementById('esavSheetSendTextBtn');
+  var sheetResponseText= document.getElementById('esavSheetResponseText');
+  var tabMessages      = document.getElementById('esavTabMessages');
+  var tabInput         = document.getElementById('esavTabInput');
+  var tabSend          = document.getElementById('esavTabSend');
+  var tabMicBtn        = document.getElementById('esavTabMicBtn');
 
-  // ── Chat helpers ────────────────────────────────────────────
-  function addBubble(text, role){
-    var el = document.createElement('div');
-    el.className = 'esav-bubble ' + role;
-    el.textContent = text;
-    messages.appendChild(el);
-    messages.scrollTop = messages.scrollHeight;
-    return el;
-  }
-  function setStatus(msg){ if(statusEl) statusEl.textContent = msg; }
+  // ── Recording state ────────────────────────────────────────
+  var mediaRecorder, audioChunks = [], isRecording = false, isPaused = false;
+  var _recSeconds = 0, _recInterval = null, _currentBlob = null, _isTabRecording = false;
 
-  function setRecordingUI(active){
-    if(textRow) textRow.style.display = active ? 'none' : '';
-    newMsgBtn.style.display   = active ? 'none' : '';
-    recordLabel.style.display = active ? 'flex' : 'none';
-    pauseBtn.style.display    = active ? '' : 'none';
-    stopBtn.style.display     = active ? '' : 'none';
-    cancelBtn.style.display   = active ? '' : 'none';
-    if(active){ _startTimer(); } else { _stopTimer(); }
-  }
+  function _startTimer(el){ _recSeconds=0; _updateTimer(el); _recInterval=setInterval(function(){ _recSeconds++; _updateTimer(el); },1000); }
+  function _stopTimer(){ clearInterval(_recInterval); _recInterval=null; _recSeconds=0; }
+  function _updateTimer(el){ var m=Math.floor(_recSeconds/60),s=_recSeconds%60; if(el) el.textContent=m+':'+(s<10?'0':'')+s; }
 
-  function showChat(){ chat.style.display = 'flex'; }
-  function hideChat(){
-    chat.style.display = 'none';
-    if(isRecording) cancelRecording();
-  }
-
-  fab.addEventListener('click', function(){
-    if(chat.style.display === 'none' || !chat.style.display){
-      if('Notification' in window){
-        if(Notification.permission === 'default'){
-          Notification.requestPermission().then(function(p){ if(p==='granted') registerPush(); });
-        } else if(Notification.permission === 'granted'){
-          registerPush(); // re-send subscription on every open (server deduplicates)
-        }
-      }
-      showChat(); startRecording();
-    } else { hideChat(); }
-  });
-  closeBtn.addEventListener('click', hideChat);
-
-  // ── Audio MIME detection ────────────────────────────────────
-  function getAudioMime(){
-    var types = ['audio/mp4','audio/mpeg','audio/webm;codecs=opus','audio/webm','audio/ogg'];
-    for(var i=0;i<types.length;i++){
-      if(typeof MediaRecorder!=='undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(types[i])) return types[i];
-    }
+  function _getAudioMime(){
+    var types=['audio/mp4','audio/mpeg','audio/webm;codecs=opus','audio/webm','audio/ogg'];
+    for(var i=0;i<types.length;i++){ if(typeof MediaRecorder!=='undefined'&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(types[i])) return types[i]; }
     return '';
   }
 
-  // ── Recording ───────────────────────────────────────────────
-  async function startRecording(){
+  // ── Sheet state machine ────────────────────────────────────
+  function _showSheetState(name){
+    sheetIdle.style.display     = name==='idle'     ? '' : 'none';
+    sheetRec.style.display      = name==='rec'      ? '' : 'none';
+    sheetPlayback.style.display = name==='playback' ? '' : 'none';
+    sheetThinking.style.display = name==='thinking' ? '' : 'none';
+    sheetResponse.style.display = name==='response' ? '' : 'none';
+    sheetTextRow.style.display  = (name==='thinking'||name==='response') ? 'none' : '';
+  }
+
+  function openSheet(){
+    sheet.classList.add('open');
+    backdrop.classList.add('open');
+    _showSheetState('idle');
+    _registerPush();
+  }
+  function closeSheet(){
+    sheet.classList.remove('open');
+    backdrop.classList.remove('open');
+    if(isRecording) _cancelRecording('sheet');
+    _stopTimer();
+    _currentBlob=null;
+    if(sheetAudio&&sheetAudio.src){ sheetAudio.pause(); sheetAudio.src=''; }
+    _showSheetState('idle');
+    sheetTextInput.value=''; sheetTextInput.style.height='auto';
+  }
+
+  fab.addEventListener('click', function(){
+    if(sheet.classList.contains('open')){ closeSheet(); } else { openSheet(); }
+  });
+  backdrop.addEventListener('click', closeSheet);
+
+  // ── Recording ──────────────────────────────────────────────
+  async function _startRecording(source){
+    _isTabRecording = (source==='tab');
     try {
       var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunks = [];
-      var mime = getAudioMime();
-      mediaRecorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
-      mediaRecorder.ondataavailable = function(e){ if(e.data && e.data.size>0) audioChunks.push(e.data); };
-      mediaRecorder.onstop = sendAudio;
+      var mime = _getAudioMime();
+      mediaRecorder = mime ? new MediaRecorder(stream,{mimeType:mime}) : new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = function(e){ if(e.data&&e.data.size>0) audioChunks.push(e.data); };
+      mediaRecorder.onstop = _onRecordingStop;
       mediaRecorder.start(250);
-      isRecording = true; isPaused = false;
-      if(recDot)  recDot.classList.remove('paused');
-      if(recText) { recText.textContent='Recording'; recText.classList.remove('paused'); }
-      setRecordingUI(true);
-      setStatus('Recording…');
+      isRecording=true; isPaused=false;
+      if(_isTabRecording){ tabMicBtn.textContent='⏹'; tabMicBtn.title='Stop recording'; _startTimer(null); }
+      else { _showSheetState('rec'); sheetPauseBtn.textContent='⏸ Pause'; sheetRecLabel.textContent='Recording'; _startTimer(sheetTimer); }
     } catch(e){
-      addBubble('Mic error: ' + e.name + ' — ' + e.message, 'esav');
+      if(_isTabRecording) _addTabBubble('Mic error: '+e.name,'esav');
+      else _showSheetState('idle');
     }
   }
 
-  function togglePause(){
-    if(!mediaRecorder || !isRecording) return;
+  function _togglePause(){
+    if(!mediaRecorder||!isRecording) return;
     if(isPaused){
-      mediaRecorder.resume();
-      isPaused = false;
-      pauseBtn.textContent = '⏸ Pause';
-      if(recDot)  { recDot.classList.remove('paused'); }
-      if(recText) { recText.textContent='Recording'; recText.classList.remove('paused'); }
-      _recInterval = setInterval(function(){ _recSeconds++; _updateTimer(); }, 1000);
-      setStatus('Recording…');
+      mediaRecorder.resume(); isPaused=false;
+      sheetPauseBtn.textContent='⏸ Pause'; sheetRecLabel.textContent='Recording';
+      _recInterval=setInterval(function(){ _recSeconds++; _updateTimer(sheetTimer); },1000);
     } else {
-      mediaRecorder.pause();
-      isPaused = true;
-      pauseBtn.textContent = '▶ Resume';
-      if(recDot)  { recDot.classList.add('paused'); }
-      if(recText) { recText.textContent='Paused'; recText.classList.add('paused'); }
-      clearInterval(_recInterval); _recInterval = null;
-      setStatus('Paused');
+      mediaRecorder.pause(); isPaused=true;
+      clearInterval(_recInterval); _recInterval=null;
+      sheetPauseBtn.textContent='▶ Resume'; sheetRecLabel.textContent='Paused';
     }
   }
 
-  function stopRecording(){
-    if(mediaRecorder && isRecording){
-      if(isPaused) mediaRecorder.resume();
-      mediaRecorder.stop();
-      mediaRecorder.stream.getTracks().forEach(function(t){ t.stop(); });
-      isRecording = false; isPaused = false;
-      setRecordingUI(false);
-      setStatus('Thinking…');
-    }
+  function _stopRecording(){
+    if(!mediaRecorder||!isRecording) return;
+    if(isPaused) mediaRecorder.resume();
+    mediaRecorder.stop();
+    mediaRecorder.stream.getTracks().forEach(function(t){ t.stop(); });
+    isRecording=false; isPaused=false; _stopTimer();
   }
 
-  function cancelRecording(){
-    if(mediaRecorder && isRecording){
-      mediaRecorder.onstop = null;
+  function _cancelRecording(source){
+    if(mediaRecorder&&isRecording){
+      mediaRecorder.onstop=null;
       if(isPaused) mediaRecorder.resume();
       mediaRecorder.stop();
       mediaRecorder.stream.getTracks().forEach(function(t){ t.stop(); });
     }
-    isRecording = false; isPaused = false;
-    audioChunks = [];
-    pauseBtn.textContent = '⏸ Pause';
-    if(recDot)  recDot.classList.remove('paused');
-    if(recText) { recText.textContent='Recording'; recText.classList.remove('paused'); }
-    setRecordingUI(false);
-    setStatus('Ready');
-    hideChat();
+    isRecording=false; isPaused=false; audioChunks=[]; _stopTimer();
+    if(source==='tab'){ tabMicBtn.textContent='🎤'; tabMicBtn.title='Tap to speak'; }
+    else _showSheetState('idle');
   }
 
-  function _afterResponse(userText, esavResponse) {
-    _history.push({ role: 'user',      content: userText });
-    _history.push({ role: 'assistant', content: esavResponse });
-    if (_history.length > 40) _history = _history.slice(_history.length - 40);
+  function _onRecordingStop(){
+    var mime=(mediaRecorder&&mediaRecorder.mimeType)||_getAudioMime()||'audio/webm';
+    _currentBlob=new Blob(audioChunks,{type:mime}); audioChunks=[];
+    if(_isTabRecording){
+      tabMicBtn.textContent='🎤'; tabMicBtn.title='Tap to speak';
+      _sendAudioBlob(_currentBlob,'tab');
+    } else {
+      var url=URL.createObjectURL(_currentBlob);
+      sheetAudio.src=url; sheetAudio.load();
+      sheetAudio.onloadedmetadata=function(){
+        var d=Math.round(sheetAudio.duration), m=Math.floor(d/60), s=d%60;
+        sheetDuration.textContent=m+':'+(s<10?'0':'')+s;
+      };
+      sheetProgressBar.style.width='0%'; sheetPlayBtn.textContent='▶';
+      _showSheetState('playback');
+    }
   }
 
-  function _logToTab(type, body) {
+  // ── Playback controls ──────────────────────────────────────
+  sheetPlayBtn.addEventListener('click', function(){
+    if(!sheetAudio.src) return;
+    if(sheetAudio.paused){ sheetAudio.play(); sheetPlayBtn.textContent='⏸'; }
+    else { sheetAudio.pause(); sheetPlayBtn.textContent='▶'; }
+  });
+  sheetAudio.addEventListener('ended', function(){ sheetPlayBtn.textContent='▶'; });
+  sheetAudio.addEventListener('timeupdate', function(){
+    if(sheetAudio.duration) sheetProgressBar.style.width=(sheetAudio.currentTime/sheetAudio.duration*100)+'%';
+  });
+
+  // ── Send ───────────────────────────────────────────────────
+  async function _sendAudioBlob(blob, source){
+    if(source==='sheet') _showSheetState('thinking');
+    else _addTabBubble('🎤 Sending voice…','thinking');
+    var mime=blob.type||'audio/webm', ext=mime.includes('mp4')?'mp4':mime.includes('ogg')?'ogg':'webm';
+    var form=new FormData();
+    form.append('audio',blob,'voice.'+ext);
+    form.append('history',JSON.stringify(_history));
     try {
-      var raw = localStorage.getItem('esav_log');
-      var log = raw ? JSON.parse(raw) : [];
-      log.unshift({ id: 'local_' + Date.now(), type: type, title: type === 'reply' ? 'You' : 'Esav', body: body, sentAt: new Date().toISOString() });
-      if (log.length > 100) log.splice(100);
-      localStorage.setItem('esav_log', JSON.stringify(log));
-    } catch(e) {}
+      var res=await fetch(ESAV_URL+'/assistant',{method:'POST',body:form});
+      var data=await res.json();
+      if(data.error){ _handleResponse(null,'Error: '+data.error,source); return; }
+      var reply=data.response||'Done!';
+      if(source==='tab'&&data.transcript) _removeLastThinking();
+      _handleResponse(data.transcript||'',reply,source);
+      _afterHistory(data.transcript||'',reply);
+      if(data.results&&data.results.length) _syncData();
+    } catch(e){ _removeLastThinking(); _handleResponse(null,'Could not reach Esav. Check your connection.',source); }
   }
 
-  // Exposed so the Esav tab reply bar can call it
-  window._esavSendText = async function(text) {
-    _logToTab('reply', text);
-    renderReminders && renderReminders();
-
+  async function _sendText(text, source){
+    if(!text||!text.trim()) return;
+    if(source==='sheet') _showSheetState('thinking');
+    else _addTabBubble(text,'user');
     try {
-      var res  = await fetch(ESAV_URL + '/assistant/text', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text, history: _history })
+      var res=await fetch(ESAV_URL+'/assistant/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,history:_history})});
+      var data=await res.json();
+      var reply=data.error?('Error: '+data.error):(data.response||'Done!');
+      _handleResponse(source==='sheet'?text:null,reply,source);
+      if(!data.error){ _afterHistory(text,reply); if(data.results&&data.results.length) _syncData(); }
+    } catch(e){ _handleResponse(null,'Could not reach Esav. Check your connection.',source); }
+  }
+
+  function _handleResponse(userText, reply, source){
+    if(source==='sheet'){
+      sheetResponseText.textContent=reply;
+      _showSheetState('response');
+      setTimeout(closeSheet,4500);
+    } else {
+      _addTabBubble(reply,'esav');
+    }
+    _logLocalMsg(reply);
+    if(window.updateEsavBadge) updateEsavBadge();
+  }
+
+  function _afterHistory(user, assistant){
+    if(user) _history.push({role:'user',content:user});
+    _history.push({role:'assistant',content:assistant});
+    if(_history.length>40) _history=_history.slice(_history.length-40);
+  }
+
+  function _syncData(){
+    if(window._esavSync) window._esavSync(function(){ try{ refresh(); renderCalendar(); }catch(e){} });
+    else setTimeout(function(){ try{ refresh(); renderCalendar(); }catch(e){}; },1500);
+  }
+
+  function _logLocalMsg(body){
+    try {
+      var raw=localStorage.getItem('esav_log'), log=raw?JSON.parse(raw):[];
+      log.unshift({id:'local_'+Date.now(),type:'esav-reply',body:body,sentAt:new Date().toISOString()});
+      if(log.length>100) log.splice(100);
+      localStorage.setItem('esav_log',JSON.stringify(log));
+    } catch(e){}
+  }
+
+  // ── Tab chat bubbles ───────────────────────────────────────
+  function _addTabBubble(text, role){
+    if(!text||!tabMessages) return;
+    var el=document.createElement('div');
+    el.className='esav-bubble '+role; el.textContent=text;
+    tabMessages.appendChild(el); tabMessages.scrollTop=tabMessages.scrollHeight;
+  }
+  function _removeLastThinking(){
+    if(!tabMessages) return;
+    var els=tabMessages.querySelectorAll('.esav-bubble.thinking');
+    if(els.length) els[els.length-1].remove();
+  }
+
+  window._esavSendText = function(text){ _sendText(text,'tab'); };
+
+  // ── Sheet event wiring ─────────────────────────────────────
+  sheetMicBtn.addEventListener('click', function(){ _startRecording('sheet'); });
+  sheetPauseBtn.addEventListener('click', _togglePause);
+  sheetStopBtn.addEventListener('click', _stopRecording);
+  sheetCancelRec.addEventListener('click', function(){ _cancelRecording('sheet'); });
+  sheetRerecord.addEventListener('click', function(){
+    if(sheetAudio.src){ sheetAudio.pause(); sheetAudio.src=''; }
+    _currentBlob=null; _showSheetState('idle');
+  });
+  sheetSendVoice.addEventListener('click', function(){ if(_currentBlob) _sendAudioBlob(_currentBlob,'sheet'); });
+  sheetTextInput.addEventListener('input', function(){ this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,100)+'px'; });
+  sheetTextInput.addEventListener('keydown', function(e){
+    if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); var t=this.value.trim(); this.value=''; this.style.height='auto'; _sendText(t,'sheet'); }
+  });
+  sheetSendText.addEventListener('click', function(){
+    var t=sheetTextInput.value.trim(); sheetTextInput.value=''; sheetTextInput.style.height='auto'; _sendText(t,'sheet');
+  });
+
+  // ── Tab event wiring ───────────────────────────────────────
+  if(tabMicBtn) tabMicBtn.addEventListener('click', function(){
+    if(isRecording&&_isTabRecording) _stopRecording(); else if(!isRecording) _startRecording('tab');
+  });
+  if(tabInput) tabInput.addEventListener('input', function(){ this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,100)+'px'; });
+  if(tabInput) tabInput.addEventListener('keydown', function(e){
+    if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); var t=this.value.trim(); this.value=''; this.style.height='auto'; _sendText(t,'tab'); }
+  });
+  if(tabSend) tabSend.addEventListener('click', function(){
+    var t=tabInput.value.trim(); tabInput.value=''; tabInput.style.height='auto'; _sendText(t,'tab');
+  });
+
+  // ── Sub-tab switching ──────────────────────────────────────
+  var _panels={goals:'esavGoalsPanel',people:'esavPeoplePanel',messages:'esavMessagesPanel',chat:'esavChatPanel'};
+  document.querySelectorAll('.esav-subtab').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var tab=this.dataset.tab;
+      document.querySelectorAll('.esav-subtab').forEach(function(b){ b.classList.remove('active'); });
+      this.classList.add('active');
+      Object.keys(_panels).forEach(function(k){
+        var el=document.getElementById(_panels[k]); if(el) el.style.display=k===tab?'':'none';
       });
-      var data = await res.json();
-      if (data.error) { _logToTab('esav-reply', 'Error: ' + data.error); }
-      else {
-        var reply = data.response || 'Done!';
-        _logToTab('esav-reply', reply);
-        _afterResponse(text, reply);
-        if (data.results && data.results.length) {
-          if(window._esavSync){ window._esavSync(function(){ try{ refresh(); renderCalendar(); renderEsavGoals(); renderReminders(); updateEsavBadge(); }catch(e){} }); }
-          else { setTimeout(function(){ try{ refresh(); renderCalendar(); renderEsavGoals(); }catch(e){} }, 1500); }
-        }
-      }
-    } catch(e) {
-      _logToTab('esav-reply', 'Could not reach Esav. Check your connection.');
+      if(tab==='goals') _loadGoals();
+      if(tab==='people') _loadPeople();
+      if(tab==='messages'){ _loadMessages(); _clearMsgBadge(); }
+    });
+  });
+
+  // ── Goals ──────────────────────────────────────────────────
+  var _CAT_COLORS={health:'#16a34a',spiritual:'#7c3aed',learning:'#2563eb',relationships:'#db2777',work:'#d97706',personal:'#64748b'};
+
+  async function _loadGoals(){
+    var el=document.getElementById('esavGoalsList'); if(!el) return;
+    el.innerHTML='<div class="stl-empty" style="padding:12px 0">Loading…</div>';
+    try { var res=await fetch(ESAV_URL+'/esav/goals'); _renderGoals(await res.json()); }
+    catch(e){ el.innerHTML='<div class="stl-empty">Could not load goals.</div>'; }
+  }
+
+  function _renderGoals(goals){
+    var el=document.getElementById('esavGoalsList'); if(!el) return;
+    if(!goals.length){ el.innerHTML='<div class="stl-empty">No goals yet. Add one below.</div>'; return; }
+    var active=goals.filter(function(g){ return !g.done; });
+    var done=goals.filter(function(g){ return g.done; });
+    function goalHtml(g){
+      var cc=_CAT_COLORS[g.category]||'#888';
+      var cat=g.category?'<span class="esav-goal-cat" style="background:'+cc+'22;color:'+cc+'">'+escHtml(g.category)+'</span>':'';
+      return '<div class="esav-goal-item'+(g.done?' done':'')+'">'+
+        '<button class="esav-goal-check" onclick="window._esavToggleGoal(\''+g.id+'\','+(!g.done)+')">'+(g.done?'✓':'○')+'</button>'+
+        '<div class="esav-goal-body"><span class="esav-goal-title">'+escHtml(g.text)+'</span>'+(cat?' '+cat:'')+'</div>'+
+        '<button class="esav-goal-delete" onclick="window._esavDeleteGoal(\''+g.id+'\')">×</button>'+
+      '</div>';
     }
-    renderReminders && renderReminders();
-    updateEsavBadge && updateEsavBadge();
+    var html=active.map(goalHtml).join('');
+    if(done.length) html+='<div class="esav-goals-done-label">Completed</div>'+done.map(goalHtml).join('');
+    el.innerHTML=html;
+  }
+
+  window._esavToggleGoal=async function(id,done){
+    try{ await fetch(ESAV_URL+'/esav/goals/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({done:done})}); _loadGoals(); }catch(e){}
+  };
+  window._esavDeleteGoal=async function(id){
+    if(!confirm('Delete this goal?')) return;
+    try{ await fetch(ESAV_URL+'/esav/goals/'+id,{method:'DELETE'}); _loadGoals(); }catch(e){}
   };
 
-  // ── Send to Esav ────────────────────────────────────────────
-  async function sendAudio(){
-    var mime = (mediaRecorder && mediaRecorder.mimeType) || getAudioMime() || 'audio/webm';
-    var ext  = mime.includes('mp4') ? 'mp4' : mime.includes('ogg') ? 'ogg' : 'webm';
-    var blob = new Blob(audioChunks, { type: mime });
-    var form = new FormData();
-    form.append('audio', blob, 'voice.' + ext);
-    form.append('history', JSON.stringify(_history));
-
-    var thinking = addBubble('Esav is thinking…', 'thinking');
-    try {
-      var res  = await fetch(ESAV_URL + '/assistant', { method: 'POST', body: form });
-      var data = await res.json();
-      thinking.remove();
-      if(data.error){ addBubble('Error: ' + data.error, 'esav'); setStatus('Error'); return; }
-      if(data.transcript) addBubble(data.transcript, 'user');
-      var reply = data.response || 'Done!';
-      addBubble(reply, 'esav');
-      if(data.results && data.results.length){
-        addBubble('Actions: ' + data.results.join(' | '), 'thinking');
-      }
-      _afterResponse(data.transcript || '', reply);
-      setStatus('Ready');
-      if(window._esavSync){ window._esavSync(function(){ try{ refresh(); renderCalendar(); renderEsavGoals(); }catch(e){} }); }
-      else { setTimeout(function(){ try{ refresh(); renderCalendar(); renderEsavGoals(); }catch(e){} }, 1500); }
-    } catch(e){
-      thinking.remove();
-      addBubble('Could not reach Esav. Check your connection.', 'esav');
-      setStatus('Offline');
-    }
-  }
-
-  // ── Send text to Esav ───────────────────────────────────────
-  async function sendText(){
-    var text = textInput.value.trim();
+  var goalAddBtn=document.getElementById('esavGoalAddBtn');
+  var goalInput=document.getElementById('esavGoalInput');
+  var goalCat=document.getElementById('esavGoalCategory');
+  if(goalAddBtn) goalAddBtn.addEventListener('click', async function(){
+    var text=goalInput.value.trim(), cat=goalCat.value;
     if(!text) return;
-    textInput.value = '';
-    textInput.style.height = 'auto';
-    addBubble(text, 'user');
-    var thinking = addBubble('Esav is thinking…', 'thinking');
-    try {
-      var res  = await fetch(ESAV_URL + '/assistant/text', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text, history: _history })
-      });
-      var data = await res.json();
-      thinking.remove();
-      if(data.error){ addBubble('Error: ' + data.error, 'esav'); setStatus('Error'); return; }
-      var reply = data.response || 'Done!';
-      addBubble(reply, 'esav');
-      if(data.results && data.results.length) addBubble('Actions: ' + data.results.join(' | '), 'thinking');
-      _afterResponse(text, reply);
-      setStatus('Ready');
-      if(window._esavSync){ window._esavSync(function(){ try{ refresh(); renderCalendar(); renderEsavGoals(); }catch(e){} }); }
-      else { setTimeout(function(){ try{ refresh(); renderCalendar(); renderEsavGoals(); }catch(e){} }, 1500); }
-    } catch(e){
-      thinking.remove();
-      addBubble('Could not reach Esav. Check your connection.', 'esav');
-      setStatus('Offline');
-    }
+    try{ await fetch(ESAV_URL+'/esav/goals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,category:cat})}); goalInput.value=''; goalCat.value=''; _loadGoals(); }catch(e){}
+  });
+  if(goalInput) goalInput.addEventListener('keydown',function(e){ if(e.key==='Enter') goalAddBtn.click(); });
+
+  // ── People ─────────────────────────────────────────────────
+  async function _loadPeople(){
+    var el=document.getElementById('esavPeopleList'); if(!el) return;
+    el.innerHTML='<div class="stl-empty" style="padding:12px 0">Loading…</div>';
+    try{ var res=await fetch(ESAV_URL+'/esav/people'); _renderPeople(await res.json()); }
+    catch(e){ el.innerHTML='<div class="stl-empty">Could not load people.</div>'; }
   }
 
-  textInput.addEventListener('input', function(){
-    this.style.height = 'auto';
-    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-  });
-  textInput.addEventListener('keydown', function(e){
-    if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendText(); }
-  });
-  sendTextBtn.addEventListener('click', sendText);
+  function _renderPeople(people){
+    var el=document.getElementById('esavPeopleList'); if(!el) return;
+    if(!people.length){ el.innerHTML='<div class="stl-empty">No one added yet. Add people you want to stay in touch with.</div>'; return; }
+    el.innerHTML=people.map(function(p){
+      var urgent=!p.lastContact||p.daysOverdue>7;
+      var overdue=p.daysOverdue>0;
+      var cls=urgent?'esav-person-urgent':overdue?'esav-person-overdue':'esav-person-ok';
+      var status=!p.lastContact?'Never contacted':overdue?(p.daysOverdue+' days overdue'):'On track';
+      var last=p.lastContact?_daysAgoStr(p.lastContact):'Never';
+      return '<div class="esav-person-card '+cls+'">'+
+        '<div class="esav-person-avatar">'+escHtml(p.name.charAt(0).toUpperCase())+'</div>'+
+        '<div class="esav-person-info">'+
+          '<div class="esav-person-name">'+escHtml(p.name)+'</div>'+
+          '<div class="esav-person-meta">Every '+p.frequencyDays+' days · Last: '+last+'</div>'+
+          '<div class="esav-person-status">'+status+'</div>'+
+        '</div>'+
+        '<div class="esav-person-actions">'+
+          '<button class="esav-person-btn esav-person-contact-btn" onclick="window._esavMarkContacted(\''+p.id+'\')">✓ Spoke</button>'+
+          (urgent?'<button class="esav-person-btn esav-person-task-btn" onclick="window._esavAddReachOutTask(\''+escHtml(p.name)+'\')">+ Task</button>':'')+
+          '<button class="esav-person-btn esav-person-delete-btn" onclick="window._esavDeletePerson(\''+p.id+'\')">×</button>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+  }
 
-  newMsgBtn.addEventListener('click',  startRecording);
-  pauseBtn.addEventListener('click',   togglePause);
-  stopBtn.addEventListener('click',    stopRecording);
-  cancelBtn.addEventListener('click',  cancelRecording);
+  function _daysAgoStr(ts){
+    var d=Math.floor((Date.now()-ts)/86400000);
+    return d===0?'Today':d===1?'Yesterday':(d+' days ago');
+  }
 
-  // ── Push notification subscription ─────────────────────────
-  async function registerPush(){
-    if(!('serviceWorker' in navigator)){
-      addBubble('[Push] serviceWorker not supported', 'esav'); return;
-    }
-    if(!('PushManager' in window)){
-      addBubble('[Push] PushManager not supported — requires iOS 16.4+ installed to homescreen', 'esav'); return;
-    }
-    var ua = navigator.userAgent;
-    var iosMatch = ua.match(/OS (\d+)_/);
-    var iosVer = iosMatch ? parseInt(iosMatch[1]) : '?';
-    var standalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
-    addBubble('[Push] iOS ' + iosVer + ' | standalone: ' + standalone + ' | permission: ' + (Notification.permission||'?'), 'esav');
+  window._esavMarkContacted=async function(id){
+    try{ await fetch(ESAV_URL+'/esav/people/'+id+'/contact',{method:'PUT'}); _loadPeople(); }catch(e){}
+  };
+  window._esavDeletePerson=async function(id){
+    if(!confirm('Remove this person?')) return;
+    try{ await fetch(ESAV_URL+'/esav/people/'+id,{method:'DELETE'}); _loadPeople(); }catch(e){}
+  };
+  window._esavAddReachOutTask=function(name){
+    var chatBtn=document.querySelector('.esav-subtab[data-tab="chat"]');
+    if(chatBtn) chatBtn.click();
+    setTimeout(function(){ _sendText('Add a task for today: Reach out to '+name,'tab'); },100);
+  };
+
+  var personAddBtn=document.getElementById('esavPersonAddBtn');
+  var personName=document.getElementById('esavPersonName');
+  var personFreq=document.getElementById('esavPersonFreq');
+  if(personAddBtn) personAddBtn.addEventListener('click', async function(){
+    var name=personName.value.trim(), freq=parseInt(personFreq.value)||14;
+    if(!name) return;
+    try{ await fetch(ESAV_URL+'/esav/people',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,frequencyDays:freq})}); personName.value=''; personFreq.value='14'; _loadPeople(); }catch(e){}
+  });
+  if(personName) personName.addEventListener('keydown',function(e){ if(e.key==='Enter') personAddBtn.click(); });
+
+  // ── Messages ───────────────────────────────────────────────
+  var TYPE_LABEL={morning:'☀️ Morning',evening:'🌙 Evening',proactive:'💬 Esav','people-reminder':'👥 Reminder','morning-briefing':'☀️ Morning'};
+
+  async function _loadMessages(){
+    var el=document.getElementById('remindersList'); if(!el) return;
+    el.innerHTML='<div class="stl-empty" style="padding:12px 0">Loading…</div>';
     try {
-      // Request permission — if already denied, iOS won't re-prompt but we proceed anyway
-      // because the Settings permission can be ON even while the API reports 'denied'
-      var perm = await Notification.requestPermission();
-      addBubble('[Push] After requestPermission: ' + perm, 'esav');
-
-      // Register SW explicitly — .ready hangs when no SW is controlling the page yet
-      var reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
-      var swState = reg.active ? 'active' : reg.waiting ? 'waiting' : reg.installing ? 'installing' : 'none';
-      addBubble('[Push] SW reg state: ' + swState, 'esav');
-
-      if(!reg.active){
-        var sw = reg.installing || reg.waiting;
-        if(sw){
-          await new Promise(function(resolve, reject){
-            sw.addEventListener('statechange', function(e){
-              if(e.target.state==='activated') resolve();
-              if(e.target.state==='redundant') reject(new Error('SW redundant'));
-            });
-            setTimeout(function(){ reject(new Error('SW activation timeout')); }, 6000);
-          });
-          reg = (await navigator.serviceWorker.getRegistration()) || reg;
-        }
+      var res=await fetch(ESAV_URL+'/esav/messages');
+      var msgs=await res.json();
+      if(!msgs.length){
+        var raw=localStorage.getItem('esav_log');
+        var local=raw?JSON.parse(raw):[];
+        msgs=local.map(function(m){ return {id:m.id,type:m.type,body:m.body||m.title||'',ts:new Date(m.sentAt||0).getTime(),read:true}; });
       }
-
-      addBubble('[Push] SW active, getting sub…', 'esav');
-      var existing = await reg.pushManager.getSubscription();
-      addBubble('[Push] Existing sub: ' + (existing ? 'yes' : 'none'), 'esav');
-      if(existing){ sendSubToServer(existing); return; }
-      var keyRes  = await fetch(ESAV_URL + '/push/vapid-key');
-      var keyData = await keyRes.json();
-      addBubble('[Push] Got VAPID key, subscribing…', 'esav');
-      var sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(keyData.key)
-      });
-      addBubble('[Push] Subscribed — sending to server', 'esav');
-      sendSubToServer(sub);
-    } catch(e){
-      addBubble('[Push] Error: ' + e.name + ' — ' + e.message, 'esav');
-    }
+      _renderMessages(msgs);
+    } catch(e){ el.innerHTML='<div class="stl-empty">Could not load messages.</div>'; }
   }
 
-  async function sendSubToServer(sub){
+  function _renderMessages(msgs){
+    var el=document.getElementById('remindersList'); if(!el) return;
+    if(!msgs.length){ el.innerHTML='<div class="stl-empty">No messages yet. Morning and evening briefs appear here.</div>'; return; }
+    el.innerHTML=msgs.slice(0,50).map(function(m){
+      var label=TYPE_LABEL[m.type]||'💬 Esav';
+      var date=m.ts?new Date(m.ts).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
+      return '<div class="esav-log-item'+(m.read?'':' unread')+'">'+
+        '<div class="esav-log-meta"><span class="esav-log-type">'+label+'</span><span class="esav-log-date">'+escHtml(date)+'</span></div>'+
+        '<div class="esav-log-body">'+escHtml(m.body||'')+'</div>'+
+      '</div>';
+    }).join('');
+  }
+
+  function _clearMsgBadge(){ var b=document.getElementById('esavMsgBadge'); if(b) b.style.display='none'; }
+
+  // ── Push registration ──────────────────────────────────────
+  async function _registerPush(){
+    if(!('serviceWorker' in navigator)||!('PushManager' in window)) return;
     try {
-      var res = await fetch(ESAV_URL + '/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sub)
-      });
-      var data = await res.json();
-      addBubble('[Push] Server response: ' + JSON.stringify(data), 'esav');
-    } catch(e){
-      addBubble('[Push] Failed to reach server: ' + e.message, 'esav');
-    }
+      var perm=await Notification.requestPermission(); if(perm!=='granted') return;
+      var reg=await navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'});
+      if(!reg.active){
+        var sw=reg.installing||reg.waiting;
+        if(sw) await new Promise(function(resolve){ sw.addEventListener('statechange',function(e){ if(e.target.state==='activated') resolve(); }); setTimeout(resolve,6000); });
+        reg=(await navigator.serviceWorker.getRegistration())||reg;
+      }
+      var existing=await reg.pushManager.getSubscription();
+      if(existing){ _sendSubToServer(existing); return; }
+      var keyRes=await fetch(ESAV_URL+'/push/vapid-key'), keyData=await keyRes.json();
+      var sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:_urlBase64ToUint8Array(keyData.key)});
+      _sendSubToServer(sub);
+    } catch(e){}
   }
-
-  function urlBase64ToUint8Array(base64String){
-    var padding = '='.repeat((4 - base64String.length % 4) % 4);
-    var base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-    var raw     = atob(base64);
-    var output  = new Uint8Array(raw.length);
-    for(var i=0; i<raw.length; i++) output[i] = raw.charCodeAt(i);
+  async function _sendSubToServer(sub){
+    try{ await fetch(ESAV_URL+'/push/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(sub)}); }catch(e){}
+  }
+  function _urlBase64ToUint8Array(b64){
+    var padding='='.repeat((4-b64.length%4)%4), base64=(b64+padding).replace(/-/g,'+').replace(/_/g,'/');
+    var raw=atob(base64), output=new Uint8Array(raw.length);
+    for(var i=0;i<raw.length;i++) output[i]=raw.charCodeAt(i);
     return output;
   }
 
-  // Push notifications parked — iOS permission stuck at denied
+  // ── FAB: hide on Esav tab, show elsewhere ─────────────────
+  setInterval(function(){
+    var rem=document.getElementById('remindersView');
+    var onEsav=rem&&rem.style.display!=='none'&&rem.offsetParent!==null;
+    fab.style.display=onEsav?'none':'';
+  },400);
+
+  // ── Auto-load Goals when Esav tab opens ───────────────────
+  window._esavSync=function(cb){ if(window._pollForUpdates) _pollForUpdates(); if(cb) setTimeout(cb,1500); };
+
+  (function _watchEsavTab(){
+    var prev=false;
+    setInterval(function(){
+      var rem=document.getElementById('remindersView');
+      var active=rem&&rem.style.display!=='none'&&rem.offsetParent!==null;
+      if(active&&!prev){ _loadGoals(); prev=true; }
+      if(!active) prev=false;
+    },300);
+  })();
 
 })();

@@ -3550,3 +3550,137 @@ body.dark-mode .crm-notes { color: #aaa; }
 body.dark-mode .crm-overdue .crm-status-badge { background: #3b0f0f; color: #f87171; }
 body.dark-mode .crm-due-soon .crm-status-badge { background: #3b2800; color: #fbbf24; }
 body.dark-mode .crm-good .crm-status-badge { background: #0f2b1a; color: #4ade80; }
+
+/* ── Esav Bottom Sheet ─────────────────────────────────────────────────────── */
+.esav-sheet-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:1100; opacity:0; pointer-events:none; transition:opacity 0.25s; }
+.esav-sheet-backdrop.open { opacity:1; pointer-events:auto; }
+.esav-sheet { position:fixed; bottom:0; left:0; right:0; background:#fff; border-radius:20px 20px 0 0; z-index:1101; transform:translateY(100%); transition:transform 0.3s cubic-bezier(0.32,0.72,0,1); box-shadow:0 -4px 32px rgba(0,0,0,0.18); max-height:80vh; overflow:hidden; }
+.esav-sheet.open { transform:translateY(0); }
+.esav-sheet-handle { width:40px; height:4px; background:#e0e0e0; border-radius:2px; margin:12px auto 0; }
+.esav-sheet-body { padding:16px 20px 32px; display:flex; flex-direction:column; gap:16px; }
+.esav-sheet-state { display:flex; flex-direction:column; align-items:center; gap:12px; }
+.esav-sheet-mic-btn { width:80px; height:80px; border-radius:50%; background:#7c3aed; border:none; color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:transform 0.15s,background 0.15s; box-shadow:0 4px 20px rgba(124,58,237,0.35); }
+.esav-sheet-mic-btn:active { transform:scale(0.93); background:#6d28d9; }
+.esav-sheet-mic-btn svg { width:32px; height:32px; }
+.esav-sheet-hint { font-size:13px; color:#888; margin:0; }
+.esav-sheet-rec-row { display:flex; align-items:center; gap:10px; }
+.esav-sheet-rec-dot { width:10px; height:10px; border-radius:50%; background:#ef4444; animation:esavRecPulse 1s infinite; flex-shrink:0; }
+@keyframes esavRecPulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.esav-sheet-rec-timer { font-size:22px; font-weight:700; color:#1a1a1a; font-variant-numeric:tabular-nums; }
+.esav-sheet-rec-label { font-size:13px; color:#888; }
+.esav-sheet-ctrl-row { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+.esav-sheet-ctrl-btn { padding:9px 18px; border-radius:20px; border:1.5px solid #e0e0e0; background:#fff; font-size:14px; cursor:pointer; font-weight:500; transition:background 0.15s; }
+.esav-sheet-ctrl-btn:hover { background:#f5f5f5; }
+.esav-sheet-stop-btn { background:#7c3aed; color:#fff; border-color:#7c3aed; }
+.esav-sheet-stop-btn:hover { background:#6d28d9; border-color:#6d28d9; }
+.esav-sheet-cancel-btn { color:#ef4444; border-color:#fee2e2; }
+.esav-sheet-cancel-btn:hover { background:#fee2e2; }
+.esav-sheet-playback-bar { display:flex; align-items:center; gap:10px; width:100%; }
+.esav-sheet-play-btn { width:44px; height:44px; border-radius:50%; background:#7c3aed; color:#fff; border:none; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.esav-sheet-waveform { flex:1; height:6px; background:#e8e8e8; border-radius:3px; position:relative; overflow:hidden; cursor:pointer; }
+.esav-sheet-progress-bar { height:100%; background:#7c3aed; border-radius:3px; transition:width 0.1s linear; width:0%; }
+.esav-sheet-duration { font-size:12px; color:#888; font-variant-numeric:tabular-nums; flex-shrink:0; }
+.esav-sheet-dots { display:flex; gap:8px; }
+.esav-sheet-dots span { width:10px; height:10px; border-radius:50%; background:#7c3aed; animation:esavDotBounce 1.2s infinite; }
+.esav-sheet-dots span:nth-child(2) { animation-delay:0.2s; }
+.esav-sheet-dots span:nth-child(3) { animation-delay:0.4s; }
+@keyframes esavDotBounce { 0%,100%{transform:translateY(0)} 40%{transform:translateY(-8px)} }
+.esav-sheet-response-text { font-size:15px; color:#1a1a1a; line-height:1.55; text-align:center; white-space:pre-line; margin:0; padding:0 4px; }
+.esav-sheet-text-row { display:flex; align-items:flex-end; gap:8px; width:100%; border-top:1px solid #f0f0f0; padding-top:12px; }
+.esav-sheet-text-input { flex:1; border:1.5px solid #e0e0e0; border-radius:20px; padding:9px 14px; font-size:14px; font-family:inherit; resize:none; outline:none; background:#fafafa; max-height:100px; line-height:1.4; transition:border-color 0.15s; }
+.esav-sheet-text-input:focus { border-color:#7c3aed; background:#fff; }
+.esav-sheet-send-text-btn { width:38px; height:38px; border-radius:50%; background:#7c3aed; color:#fff; border:none; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+
+/* ── Esav Sub-tabs ─────────────────────────────────────────────────────────── */
+.esav-subtab-bar { display:flex; gap:4px; padding:0 0 12px; border-bottom:1px solid #f0f0f0; margin-bottom:12px; flex-shrink:0; }
+.esav-subtab { flex:1; padding:8px 4px; border:none; background:none; border-radius:10px; font-size:13px; font-weight:500; color:#888; cursor:pointer; transition:background 0.15s,color 0.15s; position:relative; }
+.esav-subtab.active { background:#f3e8ff; color:#7c3aed; font-weight:700; }
+.esav-subtab:hover:not(.active) { background:#f5f5f5; color:#444; }
+.esav-msg-badge { display:inline-flex; align-items:center; justify-content:center; background:#ef4444; color:#fff; font-size:9px; font-weight:700; min-width:14px; height:14px; border-radius:99px; padding:0 3px; margin-left:4px; vertical-align:middle; }
+.esav-panel { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:0; min-height:0; }
+
+/* ── Goals panel ───────────────────────────────────────────────────────────── */
+.esav-goal-item { display:flex; align-items:center; gap:8px; background:#fff; border:1px solid #e8e8e8; border-radius:12px; padding:10px 12px; margin-bottom:8px; }
+.esav-goal-check { background:none; border:none; font-size:18px; color:#7c3aed; cursor:pointer; flex-shrink:0; padding:0; line-height:1; }
+.esav-goal-item.done .esav-goal-check { color:#22c55e; }
+.esav-goal-body { flex:1; min-width:0; }
+.esav-goal-title { font-size:14px; color:#1a1a1a; font-weight:500; }
+.esav-goal-item.done .esav-goal-title { text-decoration:line-through; color:#aaa; }
+.esav-goal-cat { display:inline-block; font-size:10px; font-weight:600; border-radius:20px; padding:1px 7px; margin-left:6px; text-transform:uppercase; letter-spacing:0.04em; vertical-align:middle; }
+.esav-goal-delete { background:none; border:none; color:#ccc; font-size:20px; cursor:pointer; flex-shrink:0; padding:0 2px; line-height:1; }
+.esav-goal-delete:hover { color:#ef4444; }
+.esav-add-row { display:flex; gap:8px; align-items:center; padding:10px 0 4px; border-top:1px solid #f0f0f0; margin-top:auto; flex-shrink:0; }
+.esav-add-input { flex:1; border:1.5px solid #e0e0e0; border-radius:10px; padding:8px 12px; font-size:14px; font-family:inherit; outline:none; transition:border-color 0.15s; }
+.esav-add-input:focus { border-color:#7c3aed; }
+.esav-add-select { border:1.5px solid #e0e0e0; border-radius:10px; padding:8px 6px; font-size:13px; font-family:inherit; outline:none; background:#fff; cursor:pointer; }
+.esav-add-btn { background:#7c3aed; color:#fff; border:none; border-radius:10px; padding:8px 14px; font-size:14px; font-weight:600; cursor:pointer; flex-shrink:0; white-space:nowrap; }
+.esav-add-btn:hover { background:#6d28d9; }
+
+/* ── People panel ──────────────────────────────────────────────────────────── */
+.esav-people-list { display:flex; flex-direction:column; gap:10px; padding-bottom:8px; }
+.esav-person-card { display:flex; align-items:center; gap:12px; background:#fff; border:1px solid #e8e8e8; border-radius:14px; padding:12px 14px; border-left:4px solid #e8e8e8; }
+.esav-person-urgent { border-left-color:#ef4444; background:#fff9f9; }
+.esav-person-overdue { border-left-color:#f59e0b; background:#fffdf5; }
+.esav-person-ok { border-left-color:#22c55e; }
+.esav-person-avatar { width:42px; height:42px; border-radius:50%; background:#f3e8ff; color:#7c3aed; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:700; flex-shrink:0; }
+.esav-person-urgent .esav-person-avatar { background:#fee2e2; color:#ef4444; }
+.esav-person-overdue .esav-person-avatar { background:#fef3c7; color:#d97706; }
+.esav-person-ok .esav-person-avatar { background:#dcfce7; color:#16a34a; }
+.esav-person-info { flex:1; min-width:0; }
+.esav-person-name { font-size:15px; font-weight:600; color:#1a1a1a; }
+.esav-person-meta { font-size:12px; color:#888; margin-top:2px; }
+.esav-person-status { font-size:12px; font-weight:600; margin-top:2px; }
+.esav-person-urgent .esav-person-status { color:#ef4444; }
+.esav-person-overdue .esav-person-status { color:#d97706; }
+.esav-person-ok .esav-person-status { color:#16a34a; }
+.esav-person-actions { display:flex; flex-direction:column; gap:5px; flex-shrink:0; }
+.esav-person-btn { font-size:12px; border-radius:8px; border:1.5px solid #e0e0e0; background:#fff; padding:5px 10px; cursor:pointer; font-weight:600; white-space:nowrap; transition:background 0.15s; }
+.esav-person-contact-btn { color:#16a34a; border-color:#dcfce7; }
+.esav-person-contact-btn:hover { background:#dcfce7; }
+.esav-person-task-btn { color:#7c3aed; border-color:#f3e8ff; }
+.esav-person-task-btn:hover { background:#f3e8ff; }
+.esav-person-delete-btn { color:#ef4444; border-color:#fee2e2; }
+.esav-person-delete-btn:hover { background:#fee2e2; }
+
+/* ── Chat panel inside Esav tab ────────────────────────────────────────────── */
+.esav-chat-panel { display:flex; flex-direction:column; }
+.esav-tab-messages { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px; padding:4px 0 8px; min-height:100px; }
+.esav-bubble { max-width:80%; padding:10px 14px; border-radius:16px; font-size:14px; line-height:1.5; word-break:break-word; }
+.esav-bubble.user { background:#7c3aed; color:#fff; align-self:flex-end; border-bottom-right-radius:4px; }
+.esav-bubble.esav { background:#f3f4f6; color:#1a1a1a; align-self:flex-start; border-bottom-left-radius:4px; }
+.esav-bubble.thinking { background:#f0e9ff; color:#7c3aed; align-self:flex-start; font-style:italic; }
+.esav-tab-reply-bar { display:flex; align-items:flex-end; gap:8px; padding:10px 0 4px; border-top:1px solid #f0f0f0; flex-shrink:0; }
+.esav-tab-mic-btn { width:36px; height:36px; border-radius:50%; background:#f3e8ff; border:none; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background 0.15s; }
+.esav-tab-mic-btn:hover { background:#ede0ff; }
+
+/* ── Dark mode — sheet ─────────────────────────────────────────────────────── */
+body.dark-mode .esav-sheet { background:#1e1e2e; }
+body.dark-mode .esav-sheet-handle { background:#3e3e4e; }
+body.dark-mode .esav-sheet-text-input { background:#2a2a3a; border-color:#3e3e4e; color:#e0e0e0; }
+body.dark-mode .esav-sheet-text-row { border-top-color:#2e2e3e; }
+body.dark-mode .esav-sheet-ctrl-btn { background:#2a2a3a; border-color:#3e3e4e; color:#e0e0e0; }
+body.dark-mode .esav-sheet-rec-timer { color:#e0e0e0; }
+body.dark-mode .esav-sheet-response-text { color:#e0e0e0; }
+body.dark-mode .esav-sheet-waveform { background:#3e3e4e; }
+body.dark-mode .esav-sheet-hint { color:#aaa; }
+
+/* ── Dark mode — sub-tabs + panels ────────────────────────────────────────── */
+body.dark-mode .esav-subtab-bar { border-bottom-color:#2e2e3e; }
+body.dark-mode .esav-subtab { color:#888; }
+body.dark-mode .esav-subtab.active { background:#2e1e4e; color:#c084fc; }
+body.dark-mode .esav-subtab:hover:not(.active) { background:#2a2a3a; color:#ccc; }
+body.dark-mode .esav-goal-item { background:#1e1e2e; border-color:#2e2e3e; }
+body.dark-mode .esav-goal-title { color:#e0e0e0; }
+body.dark-mode .esav-add-input { background:#1e1e2e; border-color:#3e3e4e; color:#e0e0e0; }
+body.dark-mode .esav-add-select { background:#1e1e2e; border-color:#3e3e4e; color:#e0e0e0; }
+body.dark-mode .esav-add-row { border-top-color:#2e2e3e; }
+body.dark-mode .esav-person-card { background:#1e1e2e; border-color:#2e2e3e; }
+body.dark-mode .esav-person-urgent { background:#2a1616; }
+body.dark-mode .esav-person-overdue { background:#1e1a10; }
+body.dark-mode .esav-person-name { color:#e0e0e0; }
+body.dark-mode .esav-person-btn { background:#2a2a3a; border-color:#3e3e4e; }
+body.dark-mode .esav-tab-messages { /* inherit */ }
+body.dark-mode .esav-bubble.esav { background:#2a2a3a; color:#e0e0e0; }
+body.dark-mode .esav-bubble.thinking { background:#1e1530; color:#c084fc; }
+body.dark-mode .esav-tab-reply-bar { border-top-color:#2e2e3e; }
+body.dark-mode .esav-tab-mic-btn { background:#2a2a3a; }
