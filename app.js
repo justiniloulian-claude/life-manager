@@ -6592,7 +6592,7 @@ function _doLogin() {
 // ESAV — PERSONAL ASSISTANT
 // ============================================================
 (function(){
-  var ESAV_URL = 'https://life-assistant-production-f813.up.railway.app';
+  var ESAV_URL = 'http://192.241.151.231:3000';
   var mediaRecorder, audioChunks = [], isRecording = false, isPaused = false;
 
   // Conversation history — persists for the page session so Esav remembers
