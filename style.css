@@ -3671,13 +3671,18 @@ body.dark-mode .crm-good .crm-status-badge { background: #0f2b1a; color: #4ade80
 .esav-goal-item.drag-over { border-top:2px solid #7c3aed; }
 
 /* ── Contact history ───────────────────────────────────────────────────────── */
-.esav-person-notes { margin-top:10px; padding-top:10px; border-top:1px solid #f0f0f0; display:flex; flex-direction:column; gap:5px; }
-.esav-person-notes-header { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#bbb; margin-bottom:2px; }
+.esav-person-notes { margin-top:10px; padding-top:10px; border-top:1px solid #f0f0f0; display:flex; flex-direction:column; gap:6px; }
+.esav-person-notes-header { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#bbb; }
+.esav-convo-list { display:flex; flex-direction:column; gap:5px; }
 .esav-contact-entry { display:flex; gap:8px; align-items:baseline; font-size:12px; }
 .esav-contact-entry-date { color:#888; flex-shrink:0; font-weight:600; white-space:nowrap; }
-.esav-contact-entry-note { color:#444; flex:1; line-height:1.4; }
-.esav-contact-entry-no-note { color:#bbb; font-style:italic; }
-.esav-spoke-cancel-btn { color:#888; border-color:#e0e0e0; }
+.esav-contact-entry-note { color:#333; flex:1; line-height:1.4; }
+.esav-contact-entry-no-note { color:#bbb; font-style:italic; font-size:12px; }
+.esav-convo-input-row { display:flex; gap:6px; align-items:center; margin-top:4px; }
+.esav-convo-input { flex:1; border:1.5px solid #e8e8e8; border-radius:8px; padding:7px 10px; font-size:13px; font-family:inherit; outline:none; background:#fafafa; transition:border-color 0.15s; }
+.esav-convo-input:focus { border-color:#7c3aed; background:#fff; }
+.esav-convo-log-btn { background:#7c3aed; color:#fff; border:none; border-radius:8px; padding:7px 14px; font-size:13px; font-weight:600; cursor:pointer; flex-shrink:0; white-space:nowrap; }
+.esav-convo-log-btn:hover { background:#6d28d9; }
 
 /* ── Chat panel inside Esav tab ────────────────────────────────────────────── */
 .esav-chat-panel { display:flex; flex-direction:column; }
@@ -3723,8 +3728,10 @@ body.dark-mode .esav-goal-ctrl-btn:hover { background:#2e1e4e; color:#c084fc; }
 body.dark-mode .esav-goal-edit-input { background:#1e1e2e; border-color:#7c3aed; color:#e0e0e0; }
 body.dark-mode .esav-goal-drag-handle { color:#555; }
 body.dark-mode .esav-person-notes { border-top-color:#2e2e3e; }
-body.dark-mode .esav-contact-entry-note { color:#bbb; }
+body.dark-mode .esav-contact-entry-note { color:#ccc; }
 body.dark-mode .esav-contact-entry-date { color:#777; }
+body.dark-mode .esav-convo-input { background:#1e1e2e; border-color:#3e3e4e; color:#e0e0e0; }
+body.dark-mode .esav-convo-input:focus { border-color:#7c3aed; background:#1e1e2e; }
 body.dark-mode .esav-tab-messages { /* inherit */ }
 body.dark-mode .esav-bubble.esav { background:#2a2a3a; color:#e0e0e0; }
 body.dark-mode .esav-bubble.thinking { background:#1e1530; color:#c084fc; }
