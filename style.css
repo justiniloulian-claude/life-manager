@@ -3641,6 +3641,29 @@ body.dark-mode .crm-good .crm-status-badge { background: #0f2b1a; color: #4ade80
 .esav-person-task-btn:hover { background:#f3e8ff; }
 .esav-person-delete-btn { color:#ef4444; border-color:#fee2e2; }
 .esav-person-delete-btn:hover { background:#fee2e2; }
+.esav-person-card { flex-direction:column; align-items:stretch; }
+.esav-person-main { display:flex; align-items:center; gap:12px; }
+.esav-person-main .esav-person-info { flex:1; min-width:0; }
+.esav-person-main .esav-person-actions { display:flex; flex-direction:column; gap:5px; flex-shrink:0; }
+
+/* ── Spoke expand ──────────────────────────────────────────────────────────── */
+.esav-spoke-expand { margin-top:10px; padding-top:10px; border-top:1px solid #f0f0f0; display:flex; flex-direction:column; gap:8px; }
+.esav-spoke-note { width:100%; box-sizing:border-box; border:1.5px solid #e0e0e0; border-radius:10px; padding:8px 12px; font-size:13px; font-family:inherit; outline:none; resize:none; transition:border-color 0.15s; }
+.esav-spoke-note:focus { border-color:#7c3aed; }
+.esav-spoke-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.esav-spoke-hint { font-size:12px; color:#888; flex:1; }
+
+/* ── Goal controls ─────────────────────────────────────────────────────────── */
+.esav-goal-item { align-items:flex-start; }
+.esav-goal-body { flex:1; min-width:0; }
+.esav-goal-title-row { display:flex; align-items:center; flex-wrap:wrap; gap:4px; }
+.esav-goal-date { font-size:11px; color:#888; }
+.esav-goal-controls { display:flex; align-items:center; gap:2px; flex-shrink:0; }
+.esav-goal-ctrl-btn { background:none; border:none; font-size:14px; color:#aaa; cursor:pointer; padding:2px 4px; border-radius:6px; line-height:1; transition:background 0.12s,color 0.12s; }
+.esav-goal-ctrl-btn:hover { background:#f3e8ff; color:#7c3aed; }
+.esav-goal-save-btn { color:#22c55e; }
+.esav-goal-save-btn:hover { background:#dcfce7; color:#16a34a; }
+.esav-goal-edit-input { flex:1; border:1.5px solid #7c3aed; border-radius:8px; padding:3px 8px; font-size:14px; font-family:inherit; outline:none; min-width:0; }
 
 /* ── Chat panel inside Esav tab ────────────────────────────────────────────── */
 .esav-chat-panel { display:flex; flex-direction:column; }
@@ -3679,6 +3702,11 @@ body.dark-mode .esav-person-urgent { background:#2a1616; }
 body.dark-mode .esav-person-overdue { background:#1e1a10; }
 body.dark-mode .esav-person-name { color:#e0e0e0; }
 body.dark-mode .esav-person-btn { background:#2a2a3a; border-color:#3e3e4e; }
+body.dark-mode .esav-spoke-expand { border-top-color:#2e2e3e; }
+body.dark-mode .esav-spoke-note { background:#1e1e2e; border-color:#3e3e4e; color:#e0e0e0; }
+body.dark-mode .esav-spoke-hint { color:#888; }
+body.dark-mode .esav-goal-ctrl-btn:hover { background:#2e1e4e; color:#c084fc; }
+body.dark-mode .esav-goal-edit-input { background:#1e1e2e; border-color:#7c3aed; color:#e0e0e0; }
 body.dark-mode .esav-tab-messages { /* inherit */ }
 body.dark-mode .esav-bubble.esav { background:#2a2a3a; color:#e0e0e0; }
 body.dark-mode .esav-bubble.thinking { background:#1e1530; color:#c084fc; }

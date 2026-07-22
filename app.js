@@ -89,14 +89,14 @@ function _initSyncBadge(){
   b.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:99999;'+
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;';
-  b.textContent = 'v199…';
+  b.textContent = 'v200…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v199'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v200'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
                                  st==='recv'?'rgba(0,80,160,0.75)':
@@ -6589,7 +6589,7 @@ function _doLogin() {
 }
 
 // ============================================================
-// ESAV — PERSONAL ASSISTANT  (v199 redesign)
+// ESAV — PERSONAL ASSISTANT  (v200 redesign)
 // ============================================================
 (function(){
   var ESAV_URL = 'https://192-241-151-231.sslip.io';
@@ -6881,11 +6881,37 @@ function _doLogin() {
 
   // ── Goals ──────────────────────────────────────────────────
   var _CAT_COLORS={health:'#16a34a',spiritual:'#7c3aed',learning:'#2563eb',relationships:'#db2777',work:'#d97706',personal:'#64748b'};
+  var _goalsCache=[], _editingGoalId=null;
 
+  // ── Frequency helpers ──────────────────────────────────────
+  function _freqToDays(num, unit){
+    var n=parseInt(num)||1;
+    if(unit==='years')  return n*365;
+    if(unit==='months') return n*30;
+    if(unit==='weeks')  return n*7;
+    return n; // days
+  }
+  function _freqLabel(days){
+    if(days%365===0) return 'Every '+(days/365)+' year'+(days/365>1?'s':'');
+    if(days%30===0)  return 'Every '+(days/30)+' month'+(days/30>1?'s':'');
+    if(days%7===0)   return 'Every '+(days/7)+' week'+(days/7>1?'s':'');
+    return 'Every '+days+' day'+(days>1?'s':'');
+  }
+  function _nextContactDate(lastContact, frequencyDays){
+    if(!lastContact) return null;
+    var d=new Date(lastContact+frequencyDays*86400000);
+    return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  }
+  function _daysAgoStr(ts){
+    var d=Math.floor((Date.now()-ts)/86400000);
+    return d===0?'Today':d===1?'Yesterday':(d+' days ago');
+  }
+
+  // ── Goals ──────────────────────────────────────────────────
   async function _loadGoals(){
     var el=document.getElementById('esavGoalsList'); if(!el) return;
     el.innerHTML='<div class="stl-empty" style="padding:12px 0">Loading…</div>';
-    try { var res=await fetch(ESAV_URL+'/esav/goals'); _renderGoals(await res.json()); }
+    try { var res=await fetch(ESAV_URL+'/esav/goals'); _goalsCache=await res.json(); _renderGoals(_goalsCache); }
     catch(e){ el.innerHTML='<div class="stl-empty">Could not load goals.</div>'; }
   }
 
@@ -6894,18 +6920,36 @@ function _doLogin() {
     if(!goals.length){ el.innerHTML='<div class="stl-empty">No goals yet. Add one below.</div>'; return; }
     var active=goals.filter(function(g){ return !g.done; });
     var done=goals.filter(function(g){ return g.done; });
-    function goalHtml(g){
+    function goalHtml(g, idx, arr){
       var cc=_CAT_COLORS[g.category]||'#888';
       var cat=g.category?'<span class="esav-goal-cat" style="background:'+cc+'22;color:'+cc+'">'+escHtml(g.category)+'</span>':'';
-      return '<div class="esav-goal-item'+(g.done?' done':'')+'">'+
+      var dateStr=g.targetDate?'<span class="esav-goal-date">🎯 '+escHtml(g.targetDate)+'</span>':'';
+      var editing=(_editingGoalId===g.id);
+      var titleEl=editing
+        ?'<input class="esav-goal-edit-input" id="esavGoalEdit_'+g.id+'" value="'+escHtml(g.text)+'" onblur="window._esavSaveGoalEdit(\''+g.id+'\')" onkeydown="if(event.key===\'Enter\')window._esavSaveGoalEdit(\''+g.id+'\')" />'
+        :'<span class="esav-goal-title">'+escHtml(g.text)+'</span>';
+      var isFirst=(idx===0), isLast=(idx===arr.length-1);
+      return '<div class="esav-goal-item'+(g.done?' done':'')+'" data-id="'+g.id+'">'+
         '<button class="esav-goal-check" onclick="window._esavToggleGoal(\''+g.id+'\','+(!g.done)+')">'+(g.done?'✓':'○')+'</button>'+
-        '<div class="esav-goal-body"><span class="esav-goal-title">'+escHtml(g.text)+'</span>'+(cat?' '+cat:'')+'</div>'+
-        '<button class="esav-goal-delete" onclick="window._esavDeleteGoal(\''+g.id+'\')">×</button>'+
+        '<div class="esav-goal-body">'+
+          '<div class="esav-goal-title-row">'+titleEl+(cat?' '+cat:'')+(dateStr?' '+dateStr:'')+'</div>'+
+        '</div>'+
+        '<div class="esav-goal-controls">'+
+          (!g.done&&!editing?'<button class="esav-goal-ctrl-btn" onclick="window._esavEditGoal(\''+g.id+'\')" title="Edit">✎</button>':'')+
+          (editing?'<button class="esav-goal-ctrl-btn esav-goal-save-btn" onclick="window._esavSaveGoalEdit(\''+g.id+'\')" title="Save">✓</button>':'')+
+          (!isFirst&&!g.done?'<button class="esav-goal-ctrl-btn" onclick="window._esavMoveGoal(\''+g.id+'\',-1)" title="Move up">↑</button>':'')+
+          (!isLast&&!g.done?'<button class="esav-goal-ctrl-btn" onclick="window._esavMoveGoal(\''+g.id+'\',1)" title="Move down">↓</button>':'')+
+          '<button class="esav-goal-delete" onclick="window._esavDeleteGoal(\''+g.id+'\')" title="Delete">×</button>'+
+        '</div>'+
       '</div>';
     }
-    var html=active.map(goalHtml).join('');
-    if(done.length) html+='<div class="esav-goals-done-label">Completed</div>'+done.map(goalHtml).join('');
+    var html=active.map(function(g,i){ return goalHtml(g,i,active); }).join('');
+    if(done.length) html+='<div class="esav-goals-done-label">Completed</div>'+done.map(function(g,i){ return goalHtml(g,i,done); }).join('');
     el.innerHTML=html;
+    if(_editingGoalId){
+      var inp=document.getElementById('esavGoalEdit_'+_editingGoalId);
+      if(inp){ inp.focus(); inp.select(); }
+    }
   }
 
   window._esavToggleGoal=async function(id,done){
@@ -6915,18 +6959,42 @@ function _doLogin() {
     if(!confirm('Delete this goal?')) return;
     try{ await fetch(ESAV_URL+'/esav/goals/'+id,{method:'DELETE'}); _loadGoals(); }catch(e){}
   };
+  window._esavEditGoal=function(id){ _editingGoalId=id; _renderGoals(_goalsCache); };
+  window._esavSaveGoalEdit=async function(id){
+    var inp=document.getElementById('esavGoalEdit_'+id); if(!inp) return;
+    var text=inp.value.trim(); if(!text) return;
+    _editingGoalId=null;
+    try{ await fetch(ESAV_URL+'/esav/goals/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text})}); _loadGoals(); }catch(e){}
+  };
+  window._esavMoveGoal=async function(id, dir){
+    var active=_goalsCache.filter(function(g){ return !g.done; });
+    var done=_goalsCache.filter(function(g){ return g.done; });
+    var idx=active.findIndex(function(g){ return g.id===id; });
+    if(idx<0) return;
+    var newIdx=idx+dir;
+    if(newIdx<0||newIdx>=active.length) return;
+    var tmp=active[idx]; active[idx]=active[newIdx]; active[newIdx]=tmp;
+    var newOrder=active.concat(done);
+    _goalsCache=newOrder;
+    _renderGoals(newOrder);
+    try{ await fetch(ESAV_URL+'/esav/goals',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(newOrder)}); }catch(e){}
+  };
 
   var goalAddBtn=document.getElementById('esavGoalAddBtn');
   var goalInput=document.getElementById('esavGoalInput');
   var goalCat=document.getElementById('esavGoalCategory');
+  var goalDate=document.getElementById('esavGoalTargetDate');
   if(goalAddBtn) goalAddBtn.addEventListener('click', async function(){
-    var text=goalInput.value.trim(), cat=goalCat.value;
+    var text=goalInput.value.trim(), cat=goalCat.value, td=goalDate?goalDate.value:'';
     if(!text) return;
-    try{ await fetch(ESAV_URL+'/esav/goals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,category:cat})}); goalInput.value=''; goalCat.value=''; _loadGoals(); }catch(e){}
+    var body={text:text,category:cat}; if(td) body.targetDate=td;
+    try{ await fetch(ESAV_URL+'/esav/goals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); goalInput.value=''; goalCat.value=''; if(goalDate) goalDate.value=''; _loadGoals(); }catch(e){}
   });
   if(goalInput) goalInput.addEventListener('keydown',function(e){ if(e.key==='Enter') goalAddBtn.click(); });
 
   // ── People ─────────────────────────────────────────────────
+  var _spokeExpandId=null;
+
   async function _loadPeople(){
     var el=document.getElementById('esavPeopleList'); if(!el) return;
     el.innerHTML='<div class="stl-empty" style="padding:12px 0">Loading…</div>';
@@ -6941,49 +7009,75 @@ function _doLogin() {
       var urgent=!p.lastContact||p.daysOverdue>7;
       var overdue=p.daysOverdue>0;
       var cls=urgent?'esav-person-urgent':overdue?'esav-person-overdue':'esav-person-ok';
-      var status=!p.lastContact?'Never contacted':overdue?(p.daysOverdue+' days overdue'):'On track';
+      var nextDate=_nextContactDate(p.lastContact,p.frequencyDays);
+      var statusText=!p.lastContact?'Never contacted':overdue?(p.daysOverdue+' day'+(p.daysOverdue>1?'s':'')+' overdue'):'Next: '+nextDate;
       var last=p.lastContact?_daysAgoStr(p.lastContact):'Never';
-      return '<div class="esav-person-card '+cls+'">'+
-        '<div class="esav-person-avatar">'+escHtml(p.name.charAt(0).toUpperCase())+'</div>'+
-        '<div class="esav-person-info">'+
-          '<div class="esav-person-name">'+escHtml(p.name)+'</div>'+
-          '<div class="esav-person-meta">Every '+p.frequencyDays+' days · Last: '+last+'</div>'+
-          '<div class="esav-person-status">'+status+'</div>'+
+      var spokeExpanded=(_spokeExpandId===p.id);
+      var spokeSection=spokeExpanded
+        ?'<div class="esav-spoke-expand">'+
+            '<textarea id="esavSpokeNote_'+p.id+'" class="esav-spoke-note" placeholder="Quick note about this conversation (optional)…" rows="2"></textarea>'+
+            '<div class="esav-spoke-actions">'+
+              '<span class="esav-spoke-hint">Add follow-up task on '+nextDate+'?</span>'+
+              '<button class="esav-person-btn esav-person-contact-btn" onclick="window._esavConfirmSpoke(\''+p.id+'\',\''+escHtml(p.name)+'\',true)">Yes, add task</button>'+
+              '<button class="esav-person-btn" onclick="window._esavConfirmSpoke(\''+p.id+'\',\''+escHtml(p.name)+'\',false)">Not now</button>'+
+            '</div>'+
+          '</div>'
+        :'';
+      return '<div class="esav-person-card '+cls+'" data-pid="'+p.id+'">'+
+        '<div class="esav-person-main">'+
+          '<div class="esav-person-avatar">'+escHtml(p.name.charAt(0).toUpperCase())+'</div>'+
+          '<div class="esav-person-info">'+
+            '<div class="esav-person-name">'+escHtml(p.name)+'</div>'+
+            '<div class="esav-person-meta">'+escHtml(_freqLabel(p.frequencyDays))+' · Last: '+last+'</div>'+
+            '<div class="esav-person-status">'+statusText+'</div>'+
+          '</div>'+
+          '<div class="esav-person-actions">'+
+            (!spokeExpanded?'<button class="esav-person-btn esav-person-contact-btn" onclick="window._esavSpokeExpand(\''+p.id+'\')">✓ Spoke</button>':'')+
+            '<button class="esav-person-btn esav-person-delete-btn" onclick="window._esavDeletePerson(\''+p.id+'\')">×</button>'+
+          '</div>'+
         '</div>'+
-        '<div class="esav-person-actions">'+
-          '<button class="esav-person-btn esav-person-contact-btn" onclick="window._esavMarkContacted(\''+p.id+'\')">✓ Spoke</button>'+
-          (urgent?'<button class="esav-person-btn esav-person-task-btn" onclick="window._esavAddReachOutTask(\''+escHtml(p.name)+'\')">+ Task</button>':'')+
-          '<button class="esav-person-btn esav-person-delete-btn" onclick="window._esavDeletePerson(\''+p.id+'\')">×</button>'+
-        '</div>'+
+        spokeSection+
       '</div>';
     }).join('');
   }
 
-  function _daysAgoStr(ts){
-    var d=Math.floor((Date.now()-ts)/86400000);
-    return d===0?'Today':d===1?'Yesterday':(d+' days ago');
-  }
+  window._esavSpokeExpand=function(id){ _spokeExpandId=id; _loadPeople(); };
 
-  window._esavMarkContacted=async function(id){
-    try{ await fetch(ESAV_URL+'/esav/people/'+id+'/contact',{method:'PUT'}); _loadPeople(); }catch(e){}
+  window._esavConfirmSpoke=async function(id,name,addTask){
+    var noteEl=document.getElementById('esavSpokeNote_'+id);
+    var note=noteEl?noteEl.value.trim():'';
+    _spokeExpandId=null;
+    try{
+      var body={lastContact:Date.now()}; if(note) body.lastContactNote=note;
+      await fetch(ESAV_URL+'/esav/people/'+id+'/contact',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      if(addTask){
+        var p=null;
+        try{ var r=await fetch(ESAV_URL+'/esav/people'); var arr=await r.json(); p=arr.find(function(x){ return x.id===id; }); }catch(e){}
+        var nextDate=p?_nextContactDate(Date.now(),p.frequencyDays):null;
+        var taskDate=nextDate||'upcoming';
+        var chatBtn=document.querySelector('.esav-subtab[data-tab="chat"]');
+        if(chatBtn) chatBtn.click();
+        setTimeout(function(){ _sendText('Add a task on '+taskDate+': Reach out to '+name,'tab'); },100);
+      } else {
+        _loadPeople();
+      }
+    }catch(e){ _loadPeople(); }
   };
+
   window._esavDeletePerson=async function(id){
     if(!confirm('Remove this person?')) return;
     try{ await fetch(ESAV_URL+'/esav/people/'+id,{method:'DELETE'}); _loadPeople(); }catch(e){}
   };
-  window._esavAddReachOutTask=function(name){
-    var chatBtn=document.querySelector('.esav-subtab[data-tab="chat"]');
-    if(chatBtn) chatBtn.click();
-    setTimeout(function(){ _sendText('Add a task for today: Reach out to '+name,'tab'); },100);
-  };
 
   var personAddBtn=document.getElementById('esavPersonAddBtn');
   var personName=document.getElementById('esavPersonName');
-  var personFreq=document.getElementById('esavPersonFreq');
+  var personFreqNum=document.getElementById('esavPersonFreqNum');
+  var personFreqUnit=document.getElementById('esavPersonFreqUnit');
   if(personAddBtn) personAddBtn.addEventListener('click', async function(){
-    var name=personName.value.trim(), freq=parseInt(personFreq.value)||14;
+    var name=personName.value.trim();
+    var freq=_freqToDays(personFreqNum?personFreqNum.value:14, personFreqUnit?personFreqUnit.value:'days');
     if(!name) return;
-    try{ await fetch(ESAV_URL+'/esav/people',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,frequencyDays:freq})}); personName.value=''; personFreq.value='14'; _loadPeople(); }catch(e){}
+    try{ await fetch(ESAV_URL+'/esav/people',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,frequencyDays:freq})}); personName.value=''; if(personFreqNum) personFreqNum.value='2'; if(personFreqUnit) personFreqUnit.value='weeks'; _loadPeople(); }catch(e){}
   });
   if(personName) personName.addEventListener('keydown',function(e){ if(e.key==='Enter') personAddBtn.click(); });
 
