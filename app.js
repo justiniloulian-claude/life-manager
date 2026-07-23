@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v208…';
+  b.textContent = 'v209…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v208'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v209'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -6596,7 +6596,7 @@ function _doLogin() {
 }
 
 // ============================================================
-// ESAV — PERSONAL ASSISTANT  (v208 redesign)
+// ESAV — PERSONAL ASSISTANT  (v209 redesign)
 // ============================================================
 (function(){
   var ESAV_URL = 'https://192-241-151-231.sslip.io';
@@ -6793,15 +6793,34 @@ function _doLogin() {
     } catch(e){ _handleResponse(null,'Could not reach Esav. Check your connection.',source); }
   }
 
+  // ── Chat history persistence ───────────────────────────────
+  function _saveChatEntry(role, text){
+    try{
+      var log=JSON.parse(localStorage.getItem('esav_chat_history')||'[]');
+      log.push({role:role,text:text,ts:Date.now()});
+      if(log.length>100) log=log.slice(log.length-100);
+      localStorage.setItem('esav_chat_history',JSON.stringify(log));
+    }catch(e){}
+  }
+  function _restoreChatHistory(){
+    if(!tabMessages) return;
+    try{
+      var log=JSON.parse(localStorage.getItem('esav_chat_history')||'[]');
+      if(!log.length) return;
+      log.forEach(function(e){ _addTabBubble(e.text,e.role,true); });
+      tabMessages.scrollTop=tabMessages.scrollHeight;
+    }catch(e){}
+  }
+
   function _handleResponse(userText, reply, source){
     if(source==='sheet'){
       sheetResponseText.textContent=reply;
       _showSheetState('response');
       setTimeout(closeSheet,4500);
     } else {
-      _addTabBubble(reply,'esav');
+      _addTabBubble(reply,'esav'); // _addTabBubble saves to chat history
     }
-    _logLocalMsg(reply);
+    // do NOT write to esav_log — that's for proactive messages only
     if(window.updateEsavBadge) updateEsavBadge();
   }
 
@@ -6826,11 +6845,12 @@ function _doLogin() {
   }
 
   // ── Tab chat bubbles ───────────────────────────────────────
-  function _addTabBubble(text, role){
+  function _addTabBubble(text, role, skipSave){
     if(!text||!tabMessages) return;
     var el=document.createElement('div');
     el.className='esav-bubble '+role; el.textContent=text;
     tabMessages.appendChild(el); tabMessages.scrollTop=tabMessages.scrollHeight;
+    if(!skipSave && role!=='thinking') _saveChatEntry(role,text);
   }
   function _removeLastThinking(){
     if(!tabMessages) return;
@@ -6883,6 +6903,7 @@ function _doLogin() {
       if(tab==='goals') _loadGoals();
       if(tab==='people') _loadPeople();
       if(tab==='messages'){ _loadMessages(); _clearMsgBadge(); }
+      if(tab==='chat' && tabMessages && !tabMessages._historyRestored){ _restoreChatHistory(); tabMessages._historyRestored=true; }
     });
   });
 
@@ -7169,13 +7190,7 @@ function _doLogin() {
     el.innerHTML='<div class="stl-empty" style="padding:12px 0">Loading…</div>';
     try {
       var res=await fetch(ESAV_URL+'/esav/messages');
-      var msgs=await res.json();
-      if(!msgs.length){
-        var raw=localStorage.getItem('esav_log');
-        var local=raw?JSON.parse(raw):[];
-        msgs=local.map(function(m){ return {id:m.id,type:m.type,body:m.body||m.title||'',ts:new Date(m.sentAt||0).getTime(),read:true}; });
-      }
-      _renderMessages(msgs);
+      _renderMessages(await res.json());
     } catch(e){ el.innerHTML='<div class="stl-empty">Could not load messages.</div>'; }
   }
 
