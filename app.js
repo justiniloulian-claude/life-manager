@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v209…';
+  b.textContent = 'v210…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v209'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v210'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -6596,7 +6596,7 @@ function _doLogin() {
 }
 
 // ============================================================
-// ESAV — PERSONAL ASSISTANT  (v209 redesign)
+// ESAV — PERSONAL ASSISTANT  (v210 redesign)
 // ============================================================
 (function(){
   var ESAV_URL = 'https://192-241-151-231.sslip.io';
@@ -6635,6 +6635,7 @@ function _doLogin() {
   // ── Recording state ────────────────────────────────────────
   var mediaRecorder, audioChunks = [], isRecording = false, isPaused = false;
   var _recSeconds = 0, _recInterval = null, _currentBlob = null, _isTabRecording = false;
+  var _sheetStateName = 'idle';
 
   function _startTimer(el){ _recSeconds=0; _updateTimer(el); _recInterval=setInterval(function(){ _recSeconds++; _updateTimer(el); },1000); }
   function _stopTimer(){ clearInterval(_recInterval); _recInterval=null; _recSeconds=0; }
@@ -6648,6 +6649,7 @@ function _doLogin() {
 
   // ── Sheet state machine ────────────────────────────────────
   function _showSheetState(name){
+    _sheetStateName = name;
     sheetIdle.style.display     = name==='idle'     ? '' : 'none';
     sheetRec.style.display      = name==='rec'      ? '' : 'none';
     sheetPlayback.style.display = name==='playback' ? '' : 'none';
@@ -6817,6 +6819,9 @@ function _doLogin() {
       sheetResponseText.textContent=reply;
       _showSheetState('response');
       setTimeout(closeSheet,4500);
+      // Save sheet conversations to chat history so they appear in the Chat tab
+      if(userText) _saveChatEntry('user', userText);
+      _saveChatEntry('esav', reply);
     } else {
       _addTabBubble(reply,'esav'); // _addTabBubble saves to chat history
     }
@@ -6870,6 +6875,12 @@ function _doLogin() {
     _currentBlob=null; _showSheetState('idle');
   });
   sheetSendVoice.addEventListener('click', function(){ if(_currentBlob) _sendAudioBlob(_currentBlob,'sheet'); });
+  // Enter key sends when in playback state (voice recorded, viewing send/redo options)
+  document.addEventListener('keydown', function(e){
+    if(e.key==='Enter' && !e.shiftKey && sheet.classList.contains('open') && _sheetStateName==='playback'){
+      e.preventDefault(); sheetSendVoice.click();
+    }
+  });
   sheetTextInput.addEventListener('input', function(){ this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,100)+'px'; });
   sheetTextInput.addEventListener('keydown', function(e){
     if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); var t=this.value.trim(); this.value=''; this.style.height='auto'; _sendText(t,'sheet'); }
