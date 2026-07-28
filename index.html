@@ -634,7 +634,11 @@
       <label class="field-label">Task or event</label>
       <input type="text" id="taskTitle" class="field" placeholder="What is it?">
       <label class="field-label">Time <span class="optional">optional</span></label>
-      <input type="time" id="taskTime" class="field">
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="time" id="taskTime" class="field" style="flex:1">
+        <span style="color:var(--c-muted);font-size:13px">to</span>
+        <input type="time" id="taskEndTime" class="field" style="flex:1" placeholder="End time">
+      </div>
       <label class="field-label">Location <span class="optional">optional</span></label>
       <input type="text" id="taskLocation" class="field" placeholder="e.g. Virtual, Office, Synagogue">
       <label class="field-label">Notes <span class="optional">optional</span></label>

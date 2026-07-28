@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v213…';
+  b.textContent = 'v214…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -1423,7 +1423,7 @@ function taskHTML(task, ds, noActions) {
   var isR = task.type === 'routine';
   var itemCls = isR ? 'is-routine' : '';
   var priorityCls = isR ? '' : ('task-p-'+(task.priority||'standard'));
-  var tb = task.time     ? '<span class="badge badge-time">'+fmt12(task.time)+'</span>'       : '';
+  var tb = task.time ? '<span class="badge badge-time">'+(task.endTime ? fmt12(task.time)+' – '+fmt12(task.endTime) : fmt12(task.time))+'</span>' : '';
   var lb = task.location ? '<span class="badge badge-loc">'+escHtml(task.location)+'</span>'  : '';
   var hasTaskNotes = !isR && task.notes && task.notes.trim();
   var linkedCount = (!isR && task.linkedNoteIds && task.linkedNoteIds.length) ? task.linkedNoteIds.length : 0;
@@ -4441,6 +4441,7 @@ window.openAddTask = function(ds) {
   document.getElementById('taskModalTitle').textContent='Add Task or Event';
   document.getElementById('taskTitle').value='';
   document.getElementById('taskTime').value='';
+  document.getElementById('taskEndTime').value='';
   document.getElementById('taskLocation').value='';
   document.getElementById('taskNotes').value='';
   document.getElementById('taskReminder').value='';
@@ -4460,6 +4461,7 @@ window.openEditTask = function(ds,id) {
   document.getElementById('taskModalTitle').textContent='Edit Task';
   document.getElementById('taskTitle').value=t.title;
   document.getElementById('taskTime').value=t.time||'';
+  document.getElementById('taskEndTime').value=t.endTime||'';
   document.getElementById('taskLocation').value=t.location||'';
   document.getElementById('taskNotes').value=t.notes||'';
   document.getElementById('taskReminder').value=t.reminder||'';
@@ -5111,7 +5113,7 @@ function saveTaskModal() {
   var title=document.getElementById('taskTitle').value.trim();
   if (!title){ document.getElementById('taskTitle').classList.add('error'); document.getElementById('taskTitle').focus(); return; }
   document.getElementById('taskTitle').classList.remove('error');
-  var d={title:title,time:document.getElementById('taskTime').value,location:document.getElementById('taskLocation').value.trim(),notes:document.getElementById('taskNotes').value.trim(),reminder:document.getElementById('taskReminder').value,color:state.selectedTaskColor,priority:state.selectedTaskPriority,linkedNoteIds:state.taskModalLinkedNotes.slice()};
+  var d={title:title,time:document.getElementById('taskTime').value,endTime:document.getElementById('taskEndTime').value,location:document.getElementById('taskLocation').value.trim(),notes:document.getElementById('taskNotes').value.trim(),reminder:document.getElementById('taskReminder').value,color:state.selectedTaskColor,priority:state.selectedTaskPriority,linkedNoteIds:state.taskModalLinkedNotes.slice()};
   var addToCal=document.getElementById('taskAddToCalendar').checked;
   state.editTaskId ? updateTask(state.editTaskDate,state.editTaskId,d) : addTask(state.editTaskDate,d);
   if (addToCal) addCalEvent({title:d.title,date:state.editTaskDate,time:d.time,color:d.color});
@@ -6304,7 +6306,7 @@ function printDashboardSingle() {
   if(!tasks.length){html+='<div class="empty">No tasks.</div>';}
   else{
     html+=tasks.map(function(t){
-      var timeStr=t.time?'<span class="task-time">'+fmt12(t.time)+'</span>':'';
+      var timeStr=t.time?'<span class="task-time">'+(t.endTime?fmt12(t.time)+' – '+fmt12(t.endTime):fmt12(t.time))+'</span>':'';
       var noteStr=t.notes?'<span class="task-note">'+escHtml(t.notes)+'</span>':'';
       var rcLabel=t._rc?'<span class="routine-label">Routine</span>':'';
       return '<div class="task'+(t.done?' done':'')+'">'+(t.done?'☑ ':'☐ ')+timeStr+escHtml(t.title)+rcLabel+noteStr+'</div>';
@@ -6321,7 +6323,7 @@ function printDashboardSeven() {
     var dayHtml='<div class="day-block"><div class="day-title">'+date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+'</div>';
     if(!tasks.length){dayHtml+='<div class="empty">—</div>';}
     else{dayHtml+=tasks.map(function(t){
-      var timeStr=t.time?'<span class="task-time">'+fmt12(t.time)+'</span>':'';
+      var timeStr=t.time?'<span class="task-time">'+(t.endTime?fmt12(t.time)+' – '+fmt12(t.endTime):fmt12(t.time))+'</span>':'';
       var rcLabel=t._rc?'<span class="routine-label">R</span>':'';
       return '<div class="task'+(t.done?' done':'')+'">'+(t.done?'☑ ':'☐ ')+timeStr+escHtml(t.title)+rcLabel+'</div>';
     }).join('');}
