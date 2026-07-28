@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v215…';
+  b.textContent = 'v216…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v215'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v216'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -885,7 +885,7 @@ function getTasksForDate(ds) {
     all=ordered;
   }
   var inc=all.filter(function(t){return !t.done;});
-  if (state.priorityFilter) inc=inc.filter(function(t){return t.priority==='urgent'||t.priority==='high';});
+  if (state.priorityFilter) inc=inc.filter(function(t){return t.priority==='priority'||t.priority==='mustdo';});
   var don=all.filter(function(t){return t.done;});
   // Partial sort: timed tasks enforce time order among themselves;
   // untimed tasks stay exactly where drag placed them.
@@ -911,13 +911,13 @@ function toggleDone(ds,id,isRoutine) {
 function addTask(ds,d) {
   var data=getData();
   if (!data.tasks[ds]) data.tasks[ds]=[];
-  data.tasks[ds].push({id:uid(),type:'once',title:d.title,time:d.time||'',location:d.location||'',notes:d.notes||'',reminder:d.reminder||'',color:d.color||'',priority:d.priority||'standard',linkedNoteIds:d.linkedNoteIds||[],done:false,createdAt:new Date().toISOString()});
+  data.tasks[ds].push({id:uid(),type:'once',title:d.title,time:d.time||'',endTime:d.endTime||'',location:d.location||'',notes:d.notes||'',reminder:d.reminder||'',color:d.color||'',priority:d.priority||'standard',linkedNoteIds:d.linkedNoteIds||[],done:false,createdAt:new Date().toISOString()});
   saveT(data.tasks);
 }
 function updateTask(ds,id,d) {
   var data=getData();
   var t=(data.tasks[ds]||[]).find(function(t){return t.id===id;});
-  if (t){t.title=d.title;t.time=d.time||'';t.location=d.location||'';t.notes=d.notes||'';t.reminder=d.reminder||'';t.color=d.color||'';t.priority=d.priority||'standard';if(d.linkedNoteIds!==undefined)t.linkedNoteIds=d.linkedNoteIds;}
+  if (t){t.title=d.title;t.time=d.time||'';t.endTime=d.endTime||'';t.location=d.location||'';t.notes=d.notes||'';t.reminder=d.reminder||'';t.color=d.color||'';t.priority=d.priority||'standard';if(d.linkedNoteIds!==undefined)t.linkedNoteIds=d.linkedNoteIds;}
   saveT(data.tasks);
 }
 function deleteTask(ds,id) {
@@ -1423,7 +1423,8 @@ function taskHTML(task, ds, noActions) {
   var isR = task.type === 'routine';
   var itemCls = isR ? 'is-routine' : '';
   var priorityCls = isR ? '' : ('task-p-'+(task.priority||'standard'));
-  var tb = task.time ? '<span class="badge badge-time">'+(task.endTime ? fmt12(task.time)+' – '+fmt12(task.endTime) : fmt12(task.time))+'</span>' : '';
+  var hasBlock = !!(task.time && task.endTime);
+  var tb = task.time ? '<span class="badge badge-time'+(hasBlock?' badge-time-block':'')+'">'+fmt12(task.time)+(hasBlock?' – '+fmt12(task.endTime):'')+'</span>' : '';
   var lb = task.location ? '<span class="badge badge-loc">'+escHtml(task.location)+'</span>'  : '';
   var hasTaskNotes = !isR && task.notes && task.notes.trim();
   var linkedCount = (!isR && task.linkedNoteIds && task.linkedNoteIds.length) ? task.linkedNoteIds.length : 0;
@@ -1457,7 +1458,7 @@ function taskHTML(task, ds, noActions) {
     ? '<span class="task-drag-handle" onclick="event.stopPropagation()" title="Drag to reorder">⠿</span>'
     : '';
   var ctxMenu=!isR?' oncontextmenu="taskContextMenu(event,\''+ds+'\',\''+task.id+'\')"':'';
-  return '<div class="task-item '+itemCls+(task.done?' is-done':'')+(noActions?' task-compact-click':' task-clickable')+'" id="ti-'+task.id+'" data-ds="'+ds+'" data-tid="'+task.id+'" data-isroutine="'+isR+'"'+itemClick+dragAttrs+ctxMenu+'>' +
+  return '<div class="task-item '+itemCls+(hasBlock?' task-time-block':'')+(task.done?' is-done':'')+(noActions?' task-compact-click':' task-clickable')+'" id="ti-'+task.id+'" data-ds="'+ds+'" data-tid="'+task.id+'" data-isroutine="'+isR+'"'+itemClick+dragAttrs+ctxMenu+'>' +
     dragHandle+
     '<input type="checkbox" class="task-check"'+(task.done?' checked':'')+' onclick="event.stopPropagation()" onchange="checkTask(\''+ds+'\',\''+task.id+'\','+isR+')">' +
     '<div class="task-body"><div class="task-title '+priorityCls+'">'+escHtml(task.title)+notesDot+'</div>' +
