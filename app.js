@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v211…';
+  b.textContent = 'v212…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -6788,14 +6788,14 @@ function _doLogin() {
     form.append('context',_getClientContext());
     try {
       var res=await fetch(ESAV_URL+'/assistant',{method:'POST',body:form});
-      var data=await res.json();
-      if(data.error){ _handleResponse(null,'Error: '+data.error,source); return; }
+      var data; try{ data=await res.json(); }catch(e){ data={error:'parse'}; }
+      if(data.error){ _removeLastThinking(); _handleResponse(null,"Esav couldn't process that — please try again.",source); return; }
       var reply=data.response||'Done!';
       if(source==='tab'&&data.transcript) _removeLastThinking();
       _handleResponse(data.transcript||'',reply,source);
       _afterHistory(data.transcript||'',reply);
       if(data.results&&data.results.length) _syncData();
-    } catch(e){ _removeLastThinking(); _handleResponse(null,'Could not reach Esav. Check your connection.',source); }
+    } catch(e){ _removeLastThinking(); _handleResponse(null,"Esav couldn't process that — please try again.",source); }
   }
 
   async function _sendText(text, source){
@@ -6804,8 +6804,8 @@ function _doLogin() {
     else _addTabBubble(text,'user');
     try {
       var res=await fetch(ESAV_URL+'/assistant/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,history:_history,context:_getClientContext()})});
-      var data=await res.json();
-      var reply=data.error?('Error: '+data.error):(data.response||'Done!');
+      var data; try{ data=await res.json(); }catch(e){ data={error:'parse'}; }
+      var reply=data.error?"Esav couldn't process that — please try again.":(data.response||'Done!');
       _handleResponse(source==='sheet'?text:null,reply,source);
       if(!data.error){ _afterHistory(text,reply); if(data.results&&data.results.length) _syncData(); }
     } catch(e){ _handleResponse(null,'Could not reach Esav. Check your connection.',source); }
