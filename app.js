@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v210…';
+  b.textContent = 'v211…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v210'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v211'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -6596,7 +6596,7 @@ function _doLogin() {
 }
 
 // ============================================================
-// ESAV — PERSONAL ASSISTANT  (v210 redesign)
+// ESAV — PERSONAL ASSISTANT  (v211 redesign)
 // ============================================================
 (function(){
   var ESAV_URL = 'https://192-241-151-231.sslip.io';
@@ -6763,6 +6763,21 @@ function _doLogin() {
   });
 
   // ── Send ───────────────────────────────────────────────────
+  function _getClientContext(){
+    var parts=[], page=state.currentPage||'dashboard';
+    if(page==='dashboard'){
+      var view=state.dashView||'single';
+      var vName={single:'Today',seven:'7-Day',cheshbon:'Cheshbon',health:'Health',reminders:'Esav'}[view]||view;
+      parts.push('Dashboard – '+vName+' view, date: '+toDateStr(new Date()));
+    } else if(page==='calendar'){
+      var yr=state.calYear||new Date().getFullYear(), mo=String((state.calMonth||new Date().getMonth())+1).padStart(2,'0');
+      parts.push('Calendar tab, viewing '+yr+'-'+mo);
+    } else {
+      parts.push('Tab: '+page);
+    }
+    return parts.join(', ');
+  }
+
   async function _sendAudioBlob(blob, source){
     if(source==='sheet') _showSheetState('thinking');
     else _addTabBubble('🎤 Sending voice…','thinking');
@@ -6770,6 +6785,7 @@ function _doLogin() {
     var form=new FormData();
     form.append('audio',blob,'voice.'+ext);
     form.append('history',JSON.stringify(_history));
+    form.append('context',_getClientContext());
     try {
       var res=await fetch(ESAV_URL+'/assistant',{method:'POST',body:form});
       var data=await res.json();
@@ -6787,7 +6803,7 @@ function _doLogin() {
     if(source==='sheet') _showSheetState('thinking');
     else _addTabBubble(text,'user');
     try {
-      var res=await fetch(ESAV_URL+'/assistant/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,history:_history})});
+      var res=await fetch(ESAV_URL+'/assistant/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,history:_history,context:_getClientContext()})});
       var data=await res.json();
       var reply=data.error?('Error: '+data.error):(data.response||'Done!');
       _handleResponse(source==='sheet'?text:null,reply,source);
