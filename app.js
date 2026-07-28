@@ -6780,6 +6780,12 @@ function _doLogin() {
     return parts.join(', ');
   }
 
+  function _fetchWithTimeout(url, opts, ms){
+    var ctrl=new AbortController();
+    var tid=setTimeout(function(){ ctrl.abort(); },ms||30000);
+    return fetch(url,Object.assign({},opts,{signal:ctrl.signal})).finally(function(){ clearTimeout(tid); });
+  }
+
   async function _sendAudioBlob(blob, source){
     if(source==='sheet') _showSheetState('thinking');
     else _addTabBubble('🎤 Sending voice…','thinking');
@@ -6789,7 +6795,7 @@ function _doLogin() {
     form.append('history',JSON.stringify(_history));
     form.append('context',_getClientContext());
     try {
-      var res=await fetch(ESAV_URL+'/assistant',{method:'POST',body:form});
+      var res=await _fetchWithTimeout(ESAV_URL+'/assistant',{method:'POST',body:form},35000);
       var data; try{ data=await res.json(); }catch(e){ data={error:'parse'}; }
       if(data.error){ _removeLastThinking(); _handleResponse(null,"Esav couldn't process that — please try again.",source); return; }
       var reply=data.response||'Done!';
@@ -6797,7 +6803,10 @@ function _doLogin() {
       _handleResponse(data.transcript||'',reply,source);
       _afterHistory(data.transcript||'',reply);
       if(data.results&&data.results.length) _syncData();
-    } catch(e){ _removeLastThinking(); _handleResponse(null,"Esav couldn't process that — please try again.",source); }
+    } catch(e){
+      _removeLastThinking();
+      _handleResponse(null, e.name==='AbortError' ? 'Esav is taking too long — please try again.' : "Esav couldn't process that — please try again.", source);
+    }
   }
 
   async function _sendText(text, source){
@@ -6805,12 +6814,14 @@ function _doLogin() {
     if(source==='sheet') _showSheetState('thinking');
     else _addTabBubble(text,'user');
     try {
-      var res=await fetch(ESAV_URL+'/assistant/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,history:_history,context:_getClientContext()})});
+      var res=await _fetchWithTimeout(ESAV_URL+'/assistant/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,history:_history,context:_getClientContext()})},35000);
       var data; try{ data=await res.json(); }catch(e){ data={error:'parse'}; }
       var reply=data.error?"Esav couldn't process that — please try again.":(data.response||'Done!');
       _handleResponse(source==='sheet'?text:null,reply,source);
       if(!data.error){ _afterHistory(text,reply); if(data.results&&data.results.length) _syncData(); }
-    } catch(e){ _handleResponse(null,'Could not reach Esav. Check your connection.',source); }
+    } catch(e){
+      _handleResponse(null, e.name==='AbortError' ? 'Esav is taking too long — please try again.' : 'Could not reach Esav. Check your connection.', source);
+    }
   }
 
   // ── Chat history persistence ───────────────────────────────
