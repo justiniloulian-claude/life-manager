@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v212…';
+  b.textContent = 'v213…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -6823,8 +6823,9 @@ function _doLogin() {
   function _restoreChatHistory(){
     if(!tabMessages) return;
     try{
+      tabMessages.innerHTML='';
       var log=JSON.parse(localStorage.getItem('esav_chat_history')||'[]');
-      if(!log.length) return;
+      if(!log.length){ tabMessages.innerHTML='<div class="stl-empty" style="padding:16px 0;color:var(--c-muted)">No messages yet today</div>'; return; }
       log.forEach(function(e){ _addTabBubble(e.text,e.role,true); });
       tabMessages.scrollTop=tabMessages.scrollHeight;
     }catch(e){}
@@ -6834,8 +6835,7 @@ function _doLogin() {
     if(source==='sheet'){
       sheetResponseText.textContent=reply;
       _showSheetState('response');
-      setTimeout(closeSheet,4500);
-      // Save sheet conversations to chat history so they appear in the Chat tab
+      // No auto-close — user taps Done to dismiss
       if(userText) _saveChatEntry('user', userText);
       _saveChatEntry('esav', reply);
     } else {
@@ -6891,6 +6891,7 @@ function _doLogin() {
     _currentBlob=null; _showSheetState('idle');
   });
   sheetSendVoice.addEventListener('click', function(){ if(_currentBlob) _sendAudioBlob(_currentBlob,'sheet'); });
+  document.getElementById('esavSheetDoneBtn').addEventListener('click', closeSheet);
   // Enter key sends when in playback state (voice recorded, viewing send/redo options)
   document.addEventListener('keydown', function(e){
     if(e.key==='Enter' && !e.shiftKey && sheet.classList.contains('open') && _sheetStateName==='playback'){
@@ -6930,7 +6931,7 @@ function _doLogin() {
       if(tab==='goals') _loadGoals();
       if(tab==='people') _loadPeople();
       if(tab==='messages'){ _loadMessages(); _clearMsgBadge(); }
-      if(tab==='chat' && tabMessages && !tabMessages._historyRestored){ _restoreChatHistory(); tabMessages._historyRestored=true; }
+      if(tab==='chat' && tabMessages){ _restoreChatHistory(); }
     });
   });
 
