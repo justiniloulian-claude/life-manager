@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v218…';
+  b.textContent = 'v219…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v218'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v219'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -6958,6 +6958,24 @@ function _doLogin() {
   var _CAT_COLORS={health:'#16a34a',spiritual:'#7c3aed',learning:'#2563eb',relationships:'#db2777',work:'#d97706',personal:'#64748b'};
   var _goalsCache=[], _editingGoalId=null, _dragGoalId=null;
 
+  function _isoWeekStr(d) {
+    var dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+    var day=dt.getUTCDay()||7; dt.setUTCDate(dt.getUTCDate()+4-day);
+    var ys=new Date(Date.UTC(dt.getUTCFullYear(),0,1));
+    var wk=Math.ceil((((dt-ys)/86400000)+1)/7);
+    return dt.getUTCFullYear()+'-W'+String(wk).padStart(2,'0');
+  }
+  function _monthStr(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+  function _yearStr(d) { return String(d.getFullYear()); }
+  function _fmtMonthPeriod(p){ var pts=p.split('-'); var months=['January','February','March','April','May','June','July','August','September','October','November','December']; return (months[parseInt(pts[1],10)-1]||pts[1])+' '+pts[0]; }
+  function _fmtWeekPeriod(p){
+    var m=p.match(/^(\d{4})-W(\d{2})$/); if(!m) return p;
+    var yr=parseInt(m[1]); var wk=parseInt(m[2]);
+    var jan4=new Date(yr,0,4);
+    var mon=new Date(jan4); mon.setDate(jan4.getDate()-(jan4.getDay()||7)+1+(wk-1)*7);
+    return 'Week of '+mon.toLocaleDateString([],{month:'short',day:'numeric'});
+  }
+
   // ── Frequency helpers ──────────────────────────────────────
   function _freqToDays(num, unit){
     var n=parseInt(num)||1;
@@ -6999,31 +7017,91 @@ function _doLogin() {
   function _renderGoals(goals){
     var el=document.getElementById('esavGoalsList'); if(!el) return;
     if(!goals.length){ el.innerHTML='<div class="stl-empty">No goals yet. Add one below.</div>'; return; }
-    var active=goals.filter(function(g){ return !g.done; });
-    var done=goals.filter(function(g){ return g.done; });
-    function goalHtml(g, draggable){
+    var now=new Date();
+    var curWeek=_isoWeekStr(now), curMonth=_monthStr(now), curYear=_yearStr(now);
+
+    function goalHtml(g, draggable, showRollover){
       var cc=_CAT_COLORS[g.category]||'#888';
       var cat=g.category?'<span class="esav-goal-cat" style="background:'+cc+'22;color:'+cc+'">'+escHtml(g.category)+'</span>':'';
-      var td=g.targetDate?'<span class="esav-goal-date">🎯 '+escHtml(g.targetDate)+'</span>':'';
       var editing=(_editingGoalId===g.id);
       var titleEl=editing
         ?'<input class="esav-goal-edit-input" id="esavGoalEdit_'+g.id+'" value="'+escHtml(g.text)+'" onblur="window._esavSaveGoalEdit(\''+g.id+'\')" onkeydown="if(event.key===\'Enter\')window._esavSaveGoalEdit(\''+g.id+'\')" />'
         :'<span class="esav-goal-title">'+escHtml(g.text)+'</span>';
+      var rollBtn=showRollover&&!g.done?'<button class="esav-goal-rollover" onclick="window._esavRolloverGoal(\''+g.id+'\')" title="Move to this week">→ This week</button>':'';
       return '<div class="esav-goal-item'+(g.done?' done':'')+'"'+(draggable?' draggable="true"':'')+' data-id="'+g.id+'">'+
         (draggable?'<span class="esav-goal-drag-handle" title="Drag to reorder">⠿</span>':'')+
         '<button class="esav-goal-check" onclick="window._esavToggleGoal(\''+g.id+'\','+(!g.done)+')">'+(g.done?'✓':'○')+'</button>'+
         '<div class="esav-goal-body">'+
-          '<div class="esav-goal-title-row">'+titleEl+(cat?' '+cat:'')+(td?' '+td:'')+'</div>'+
+          '<div class="esav-goal-title-row">'+titleEl+(cat?' '+cat:'')+'</div>'+
         '</div>'+
         '<div class="esav-goal-controls">'+
+          rollBtn+
           (!g.done&&!editing?'<button class="esav-goal-ctrl-btn" onclick="window._esavEditGoal(\''+g.id+'\')" title="Edit">✎</button>':'')+
           (editing?'<button class="esav-goal-ctrl-btn esav-goal-save-btn" onclick="window._esavSaveGoalEdit(\''+g.id+'\')" title="Save">✓</button>':'')+
           '<button class="esav-goal-delete" onclick="window._esavDeleteGoal(\''+g.id+'\')" title="Delete">×</button>'+
         '</div>'+
       '</div>';
     }
-    var html=active.map(function(g){ return goalHtml(g,true); }).join('');
-    if(done.length) html+='<div class="esav-goals-done-label">Completed</div>'+done.map(function(g){ return goalHtml(g,false); }).join('');
+
+    function renderGroup(list, draggable, showRollover){
+      var active=list.filter(function(g){return !g.done;});
+      var done=list.filter(function(g){return g.done;});
+      var h=active.map(function(g){return goalHtml(g,draggable,showRollover);}).join('');
+      if(done.length) h+='<div class="esav-goals-done-label">Done</div>'+done.map(function(g){return goalHtml(g,false,false);}).join('');
+      return h;
+    }
+
+    var yearly=goals.filter(function(g){return (g.timeframe||'yearly')==='yearly';});
+    var monthly=goals.filter(function(g){return g.timeframe==='monthly';});
+    var weekly=goals.filter(function(g){return g.timeframe==='weekly';});
+    var thisWeek=weekly.filter(function(g){return g.period===curWeek;});
+    var pastWeeks=weekly.filter(function(g){return g.period!==curWeek;});
+    var html='';
+
+    // ── Yearly ──
+    if(yearly.length){
+      html+='<div class="goals-section-header">Yearly</div>';
+      var yrs=[]; yearly.forEach(function(g){var y=g.period||curYear;if(yrs.indexOf(y)<0)yrs.push(y);}); yrs.sort().reverse();
+      yrs.forEach(function(yr){
+        var grp=yearly.filter(function(g){return (g.period||curYear)===yr;});
+        html+='<div class="goals-period-label">'+escHtml(yr)+'</div>'+renderGroup(grp,true,false);
+      });
+    }
+
+    // ── Monthly ──
+    if(monthly.length){
+      html+='<div class="goals-section-header">Monthly</div>';
+      var mos=[]; monthly.forEach(function(g){var m=g.period||curMonth;if(mos.indexOf(m)<0)mos.push(m);}); mos.sort().reverse();
+      mos.forEach(function(mo){
+        var grp=monthly.filter(function(g){return (g.period||curMonth)===mo;});
+        var isCur=mo===curMonth;
+        var lbl=_fmtMonthPeriod(mo)+(isCur?' <span class="goals-current-chip">This month</span>':'');
+        html+='<div class="goals-period-label'+(isCur?' is-current':'')+'">'+lbl+'</div>'+renderGroup(grp,true,false);
+      });
+    }
+
+    // ── Weekly ──
+    if(weekly.length){
+      html+='<div class="goals-section-header">Weekly</div>';
+      if(thisWeek.length){
+        html+='<div class="goals-period-label is-current">This week <span class="goals-current-chip">Current</span></div>'+renderGroup(thisWeek,true,false);
+      } else {
+        html+='<div class="goals-period-label is-current">This week <span class="goals-current-chip">Current</span></div><div class="stl-empty" style="font-size:12px;padding:6px 0">No goals for this week yet.</div>';
+      }
+      if(pastWeeks.length){
+        var incPast=pastWeeks.filter(function(g){return !g.done;}).length;
+        html+='<div class="goals-past-toggle" onclick="this.nextElementSibling.classList.toggle(\'open\')">▸ Past weeks'+(incPast?' ('+incPast+' incomplete)':'')+'</div>';
+        html+='<div class="goals-past-section">';
+        var pws=[]; pastWeeks.forEach(function(g){var w=g.period||'';if(pws.indexOf(w)<0)pws.push(w);}); pws.sort().reverse();
+        pws.forEach(function(pw){
+          var grp=pastWeeks.filter(function(g){return (g.period||'')===pw;});
+          html+='<div class="goals-period-label">'+_fmtWeekPeriod(pw)+'</div>'+renderGroup(grp,false,true);
+        });
+        html+='</div>';
+      }
+    }
+
+    if(!yearly.length&&!monthly.length&&!weekly.length) html='<div class="stl-empty">No goals yet. Add one below.</div>';
     el.innerHTML=html;
     if(_editingGoalId){
       var inp=document.getElementById('esavGoalEdit_'+_editingGoalId);
@@ -7080,22 +7158,45 @@ function _doLogin() {
     _editingGoalId=null;
     try{ await fetch(ESAV_URL+'/esav/goals/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text})}); _loadGoals(); }catch(e){}
   };
+  window._esavRolloverGoal=async function(id){
+    var curWeek=_isoWeekStr(new Date());
+    try{ await fetch(ESAV_URL+'/esav/goals/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({period:curWeek})}); _loadGoals(); }catch(e){}
+  };
+
+  // ── Period picker: sync input type with timeframe selection ──
+  var goalTimeframe=document.getElementById('esavGoalTimeframe');
+  var goalPeriod=document.getElementById('esavGoalPeriod');
+  function _syncPeriodPicker(){
+    var tf=goalTimeframe?goalTimeframe.value:'monthly';
+    if(!goalPeriod) return;
+    var now=new Date();
+    if(tf==='yearly'){
+      goalPeriod.style.display='none';
+    } else if(tf==='monthly'){
+      goalPeriod.style.display='';
+      goalPeriod.type='month';
+      if(!goalPeriod.value) goalPeriod.value=_monthStr(now);
+    } else {
+      goalPeriod.style.display='';
+      goalPeriod.type='week';
+      if(!goalPeriod.value) goalPeriod.value=_isoWeekStr(now);
+    }
+  }
+  if(goalTimeframe){ goalTimeframe.addEventListener('change',_syncPeriodPicker); _syncPeriodPicker(); }
 
   var goalAddBtn=document.getElementById('esavGoalAddBtn');
   var goalInput=document.getElementById('esavGoalInput');
   var goalCat=document.getElementById('esavGoalCategory');
-  var goalDate=document.getElementById('esavGoalTargetDate');
   if(goalAddBtn) goalAddBtn.addEventListener('click', async function(){
     var text=(goalInput?goalInput.value:'').trim();
-    var cat=goalCat?goalCat.value:'';
-    var td=goalDate?goalDate.value:'';
     if(!text) return;
-    var body={text:text,category:cat}; if(td) body.targetDate=td;
+    var tf=goalTimeframe?goalTimeframe.value:'monthly';
+    var now=new Date();
+    var period=tf==='yearly'?_yearStr(now):(goalPeriod&&goalPeriod.value?goalPeriod.value:(tf==='monthly'?_monthStr(now):_isoWeekStr(now)));
+    var body={text:text,timeframe:tf,period:period,category:goalCat?goalCat.value:''};
     try{
       await fetch(ESAV_URL+'/esav/goals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
       if(goalInput) goalInput.value='';
-      if(goalCat)   goalCat.value='';
-      if(goalDate)  goalDate.value='';
       _loadGoals();
     }catch(e){}
   });

@@ -452,8 +452,17 @@
     <!-- Goals panel -->
     <div id="esavGoalsPanel" class="esav-panel">
       <div id="esavGoalsList" class="esav-goals-list"></div>
-      <div class="esav-add-row esav-goal-add-row">
-        <input id="esavGoalInput" class="esav-add-input" placeholder="Add a goal…" type="text" style="flex:3">
+      <div class="esav-add-row" style="gap:6px">
+        <input id="esavGoalInput" class="esav-add-input" placeholder="Add a goal…" type="text" style="flex:1">
+        <button id="esavGoalAddBtn" class="esav-add-btn">+ Add</button>
+      </div>
+      <div class="esav-add-row esav-goal-meta-row" style="gap:6px;margin-top:4px">
+        <select id="esavGoalTimeframe" class="esav-add-select">
+          <option value="yearly">Yearly</option>
+          <option value="monthly" selected>Monthly</option>
+          <option value="weekly">Weekly</option>
+        </select>
+        <input id="esavGoalPeriod" class="esav-add-input" type="month" style="flex:1;min-width:110px">
         <select id="esavGoalCategory" class="esav-add-select">
           <option value="">Category</option>
           <option value="health">Health</option>
@@ -463,8 +472,6 @@
           <option value="work">Work</option>
           <option value="personal">Personal</option>
         </select>
-        <input id="esavGoalTargetDate" class="esav-add-input esav-date-input" type="date" title="Target date (optional)" style="flex:1.2;min-width:110px">
-        <button id="esavGoalAddBtn" class="esav-add-btn">+ Add</button>
       </div>
     </div>
     <!-- People panel -->
