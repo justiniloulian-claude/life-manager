@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v220…';
+  b.textContent = 'v221…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v220'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v221'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -7024,21 +7024,37 @@ function _doLogin() {
       var cc=_CAT_COLORS[g.category]||'#888';
       var cat=g.category?'<span class="esav-goal-cat" style="background:'+cc+'22;color:'+cc+'">'+escHtml(g.category)+'</span>':'';
       var editing=(_editingGoalId===g.id);
-      var titleEl=editing
-        ?'<input class="esav-goal-edit-input" id="esavGoalEdit_'+g.id+'" value="'+escHtml(g.text)+'" onblur="window._esavSaveGoalEdit(\''+g.id+'\')" onkeydown="if(event.key===\'Enter\')window._esavSaveGoalEdit(\''+g.id+'\')" />'
-        :'<span class="esav-goal-title">'+escHtml(g.text)+'</span>';
+      var tf=g.timeframe||'yearly';
+      var periodVal=g.period||'';
+      var periodType=tf==='monthly'?'month':tf==='weekly'?'week':'';
+      var titleEl, metaEl='';
+      if(editing){
+        titleEl='<input class="esav-goal-edit-input" id="esavGoalEdit_'+g.id+'" value="'+escHtml(g.text)+'" onkeydown="if(event.key===\'Enter\')window._esavSaveGoalEdit(\''+g.id+'\');if(event.key===\'Escape\')window._esavCancelGoalEdit()" />';
+        metaEl='<div class="esav-goal-edit-meta">'+
+          '<select class="esav-goal-edit-tf" id="esavGoalEditTf_'+g.id+'" onchange="window._esavGoalTfChange(\''+g.id+'\')">'+
+            '<option value="yearly"'+(tf==='yearly'?' selected':'')+'>Yearly</option>'+
+            '<option value="monthly"'+(tf==='monthly'?' selected':'')+'>Monthly</option>'+
+            '<option value="weekly"'+(tf==='weekly'?' selected':'')+'>Weekly</option>'+
+          '</select>'+
+          (periodType?'<input class="esav-goal-edit-period" id="esavGoalEditPeriod_'+g.id+'" type="'+periodType+'" value="'+escHtml(periodVal)+'">':'<span style="font-size:11px;color:#9ca3af">'+escHtml(curYear)+'</span>')+
+        '</div>';
+      } else {
+        titleEl='<span class="esav-goal-title">'+escHtml(g.text)+'</span>';
+      }
       var rollBtn=showRollover&&!g.done?'<button class="esav-goal-rollover" onclick="window._esavRolloverGoal(\''+g.id+'\')" title="Move to this week">→ This week</button>':'';
-      return '<div class="esav-goal-item'+(g.done?' done':'')+'"'+(draggable?' draggable="true"':'')+' data-id="'+g.id+'">'+
-        (draggable?'<span class="esav-goal-drag-handle" title="Drag to reorder">⠿</span>':'')+
+      return '<div class="esav-goal-item'+(g.done?' done':'')+(editing?' editing':'')+'"'+(draggable&&!editing?' draggable="true"':'')+' data-id="'+g.id+'">'+
+        (draggable&&!editing?'<span class="esav-goal-drag-handle" title="Drag to reorder">⠿</span>':'')+
         '<button class="esav-goal-check" onclick="window._esavToggleGoal(\''+g.id+'\','+(!g.done)+')">'+(g.done?'✓':'○')+'</button>'+
         '<div class="esav-goal-body">'+
-          '<div class="esav-goal-title-row">'+titleEl+(cat?' '+cat:'')+'</div>'+
+          '<div class="esav-goal-title-row">'+titleEl+(cat&&!editing?' '+cat:'')+'</div>'+
+          metaEl+
         '</div>'+
         '<div class="esav-goal-controls">'+
           rollBtn+
           (!g.done&&!editing?'<button class="esav-goal-ctrl-btn" onclick="window._esavEditGoal(\''+g.id+'\')" title="Edit">✎</button>':'')+
           (editing?'<button class="esav-goal-ctrl-btn esav-goal-save-btn" onclick="window._esavSaveGoalEdit(\''+g.id+'\')" title="Save">✓</button>':'')+
-          '<button class="esav-goal-delete" onclick="window._esavDeleteGoal(\''+g.id+'\')" title="Delete">×</button>'+
+          (editing?'<button class="esav-goal-ctrl-btn" onclick="window._esavCancelGoalEdit()" title="Cancel" style="color:#aaa">✕</button>':'')+
+          (!editing?'<button class="esav-goal-delete" onclick="window._esavDeleteGoal(\''+g.id+'\')" title="Delete">×</button>':'')+
         '</div>'+
       '</div>';
     }
@@ -7155,8 +7171,24 @@ function _doLogin() {
   window._esavSaveGoalEdit=async function(id){
     var inp=document.getElementById('esavGoalEdit_'+id); if(!inp) return;
     var text=inp.value.trim(); if(!text) return;
+    var tfEl=document.getElementById('esavGoalEditTf_'+id);
+    var tf=tfEl?tfEl.value:'yearly';
+    var periodEl=document.getElementById('esavGoalEditPeriod_'+id);
+    var period=periodEl?periodEl.value:(tf==='yearly'?_yearStr(new Date()):'');
+    if(tf==='yearly') period=_yearStr(new Date());
     _editingGoalId=null;
-    try{ await fetch(ESAV_URL+'/esav/goals/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text})}); _loadGoals(); }catch(e){}
+    try{ await fetch(ESAV_URL+'/esav/goals/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,timeframe:tf,period:period})}); _loadGoals(); }catch(e){}
+  };
+  window._esavCancelGoalEdit=function(){ _editingGoalId=null; _renderGoals(_goalsCache); };
+  window._esavGoalTfChange=function(id){
+    var tfEl=document.getElementById('esavGoalEditTf_'+id); if(!tfEl) return;
+    var tf=tfEl.value;
+    var periodEl=document.getElementById('esavGoalEditPeriod_'+id);
+    if(!periodEl) return;
+    var now=new Date();
+    if(tf==='yearly'){ periodEl.style.display='none'; }
+    else if(tf==='monthly'){ periodEl.style.display=''; periodEl.type='month'; if(!periodEl.value) periodEl.value=_monthStr(now); }
+    else { periodEl.style.display=''; periodEl.type='week'; if(!periodEl.value) periodEl.value=_isoWeekStr(now); }
   };
   window._esavRolloverGoal=async function(id){
     var curWeek=_isoWeekStr(new Date());
