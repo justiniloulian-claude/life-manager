@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v219…';
+  b.textContent = 'v220…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v219'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v220'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -7213,22 +7213,97 @@ function _doLogin() {
               .sort(function(a,b){ return b.ts-a.ts; });
   }
 
+  // ── People categories ──────────────────────────────────────
+  var _PEOPLE_CAT_PALETTE=['#7c3aed','#2563eb','#16a34a','#db2777','#d97706','#0891b2','#dc2626','#65a30d','#6366f1','#0d9488'];
+  var _activePeopleCat=''; // '' = All
+  var _openCatPickerId=null; // person id whose picker is open
+
+  function _getPeopleCats(){ try{ return JSON.parse(localStorage.getItem('esav_person_cats')||'[]'); }catch(e){ return []; } }
+  function _savePeopleCats(cats){ localStorage.setItem('esav_person_cats',JSON.stringify(cats)); }
+
+  function _renderCatStrip(){
+    var strip=document.getElementById('peopleCatStrip'); if(!strip) return;
+    var cats=_getPeopleCats();
+    var html='<button class="people-cat-filter'+('' ===_activePeopleCat?' active':'')+'" data-cat="" onclick="window._setPeopleCatFilter(\'\')">All</button>';
+    cats.forEach(function(c){
+      html+='<button class="people-cat-filter'+(c.id===_activePeopleCat?' active':'')+'" data-cat="'+c.id+'" onclick="window._setPeopleCatFilter(\''+c.id+'\')" style="'+(c.id===_activePeopleCat?'background:'+c.color+';border-color:'+c.color+';color:#fff':'border-color:'+c.color+';color:'+c.color)+'">'+escHtml(c.name)+'</button>';
+    });
+    html+='<button class="people-cat-add-btn" id="peopleCatAddBtn" onclick="window._toggleCatNewForm()">+ Category</button>';
+    strip.innerHTML=html;
+  }
+
+  window._setPeopleCatFilter=function(catId){ _activePeopleCat=catId; _renderCatStrip(); _loadPeople(); };
+  window._toggleCatNewForm=function(){
+    var f=document.getElementById('peopleCatNewForm'); if(!f) return;
+    var showing=f.style.display!=='none';
+    f.style.display=showing?'none':'flex';
+    if(!showing){ var inp=document.getElementById('peopleCatNewName'); if(inp){inp.value='';inp.focus();} }
+  };
+  window._savePeopleCatNew=function(){
+    var inp=document.getElementById('peopleCatNewName'); if(!inp) return;
+    var name=inp.value.trim(); if(!name) return;
+    var cats=_getPeopleCats();
+    var color=_PEOPLE_CAT_PALETTE[cats.length%_PEOPLE_CAT_PALETTE.length];
+    cats.push({id:uid(),name:name,color:color});
+    _savePeopleCats(cats);
+    var f=document.getElementById('peopleCatNewForm'); if(f) f.style.display='none';
+    _renderCatStrip();
+  };
+  window._deletePeopleCat=function(catId){
+    var cats=_getPeopleCats().filter(function(c){ return c.id!==catId; });
+    _savePeopleCats(cats);
+    if(_activePeopleCat===catId) _activePeopleCat='';
+    _renderCatStrip(); _loadPeople();
+  };
+  window._openCatPicker=function(pid){
+    if(_openCatPickerId===pid){ _openCatPickerId=null; _renderPeople(_peopleCache); return; }
+    _openCatPickerId=pid; _renderPeople(_peopleCache);
+    setTimeout(function(){
+      document.addEventListener('click',function _closePicker(e){
+        if(!e.target.closest('.esav-cat-picker')&&!e.target.closest('.esav-person-cat-assign-btn')&&!e.target.closest('.esav-person-cat-pill')){
+          _openCatPickerId=null; _renderPeople(_peopleCache);
+          document.removeEventListener('click',_closePicker);
+        }
+      });
+    },10);
+  };
+  window._togglePersonCat=async function(pid,catId){
+    var p=_peopleCache.find(function(x){ return x.id===pid; }); if(!p) return;
+    var cats=(p.categories||[]).slice();
+    var idx=cats.indexOf(catId);
+    if(idx>=0) cats.splice(idx,1); else cats.push(catId);
+    p.categories=cats; // optimistic
+    _renderPeople(_peopleCache);
+    try{ await fetch(ESAV_URL+'/esav/people/'+pid,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({categories:cats})}); }catch(e){}
+  };
+
   // ── People ─────────────────────────────────────────────────
+  var _peopleCache=[];
   async function _loadPeople(){
     var el=document.getElementById('esavPeopleList'); if(!el) return;
     el.innerHTML='<div class="stl-empty" style="padding:12px 0">Loading…</div>';
-    try{ var res=await fetch(ESAV_URL+'/esav/people'); _renderPeople(await res.json()); }
+    try{ var res=await fetch(ESAV_URL+'/esav/people'); _peopleCache=await res.json(); _renderCatStrip(); _renderPeople(_peopleCache); }
     catch(e){ el.innerHTML='<div class="stl-empty">Could not load people.</div>'; }
   }
 
   function _renderPeople(people){
     var el=document.getElementById('esavPeopleList'); if(!el) return;
-    if(!people.length){ el.innerHTML='<div class="stl-empty">No one added yet.</div>'; return; }
-    var sorted=people.slice().sort(function(a,b){
+    var allCats=_getPeopleCats();
+    var catMap={}; allCats.forEach(function(c){ catMap[c.id]=c; });
+
+    // filter by active category
+    var visible=_activePeopleCat
+      ? people.filter(function(p){ return (p.categories||[]).indexOf(_activePeopleCat)>=0; })
+      : people;
+
+    if(!visible.length){ el.innerHTML='<div class="stl-empty">'+(people.length?'No one in this category.':'No one added yet.')+'</div>'; return; }
+
+    var sorted=visible.slice().sort(function(a,b){
       var aNext=(a.lastContact||0)+a.frequencyDays*86400000;
       var bNext=(b.lastContact||0)+b.frequencyDays*86400000;
       return aNext-bNext;
     });
+
     el.innerHTML=sorted.map(function(p){
       var overdue=p.daysOverdue>0;
       var urgent=!p.lastContact||p.daysOverdue>7;
@@ -7236,7 +7311,6 @@ function _doLogin() {
       var nextDate=_nextContactDate(p.lastContact,p.frequencyDays);
       var statusText=!p.lastContact?'Never contacted':overdue?(p.daysOverdue+' day'+(p.daysOverdue>1?'s':'')+' overdue'):(nextDate?'Next: '+nextDate:'On track');
       var last=p.lastContact?_daysAgoStr(p.lastContact):'Never';
-      // merge server history with local cache so notes always show
       var history=_mergeHistory(p.contactHistory||[], p.id);
 
       var entriesHtml=history.length
@@ -7250,6 +7324,35 @@ function _doLogin() {
           }).join('')
         : '<div class="esav-contact-entry-no-note" style="padding:2px 0">No conversations logged yet</div>';
 
+      // ── category pills ──
+      var pCats=p.categories||[];
+      var pillsHtml=pCats.map(function(cid){
+        var c=catMap[cid]; if(!c) return '';
+        return '<span class="esav-person-cat-pill" style="background:'+c.color+'22;color:'+c.color+'">'+
+          escHtml(c.name)+
+          '<span class="cat-remove" onclick="event.stopPropagation();window._togglePersonCat(\''+p.id+'\',\''+cid+'\')">×</span>'+
+          '</span>';
+      }).join('');
+      var assignBtn='<button class="esav-person-cat-assign-btn" onclick="event.stopPropagation();window._openCatPicker(\''+p.id+'\')">+ tag</button>';
+
+      // ── cat picker dropdown ──
+      var pickerHtml='';
+      if(_openCatPickerId===p.id){
+        if(!allCats.length){
+          pickerHtml='<div class="esav-cat-picker"><div class="esav-cat-picker-none">No categories yet — add one above.</div></div>';
+        } else {
+          pickerHtml='<div class="esav-cat-picker">'+allCats.map(function(c){
+            var checked=pCats.indexOf(c.id)>=0;
+            return '<div class="esav-cat-picker-item">'+
+              '<input type="checkbox"'+(checked?' checked':'')+' onchange="window._togglePersonCat(\''+p.id+'\',\''+c.id+'\')">'+
+              '<span class="esav-cat-picker-dot" style="background:'+c.color+'"></span>'+
+              '<span style="flex:1">'+escHtml(c.name)+'</span>'+
+              '<button class="esav-cat-picker-delete" onclick="event.stopPropagation();if(confirm(\'Delete category \\\''+escHtml(c.name)+'\\\'?\'))window._deletePeopleCat(\''+c.id+'\')" title="Delete category">×</button>'+
+            '</div>';
+          }).join('')+'</div>';
+        }
+      }
+
       return '<div class="esav-person-card '+cls+'" data-pid="'+p.id+'">'+
         '<div class="esav-person-main">'+
           '<div class="esav-person-avatar">'+escHtml(p.name.charAt(0).toUpperCase())+'</div>'+
@@ -7257,13 +7360,16 @@ function _doLogin() {
             '<div class="esav-person-name">'+escHtml(p.name)+'</div>'+
             '<div class="esav-person-meta">'+escHtml(_freqLabel(p.frequencyDays))+' · Last: '+last+'</div>'+
             '<div class="esav-person-status">'+statusText+'</div>'+
+            '<div class="esav-person-cats-wrap">'+
+              '<div class="esav-person-cats">'+pillsHtml+assignBtn+'</div>'+
+              pickerHtml+
+            '</div>'+
           '</div>'+
           '<div class="esav-person-actions">'+
             (nextDate?'<button class="esav-person-btn esav-person-task-btn" onclick="window._esavAddTaskDirect(\''+escHtml(p.name)+'\',\''+escHtml(nextDate)+'\')">+ Task</button>':'')+
             '<button class="esav-person-btn esav-person-delete-btn" onclick="window._esavDeletePerson(\''+p.id+'\')">×</button>'+
           '</div>'+
         '</div>'+
-        // ── notes — always visible ──────────────────────────
         '<div class="esav-person-notes">'+
           '<div class="esav-person-notes-label">Notes</div>'+
           '<div class="esav-convo-list" id="esavConvoList_'+p.id+'">'+entriesHtml+'</div>'+
@@ -7274,6 +7380,7 @@ function _doLogin() {
         '</div>'+
       '</div>';
     }).join('');
+
     sorted.forEach(function(p){
       var inp=document.getElementById('esavConvoNote_'+p.id);
       if(inp) inp.addEventListener('keydown',function(e){ if(e.key==='Enter') window._esavLogConvo(p.id); });
@@ -7329,6 +7436,14 @@ function _doLogin() {
     }catch(e){}
   });
   if(personName) personName.addEventListener('keydown',function(e){ if(e.key==='Enter') personAddBtn.click(); });
+
+  // ── People category form wiring ────────────────────────────
+  var catNewSave=document.getElementById('peopleCatNewSave');
+  var catNewCancel=document.getElementById('peopleCatNewCancel');
+  var catNewName=document.getElementById('peopleCatNewName');
+  if(catNewSave) catNewSave.addEventListener('click', window._savePeopleCatNew);
+  if(catNewCancel) catNewCancel.addEventListener('click', function(){ var f=document.getElementById('peopleCatNewForm'); if(f) f.style.display='none'; });
+  if(catNewName) catNewName.addEventListener('keydown', function(e){ if(e.key==='Enter') window._savePeopleCatNew(); if(e.key==='Escape'){ var f=document.getElementById('peopleCatNewForm'); if(f) f.style.display='none'; } });
 
   // ── Messages ───────────────────────────────────────────────
   var TYPE_LABEL={morning:'☀️ Morning',evening:'🌙 Evening',proactive:'💬 Esav','people-reminder':'👥 Reminder','morning-briefing':'☀️ Morning'};

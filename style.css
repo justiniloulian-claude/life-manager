@@ -3761,3 +3761,37 @@ body.dark-mode .esav-bubble.esav { background:#2a2a3a; color:#e0e0e0; }
 body.dark-mode .esav-bubble.thinking { background:#1e1530; color:#c084fc; }
 body.dark-mode .esav-tab-reply-bar { border-top-color:#2e2e3e; }
 body.dark-mode .esav-tab-mic-btn { background:#2a2a3a; }
+
+/* ── People categories ─────────────────────────────────────────────────────── */
+.people-cat-strip { display:flex; flex-wrap:wrap; gap:6px; padding:0 0 10px; }
+.people-cat-filter { font-size:12px; font-weight:600; border:1.5px solid #e5e7eb; border-radius:20px; padding:3px 12px; background:#fff; color:#6b7280; cursor:pointer; transition:all 0.15s; white-space:nowrap; }
+.people-cat-filter:hover { border-color:#7c3aed; color:#7c3aed; }
+.people-cat-filter.active { background:#7c3aed; border-color:#7c3aed; color:#fff; }
+.people-cat-add-btn { font-size:12px; font-weight:600; border:1.5px dashed #d1d5db; border-radius:20px; padding:3px 12px; background:transparent; color:#9ca3af; cursor:pointer; transition:all 0.15s; white-space:nowrap; }
+.people-cat-add-btn:hover { border-color:#7c3aed; color:#7c3aed; }
+.people-cat-new-form { display:flex; gap:6px; align-items:center; padding:0 0 10px; flex-wrap:wrap; }
+/* person card category pills */
+.esav-person-cats { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; align-items:center; }
+.esav-person-cat-pill { font-size:10px; font-weight:700; border-radius:20px; padding:2px 8px; cursor:pointer; letter-spacing:0.03em; border:none; transition:opacity 0.15s; position:relative; }
+.esav-person-cat-pill:hover { opacity:0.8; }
+.esav-person-cat-pill .cat-remove { margin-left:4px; opacity:0.6; font-size:10px; cursor:pointer; }
+.esav-person-cat-pill .cat-remove:hover { opacity:1; }
+.esav-person-cat-assign-btn { font-size:11px; color:#9ca3af; border:1.5px dashed #d1d5db; border-radius:20px; padding:1px 8px; background:none; cursor:pointer; transition:all 0.15s; }
+.esav-person-cat-assign-btn:hover { border-color:#7c3aed; color:#7c3aed; }
+/* category picker dropdown */
+.esav-cat-picker { position:absolute; z-index:200; background:#fff; border:1px solid #e8e8e8; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.12); padding:8px; min-width:150px; display:flex; flex-direction:column; gap:4px; }
+.esav-cat-picker-item { display:flex; align-items:center; gap:8px; padding:5px 8px; border-radius:8px; cursor:pointer; font-size:13px; }
+.esav-cat-picker-item:hover { background:#f5f3ff; }
+.esav-cat-picker-item input[type=checkbox] { accent-color:#7c3aed; width:14px; height:14px; flex-shrink:0; }
+.esav-cat-picker-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.esav-cat-picker-delete { margin-left:auto; color:#d1d5db; background:none; border:none; cursor:pointer; font-size:14px; padding:0 2px; }
+.esav-cat-picker-delete:hover { color:#ef4444; }
+.esav-cat-picker-none { font-size:12px; color:#aaa; padding:4px 8px; }
+/* wrapper for positioning the picker */
+.esav-person-cats-wrap { position:relative; }
+body.dark-mode .people-cat-filter { background:#1e1e2e; border-color:#3e3e4e; color:#888; }
+body.dark-mode .people-cat-filter.active { background:#7c3aed; border-color:#7c3aed; color:#fff; }
+body.dark-mode .people-cat-add-btn { border-color:#3e3e4e; color:#666; }
+body.dark-mode .esav-cat-picker { background:#1e1e2e; border-color:#3e3e4e; }
+body.dark-mode .esav-cat-picker-item:hover { background:#2e1e4e; }
+body.dark-mode .esav-person-cat-assign-btn { border-color:#3e3e4e; color:#666; }

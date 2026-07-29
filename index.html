@@ -476,6 +476,15 @@
     </div>
     <!-- People panel -->
     <div id="esavPeoplePanel" class="esav-panel" style="display:none">
+      <div class="people-cat-strip" id="peopleCatStrip">
+        <button class="people-cat-filter active" data-cat="">All</button>
+        <button class="people-cat-add-btn" id="peopleCatAddBtn">+ Category</button>
+      </div>
+      <div class="people-cat-new-form" id="peopleCatNewForm" style="display:none">
+        <input id="peopleCatNewName" class="esav-add-input" placeholder="Category name…" type="text" style="flex:1">
+        <button id="peopleCatNewSave" class="esav-add-btn">Add</button>
+        <button id="peopleCatNewCancel" class="btn-cancel" style="padding:6px 10px;font-size:13px">Cancel</button>
+      </div>
       <div id="esavPeopleList" class="esav-people-list"></div>
       <div class="esav-add-row">
         <input id="esavPersonName" class="esav-add-input" placeholder="Name" type="text" style="flex:2">
