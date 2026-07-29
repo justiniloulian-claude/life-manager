@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v224…';
+  b.textContent = 'v225…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v224'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v225'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -6957,6 +6957,26 @@ function _doLogin() {
   // ── Goals ──────────────────────────────────────────────────
   var _CAT_COLORS={health:'#16a34a',spiritual:'#7c3aed',learning:'#2563eb',relationships:'#db2777',work:'#d97706',personal:'#64748b'};
   var _goalsCache=[], _editingGoalId=null, _dragGoalId=null;
+  var _hebPeriodCache={};
+
+  function _hebPeriodLabel(period, type, elId) {
+    if (_hebPeriodCache[period]) return _hebPeriodCache[period];
+    var ds = type==='monthly' ? period+'-01' : period+'-01-01';
+    var pts = ds.split('-');
+    var url = 'https://www.hebcal.com/converter?cfg=json&gy='+pts[0]+'&gm='+Number(pts[1])+'&gd='+Number(pts[2])+'&g2h=1';
+    fetch(url).then(function(r){ return r.json(); }).then(function(json){
+      var monthName = _HMONTH_NAMES[json.hm]||json.hm;
+      var label = type==='monthly' ? monthName+' '+json.hy : String(json.hy);
+      _hebPeriodCache[period] = label;
+      var el = document.getElementById(elId);
+      if (el) {
+        var chip = el.querySelector('.goals-current-chip');
+        el.firstChild.textContent = label;
+        if (!chip && el.dataset.chip) el.innerHTML = label+' <span class="goals-current-chip">'+el.dataset.chip+'</span>';
+      }
+    }).catch(function(){});
+    return type==='monthly' ? _fmtMonthPeriod(period) : period;
+  }
 
   function _isoWeekStr(d) {
     var dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
@@ -7080,7 +7100,9 @@ function _doLogin() {
       var yrs=[]; yearly.forEach(function(g){var y=g.period||curYear;if(yrs.indexOf(y)<0)yrs.push(y);}); yrs.sort().reverse();
       yrs.forEach(function(yr){
         var grp=yearly.filter(function(g){return (g.period||curYear)===yr;});
-        html+='<div class="goals-period-label">'+escHtml(yr)+'</div>'+renderGroup(grp,true,false);
+        var yrElId='gpl_y_'+yr;
+        var yrLbl=_hebPeriodLabel(yr,'yearly',yrElId);
+        html+='<div class="goals-period-label" id="'+yrElId+'"><span>'+escHtml(yrLbl)+'</span></div>'+renderGroup(grp,true,false);
       });
     }
 
@@ -7091,8 +7113,10 @@ function _doLogin() {
       mos.forEach(function(mo){
         var grp=monthly.filter(function(g){return (g.period||curMonth)===mo;});
         var isCur=mo===curMonth;
-        var lbl=_fmtMonthPeriod(mo)+(isCur?' <span class="goals-current-chip">This month</span>':'');
-        html+='<div class="goals-period-label'+(isCur?' is-current':'')+'">'+lbl+'</div>'+renderGroup(grp,true,false);
+        var moElId='gpl_m_'+mo.replace('-','_');
+        var moLbl=_hebPeriodLabel(mo,'monthly',moElId);
+        var chip=isCur?' <span class="goals-current-chip">This month</span>':'';
+        html+='<div class="goals-period-label'+(isCur?' is-current':'')+'" id="'+moElId+'" data-chip="'+(isCur?'This month':'')+'"><span>'+escHtml(moLbl)+'</span>'+chip+'</div>'+renderGroup(grp,true,false);
       });
     }
 
@@ -7376,7 +7400,8 @@ function _doLogin() {
               : (h.note
                   ?'<span class="esav-contact-entry-note">'+escHtml(h.note)+'</span>'
                   :'<span class="esav-contact-entry-note esav-contact-entry-no-note">—</span>')+
-                '<button class="esav-note-edit-btn" onclick="window._esavEditNote(\''+p.id+'\','+h.ts+')" title="Edit note">✎</button>';
+                '<button class="esav-note-edit-btn" onclick="window._esavEditNote(\''+p.id+'\','+h.ts+')" title="Edit note">✎</button>'+
+                '<button class="esav-note-edit-btn esav-note-del-btn" onclick="window._esavDeleteNote(\''+p.id+'\','+h.ts+')" title="Delete entry">🗑</button>';
             return '<div class="esav-contact-entry'+(editingNote?' editing':'')+'">'+
               '<span class="esav-contact-entry-date">'+_tsLabel(h.ts)+'</span>'+
               noteEl+
@@ -7488,6 +7513,24 @@ function _doLogin() {
   window._esavDeletePerson=async function(id){
     if(!confirm('Remove this person?')) return;
     try{ await fetch(ESAV_URL+'/esav/people/'+id,{method:'DELETE'}); _loadPeople(); }catch(e){}
+  };
+  window._esavDeleteNote=async function(pid,ts){
+    // remove from local cache
+    try{
+      var local=JSON.parse(localStorage.getItem('pnotes_'+pid)||'[]');
+      local=local.filter(function(h){ return Math.round(h.ts/1000)!==Math.round(ts/1000); });
+      localStorage.setItem('pnotes_'+pid,JSON.stringify(local));
+    }catch(e){}
+    // remove from server contactHistory
+    var p=_peopleCache.find(function(x){ return x.id===pid; });
+    if(p&&Array.isArray(p.contactHistory)){
+      p.contactHistory=p.contactHistory.filter(function(h){ return Math.round(h.ts/1000)!==Math.round(ts/1000); });
+      // update lastContact to most recent remaining entry
+      if(p.contactHistory.length) p.lastContact=p.contactHistory[0].ts;
+      else p.lastContact=null;
+    }
+    _renderPeople(_peopleCache);
+    if(p) try{ await fetch(ESAV_URL+'/esav/people/'+pid,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({contactHistory:p.contactHistory,lastContact:p.lastContact})}); }catch(e){}
   };
   window._esavEditNote=function(pid,ts){ _editingNoteKey={pid:pid,ts:ts}; _editingPersonId=null; _renderPeople(_peopleCache); setTimeout(function(){ var inp=document.getElementById('noteEdit_'+pid+'_'+ts); if(inp){inp.focus();inp.select();} },30); };
   window._esavCancelNoteEdit=function(){ _editingNoteKey=null; _renderPeople(_peopleCache); };
