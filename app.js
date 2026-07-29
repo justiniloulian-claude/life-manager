@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v226…';
+  b.textContent = 'v227…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v226'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v227'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -822,6 +822,40 @@ var _HMONTH_NAMES={
   'Tishrei':'Tishrei','Cheshvan':'Cheshvan','Kislev':'Kislev','Tevet':'Tevet',
   'Shvat':'Shevat','Adar':'Adar','Adar II':'Adar II','Adar I':'Adar I'
 };
+var _HEB_MONTHS_ORDERED=['Tishrei','Cheshvan','Kislev','Tevet','Shevat','Adar','Nisan','Iyar','Sivan','Tammuz','Av','Elul'];
+function _hebMonthIdx(m){ var i=_HEB_MONTHS_ORDERED.indexOf(m); return i<0?99:i; }
+var _todayHebMonth=null; // {month:'Av', year:5786}
+async function _initTodayHeb(){
+  var ds=toDateStr(new Date()); var pts=ds.split('-');
+  try{
+    var res=await fetch('https://www.hebcal.com/converter?cfg=json&gy='+pts[0]+'&gm='+Number(pts[1])+'&gd='+Number(pts[2])+'&g2h=1');
+    var json=await res.json();
+    _todayHebMonth={month:_HMONTH_NAMES[json.hm]||json.hm,year:json.hy};
+    _syncPeriodPicker();
+    if(typeof _goalsCache!=='undefined'&&_goalsCache&&_goalsCache.length) _renderGoals(_goalsCache);
+  }catch(e){}
+}
+function _curHebPeriod(){ return _todayHebMonth?(_todayHebMonth.year+'-'+_todayHebMonth.month):''; }
+function _curHebYear(){ return _todayHebMonth?String(_todayHebMonth.year):''; }
+function _hebPeriodDisplay(p){ var s=p.split('-'); return s.length>=2?s[1]+' '+s[0]:p; }
+function _hebMonthAdj(year,month,delta){
+  var ms=_HEB_MONTHS_ORDERED;
+  var i=ms.indexOf(month); if(i<0) i=10;
+  i+=delta;
+  while(i<0){i+=ms.length;year--;} while(i>=ms.length){i-=ms.length;year++;}
+  return {year:year,month:ms[i]};
+}
+function _hebMonthSelectHtml(sel){
+  if(!_todayHebMonth) return '<option value="'+(sel||'')+'">'+(_hebPeriodDisplay(sel||'')||'Loading...')+'</option>';
+  var opts=[]; var seen={};
+  for(var d=-3;d<=6;d++){
+    var hm=_hebMonthAdj(_todayHebMonth.year,_todayHebMonth.month,d);
+    var p=hm.year+'-'+hm.month; if(seen[p]) continue; seen[p]=true;
+    opts.push('<option value="'+p+'"'+(p===sel?' selected':'')+'>'+_hebPeriodDisplay(p)+'</option>');
+  }
+  if(sel&&!seen[sel]) opts.unshift('<option value="'+sel+'">'+(_hebPeriodDisplay(sel)||sel)+'</option>');
+  return opts.join('');
+}
 function _hebrewOrdinal(n){
   var s=['th','st','nd','rd'];
   var v=n%100;
@@ -6957,28 +6991,7 @@ function _doLogin() {
   // ── Goals ──────────────────────────────────────────────────
   var _CAT_COLORS={health:'#16a34a',spiritual:'#7c3aed',learning:'#2563eb',relationships:'#db2777',work:'#d97706',personal:'#64748b'};
   var _goalsCache=[], _editingGoalId=null, _dragGoalId=null;
-  var _hebPeriodCache={};
-
-  function _hebPeriodLabel(period, type, elId) {
-    if (_hebPeriodCache[period]) return _hebPeriodCache[period];
-    var moPts = period.split('-');
-    var lastDay = type==='monthly' ? new Date(parseInt(moPts[0],10), parseInt(moPts[1],10), 0).getDate() : 1;
-    var ds = type==='monthly' ? period+'-'+lastDay : period+'-01-01';
-    var pts = ds.split('-');
-    var url = 'https://www.hebcal.com/converter?cfg=json&gy='+pts[0]+'&gm='+Number(pts[1])+'&gd='+Number(pts[2])+'&g2h=1';
-    fetch(url).then(function(r){ return r.json(); }).then(function(json){
-      var monthName = _HMONTH_NAMES[json.hm]||json.hm;
-      var label = type==='monthly' ? monthName+' '+json.hy : String(json.hy);
-      _hebPeriodCache[period] = label;
-      var el = document.getElementById(elId);
-      if (el) {
-        var chip = el.querySelector('.goals-current-chip');
-        el.firstChild.textContent = label;
-        if (!chip && el.dataset.chip) el.innerHTML = label+' <span class="goals-current-chip">'+el.dataset.chip+'</span>';
-      }
-    }).catch(function(){});
-    return type==='monthly' ? _fmtMonthPeriod(period) : period;
-  }
+  _initTodayHeb();
 
   function _isoWeekStr(d) {
     var dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
@@ -7040,7 +7053,7 @@ function _doLogin() {
     var el=document.getElementById('esavGoalsList'); if(!el) return;
     if(!goals.length){ el.innerHTML='<div class="stl-empty">No goals yet. Add one below.</div>'; return; }
     var now=new Date();
-    var curWeek=_isoWeekStr(now), curMonth=_monthStr(now), curYear=_yearStr(now);
+    var curWeek=_isoWeekStr(now), curHebP=_curHebPeriod(), curHebYr=_curHebYear();
 
     function goalHtml(g, draggable, showRollover){
       var cc=_CAT_COLORS[g.category]||'#888';
@@ -7048,17 +7061,24 @@ function _doLogin() {
       var editing=(_editingGoalId===g.id);
       var tf=g.timeframe||'yearly';
       var periodVal=g.period||'';
-      var periodType=tf==='monthly'?'month':tf==='weekly'?'week':'';
       var titleEl, metaEl='';
       if(editing){
         titleEl='<input class="esav-goal-edit-input" id="esavGoalEdit_'+g.id+'" value="'+escHtml(g.text)+'" onkeydown="if(event.key===\'Enter\')window._esavSaveGoalEdit(\''+g.id+'\');if(event.key===\'Escape\')window._esavCancelGoalEdit()" />';
+        var periodWidget;
+        if(tf==='monthly'){
+          periodWidget='<select class="esav-goal-edit-period" id="esavGoalEditPeriod_'+g.id+'">'+_hebMonthSelectHtml(periodVal||curHebP)+'</select>';
+        } else if(tf==='weekly'){
+          periodWidget='<input class="esav-goal-edit-period" id="esavGoalEditPeriod_'+g.id+'" type="week" value="'+escHtml(periodVal)+'">';
+        } else {
+          periodWidget='<span style="font-size:11px;color:#9ca3af">'+escHtml(curHebYr)+'</span>';
+        }
         metaEl='<div class="esav-goal-edit-meta">'+
           '<select class="esav-goal-edit-tf" id="esavGoalEditTf_'+g.id+'" onchange="window._esavGoalTfChange(\''+g.id+'\')">'+
             '<option value="yearly"'+(tf==='yearly'?' selected':'')+'>Yearly</option>'+
             '<option value="monthly"'+(tf==='monthly'?' selected':'')+'>Monthly</option>'+
             '<option value="weekly"'+(tf==='weekly'?' selected':'')+'>Weekly</option>'+
           '</select>'+
-          (periodType?'<input class="esav-goal-edit-period" id="esavGoalEditPeriod_'+g.id+'" type="'+periodType+'" value="'+escHtml(periodVal)+'">':'<span style="font-size:11px;color:#9ca3af">'+escHtml(curYear)+'</span>')+
+          '<span id="esavGoalEditPeriodWrap_'+g.id+'">'+periodWidget+'</span>'+
         '</div>';
       } else {
         titleEl='<span class="esav-goal-title">'+escHtml(g.text)+'</span>';
@@ -7099,26 +7119,31 @@ function _doLogin() {
     // ── Yearly ──
     if(yearly.length){
       html+='<div class="goals-section-header">Yearly</div>';
-      var yrs=[]; yearly.forEach(function(g){var y=g.period||curYear;if(yrs.indexOf(y)<0)yrs.push(y);}); yrs.sort().reverse();
+      var yrs=[]; yearly.forEach(function(g){var y=g.period||curHebYr;if(yrs.indexOf(y)<0)yrs.push(y);}); yrs.sort().reverse();
       yrs.forEach(function(yr){
-        var grp=yearly.filter(function(g){return (g.period||curYear)===yr;});
+        var grp=yearly.filter(function(g){return (g.period||curHebYr)===yr;});
         var yrElId='gpl_y_'+yr;
-        var yrLbl=_hebPeriodLabel(yr,'yearly',yrElId);
-        html+='<div class="goals-period-label" id="'+yrElId+'"><span>'+escHtml(yrLbl)+'</span></div>'+renderGroup(grp,true,false);
+        html+='<div class="goals-period-label" id="'+yrElId+'"><span>'+escHtml(yr)+'</span></div>'+renderGroup(grp,true,false);
       });
     }
 
     // ── Monthly ──
     if(monthly.length){
       html+='<div class="goals-section-header">Monthly</div>';
-      var mos=[]; monthly.forEach(function(g){var m=g.period||curMonth;if(mos.indexOf(m)<0)mos.push(m);}); mos.sort().reverse();
+      var mos=[]; monthly.forEach(function(g){var m=g.period||curHebP;if(mos.indexOf(m)<0)mos.push(m);});
+      mos.sort(function(a,b){
+        var ap=a.split('-'),bp=b.split('-');
+        var ay=parseInt(ap[0],10)||0,by=parseInt(bp[0],10)||0;
+        if(ay!==by) return by-ay;
+        return _hebMonthIdx(bp[1])-_hebMonthIdx(ap[1]);
+      });
       mos.forEach(function(mo){
-        var grp=monthly.filter(function(g){return (g.period||curMonth)===mo;});
-        var isCur=mo===curMonth;
-        var moElId='gpl_m_'+mo.replace('-','_');
-        var moLbl=_hebPeriodLabel(mo,'monthly',moElId);
+        var grp=monthly.filter(function(g){return (g.period||curHebP)===mo;});
+        var isCur=mo===curHebP;
+        var moElId='gpl_m_'+mo.replace(/[^a-z0-9]/gi,'_');
+        var moLbl=_hebPeriodDisplay(mo);
         var chip=isCur?' <span class="goals-current-chip">This month</span>':'';
-        html+='<div class="goals-period-label'+(isCur?' is-current':'')+'" id="'+moElId+'" data-chip="'+(isCur?'This month':'')+'"><span>'+escHtml(moLbl)+'</span>'+chip+'</div>'+renderGroup(grp,true,false);
+        html+='<div class="goals-period-label'+(isCur?' is-current':'')+'" id="'+moElId+'"><span>'+escHtml(moLbl)+'</span>'+chip+'</div>'+renderGroup(grp,true,false);
       });
     }
 
@@ -7200,8 +7225,9 @@ function _doLogin() {
     var tfEl=document.getElementById('esavGoalEditTf_'+id);
     var tf=tfEl?tfEl.value:'yearly';
     var periodEl=document.getElementById('esavGoalEditPeriod_'+id);
-    var period=periodEl?periodEl.value:(tf==='yearly'?_yearStr(new Date()):'');
-    if(tf==='yearly') period=_yearStr(new Date());
+    var period;
+    if(tf==='yearly') period=_curHebYear()||String(new Date().getFullYear());
+    else period=periodEl?periodEl.value:_curHebPeriod();
     _editingGoalId=null;
     try{ await fetch(ESAV_URL+'/esav/goals/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,timeframe:tf,period:period})}); _loadGoals(); }catch(e){}
   };
@@ -7209,35 +7235,36 @@ function _doLogin() {
   window._esavGoalTfChange=function(id){
     var tfEl=document.getElementById('esavGoalEditTf_'+id); if(!tfEl) return;
     var tf=tfEl.value;
-    var periodEl=document.getElementById('esavGoalEditPeriod_'+id);
-    if(!periodEl) return;
+    var wrap=document.getElementById('esavGoalEditPeriodWrap_'+id); if(!wrap) return;
     var now=new Date();
-    if(tf==='yearly'){ periodEl.style.display='none'; }
-    else if(tf==='monthly'){ periodEl.style.display=''; periodEl.type='month'; if(!periodEl.value) periodEl.value=_monthStr(now); }
-    else { periodEl.style.display=''; periodEl.type='week'; if(!periodEl.value) periodEl.value=_isoWeekStr(now); }
+    if(tf==='yearly'){
+      wrap.innerHTML='<span style="font-size:11px;color:#9ca3af">'+escHtml(_curHebYear())+'</span>';
+    } else if(tf==='monthly'){
+      wrap.innerHTML='<select class="esav-goal-edit-period" id="esavGoalEditPeriod_'+id+'">'+_hebMonthSelectHtml(_curHebPeriod())+'</select>';
+    } else {
+      wrap.innerHTML='<input class="esav-goal-edit-period" id="esavGoalEditPeriod_'+id+'" type="week" value="'+_isoWeekStr(now)+'">';
+    }
   };
   window._esavRolloverGoal=async function(id){
     var curWeek=_isoWeekStr(new Date());
     try{ await fetch(ESAV_URL+'/esav/goals/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({period:curWeek})}); _loadGoals(); }catch(e){}
   };
 
-  // ── Period picker: sync input type with timeframe selection ──
+  // ── Period picker: sync with timeframe selection ──
   var goalTimeframe=document.getElementById('esavGoalTimeframe');
-  var goalPeriod=document.getElementById('esavGoalPeriod');
+  var goalPeriod=document.getElementById('esavGoalPeriod'); // <select> for Hebrew months
+  var goalPeriodWeek=document.getElementById('esavGoalPeriodWeek'); // <input type="week">
   function _syncPeriodPicker(){
     var tf=goalTimeframe?goalTimeframe.value:'monthly';
-    if(!goalPeriod) return;
-    var now=new Date();
     if(tf==='yearly'){
-      goalPeriod.style.display='none';
+      if(goalPeriod) goalPeriod.style.display='none';
+      if(goalPeriodWeek) goalPeriodWeek.style.display='none';
     } else if(tf==='monthly'){
-      goalPeriod.style.display='';
-      goalPeriod.type='month';
-      if(!goalPeriod.value) goalPeriod.value=_monthStr(now);
+      if(goalPeriod){ goalPeriod.style.display=''; goalPeriod.innerHTML=_hebMonthSelectHtml(_curHebPeriod()); }
+      if(goalPeriodWeek) goalPeriodWeek.style.display='none';
     } else {
-      goalPeriod.style.display='';
-      goalPeriod.type='week';
-      if(!goalPeriod.value) goalPeriod.value=_isoWeekStr(now);
+      if(goalPeriod) goalPeriod.style.display='none';
+      if(goalPeriodWeek){ goalPeriodWeek.style.display=''; if(!goalPeriodWeek.value) goalPeriodWeek.value=_isoWeekStr(new Date()); }
     }
   }
   if(goalTimeframe){ goalTimeframe.addEventListener('change',_syncPeriodPicker); _syncPeriodPicker(); }
@@ -7250,7 +7277,10 @@ function _doLogin() {
     if(!text) return;
     var tf=goalTimeframe?goalTimeframe.value:'monthly';
     var now=new Date();
-    var period=tf==='yearly'?_yearStr(now):(goalPeriod&&goalPeriod.value?goalPeriod.value:(tf==='monthly'?_monthStr(now):_isoWeekStr(now)));
+    var period;
+    if(tf==='yearly') period=_curHebYear()||String(now.getFullYear());
+    else if(tf==='monthly') period=(goalPeriod&&goalPeriod.value)?goalPeriod.value:_curHebPeriod();
+    else period=(goalPeriodWeek&&goalPeriodWeek.value)?goalPeriodWeek.value:_isoWeekStr(now);
     var body={text:text,timeframe:tf,period:period,category:goalCat?goalCat.value:''};
     try{
       await fetch(ESAV_URL+'/esav/goals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
