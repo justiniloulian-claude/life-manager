@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v222…';
+  b.textContent = 'v223…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v222'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v223'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -7249,6 +7249,7 @@ function _doLogin() {
   var _PEOPLE_CAT_PALETTE=['#7c3aed','#2563eb','#16a34a','#db2777','#d97706','#0891b2','#dc2626','#65a30d','#6366f1','#0d9488'];
   var _activePeopleCat=''; // '' = All
   var _openCatPickerId=null; // person id whose picker is open
+  var _editingPersonId=null;
 
   function _getPeopleCats(){ try{ return JSON.parse(localStorage.getItem('esav_person_cats')||'[]'); }catch(e){ return []; } }
   function _savePeopleCats(cats){ localStorage.setItem('esav_person_cats',JSON.stringify(cats)); }
@@ -7407,11 +7408,22 @@ function _doLogin() {
         pickerHtml='<div class="esav-cat-picker">'+catItems+newCatRow+'</div>';
       }
 
+      var editing=(_editingPersonId===p.id);
+      var nameEl=editing
+        ? '<input class="esav-person-name-input" id="esavPersonNameEdit_'+p.id+'" value="'+escHtml(p.name)+'" onkeydown="if(event.key===\'Enter\')window._esavSavePersonEdit(\''+p.id+'\');if(event.key===\'Escape\')window._esavCancelPersonEdit()" />'
+        : '<div class="esav-person-name">'+escHtml(p.name)+'</div>';
+      var actionsEl=editing
+        ? '<button class="esav-person-btn esav-person-save-btn" onclick="window._esavSavePersonEdit(\''+p.id+'\')">✓ Save</button>'+
+          '<button class="esav-person-btn" onclick="window._esavCancelPersonEdit()" style="color:#aaa">✕</button>'
+        : '<button class="esav-person-btn esav-person-edit-btn" onclick="window._esavEditPerson(\''+p.id+'\')" title="Edit">✎</button>'+
+          (nextDate?'<button class="esav-person-btn esav-person-task-btn" onclick="window._esavAddTaskDirect(\''+escHtml(p.name)+'\',\''+escHtml(nextDate)+'\')">+ Task</button>':'')+
+          '<button class="esav-person-btn esav-person-delete-btn" onclick="window._esavDeletePerson(\''+p.id+'\')">×</button>';
+
       return '<div class="esav-person-card '+cls+'" data-pid="'+p.id+'">'+
         '<div class="esav-person-main">'+
           '<div class="esav-person-avatar">'+escHtml(p.name.charAt(0).toUpperCase())+'</div>'+
           '<div class="esav-person-info">'+
-            '<div class="esav-person-name">'+escHtml(p.name)+'</div>'+
+            nameEl+
             '<div class="esav-person-meta">'+escHtml(_freqLabel(p.frequencyDays))+' · Last: '+last+'</div>'+
             '<div class="esav-person-status">'+statusText+'</div>'+
             '<div class="esav-person-cats-wrap">'+
@@ -7419,10 +7431,7 @@ function _doLogin() {
               pickerHtml+
             '</div>'+
           '</div>'+
-          '<div class="esav-person-actions">'+
-            (nextDate?'<button class="esav-person-btn esav-person-task-btn" onclick="window._esavAddTaskDirect(\''+escHtml(p.name)+'\',\''+escHtml(nextDate)+'\')">+ Task</button>':'')+
-            '<button class="esav-person-btn esav-person-delete-btn" onclick="window._esavDeletePerson(\''+p.id+'\')">×</button>'+
-          '</div>'+
+          '<div class="esav-person-actions">'+actionsEl+'</div>'+
         '</div>'+
         '<div class="esav-person-notes">'+
           '<div class="esav-person-notes-label">Notes</div>'+
@@ -7471,6 +7480,16 @@ function _doLogin() {
   window._esavDeletePerson=async function(id){
     if(!confirm('Remove this person?')) return;
     try{ await fetch(ESAV_URL+'/esav/people/'+id,{method:'DELETE'}); _loadPeople(); }catch(e){}
+  };
+  window._esavEditPerson=function(id){ _editingPersonId=id; _openCatPickerId=null; _renderPeople(_peopleCache); setTimeout(function(){ var inp=document.getElementById('esavPersonNameEdit_'+id); if(inp){inp.focus();inp.select();} },30); };
+  window._esavCancelPersonEdit=function(){ _editingPersonId=null; _renderPeople(_peopleCache); };
+  window._esavSavePersonEdit=async function(id){
+    var inp=document.getElementById('esavPersonNameEdit_'+id); if(!inp) return;
+    var name=inp.value.trim(); if(!name) return;
+    _editingPersonId=null;
+    var p=_peopleCache.find(function(x){ return x.id===id; }); if(p) p.name=name;
+    _renderPeople(_peopleCache);
+    try{ await fetch(ESAV_URL+'/esav/people/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})}); }catch(e){}
   };
 
   var personAddBtn=document.getElementById('esavPersonAddBtn');

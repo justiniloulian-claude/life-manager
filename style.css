@@ -3752,6 +3752,11 @@ body.dark-mode .esav-person-card { background:#1e1e2e; border-color:#2e2e3e; }
 body.dark-mode .esav-person-urgent { background:#2a1616; }
 body.dark-mode .esav-person-overdue { background:#1e1a10; }
 body.dark-mode .esav-person-name { color:#e0e0e0; }
+.esav-person-name-input { font-size:15px; font-weight:600; border:none; border-bottom:2px solid #7c3aed; background:transparent; outline:none; color:#1a1a1a; width:100%; padding:0 0 2px; font-family:inherit; }
+body.dark-mode .esav-person-name-input { color:#e0e0e0; }
+.esav-person-edit-btn { color:#9ca3af; }
+.esav-person-edit-btn:hover { color:#7c3aed; }
+.esav-person-save-btn { color:#16a34a; font-weight:700; }
 body.dark-mode .esav-person-btn { background:#2a2a3a; border-color:#3e3e4e; }
 body.dark-mode .esav-spoke-expand { border-top-color:#2e2e3e; }
 body.dark-mode .esav-spoke-note { background:#1e1e2e; border-color:#3e3e4e; color:#e0e0e0; }
