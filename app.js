@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v227…';
+  b.textContent = 'v228…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v227'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v228'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -6697,7 +6697,9 @@ function _doLogin() {
     sheetPlayback.style.display = name==='playback' ? '' : 'none';
     sheetThinking.style.display = name==='thinking' ? '' : 'none';
     sheetResponse.style.display = name==='response' ? '' : 'none';
-    sheetTextRow.style.display  = (name==='thinking'||name==='response') ? 'none' : '';
+    sheetTextRow.style.display  = name==='thinking' ? 'none' : '';
+    if(name==='response'){ var inp=document.getElementById('esavSheetTextInput'); if(inp){ inp.placeholder='Reply…'; setTimeout(function(){inp.focus();},100); } }
+    else { var inp2=document.getElementById('esavSheetTextInput'); if(inp2) inp2.placeholder='Or type a message…'; }
   }
 
   function openSheet(){
