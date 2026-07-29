@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v216…';
+  b.textContent = 'v217…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v216'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v217'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -929,8 +929,8 @@ function deleteTask(ds,id) {
 // ============================================================
 // ROUTINE
 // ============================================================
-function addRoutineItem(d)    { var data=getData(); data.routine.push({id:uid(),title:d.title,time:d.time||'',location:d.location||'',days:d.days}); saveR(data.routine); }
-function updateRoutineItem(id,d){ var data=getData(); var r=data.routine.find(function(r){return r.id===id;}); if(r){r.title=d.title;r.time=d.time||'';r.location=d.location||'';r.days=d.days;} saveR(data.routine); }
+function addRoutineItem(d)    { var data=getData(); data.routine.push({id:uid(),title:d.title,time:d.time||'',endTime:d.endTime||'',location:d.location||'',days:d.days}); saveR(data.routine); }
+function updateRoutineItem(id,d){ var data=getData(); var r=data.routine.find(function(r){return r.id===id;}); if(r){r.title=d.title;r.time=d.time||'';r.endTime=d.endTime||'';r.location=d.location||'';r.days=d.days;} saveR(data.routine); }
 function deleteRoutineItem(id){ var data=getData(); saveR(data.routine.filter(function(r){return r.id!==id;})); }
 
 // ============================================================
@@ -4518,6 +4518,7 @@ window.openEditRoutineItem = function(id) {
   document.getElementById('routineItemModalTitle').textContent='Edit Routine Task';
   document.getElementById('routineTitle').value=r.title;
   document.getElementById('routineTime').value=r.time||'';
+  document.getElementById('routineEndTime').value=r.endTime||'';
   document.getElementById('routineLocation').value=r.location||'';
   document.querySelectorAll('input[name="rDay"]').forEach(function(cb){cb.checked=r.days.includes(+cb.value);});
   openModal('routineItemModal');
@@ -5134,7 +5135,8 @@ function renderRoutineList() {
   var dn=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   el.innerHTML=data.routine.map(function(r){
     var days=r.days.length===7?'Every day':r.days.map(function(d){return dn[d];}).join(', ');
-    var meta=[days,r.time?fmt12(r.time):'',r.location].filter(Boolean).join(' · ');
+    var timeStr=r.time?(r.endTime?fmt12(r.time)+' – '+fmt12(r.endTime):fmt12(r.time)):'';
+    var meta=[days,timeStr,r.location].filter(Boolean).join(' · ');
     return '<div class="routine-row"><div><div class="routine-row-title">'+escHtml(r.title)+'</div><div class="routine-row-meta">'+escHtml(meta)+'</div></div>'+
       '<div class="routine-row-actions"><button class="btn-icon" onclick="openEditRoutineItem(\''+r.id+'\')">✏️</button>'+
       '<button class="btn-icon" onclick="removeRoutineItem(\''+r.id+'\')">🗑</button></div></div>';
@@ -5146,7 +5148,7 @@ function saveRoutineModal() {
   if (!title){ document.getElementById('routineTitle').classList.add('error'); document.getElementById('routineTitle').focus(); return; }
   document.getElementById('routineTitle').classList.remove('error');
   var days=Array.from(document.querySelectorAll('input[name="rDay"]:checked')).map(function(cb){return +cb.value;});
-  var d={title:title,time:document.getElementById('routineTime').value,location:document.getElementById('routineLocation').value.trim(),days:days};
+  var d={title:title,time:document.getElementById('routineTime').value,endTime:document.getElementById('routineEndTime').value,location:document.getElementById('routineLocation').value.trim(),days:days};
   state.editRoutineId?updateRoutineItem(state.editRoutineId,d):addRoutineItem(d);
   state.editRoutineId=null; closeModal('routineItemModal'); renderRoutineList(); refresh();
 }
@@ -5662,7 +5664,7 @@ function initListeners() {
   document.getElementById('addRoutineItemBtn').addEventListener('click', function(){
     state.editRoutineId=null;
     document.getElementById('routineItemModalTitle').textContent='Add Routine Task';
-    document.getElementById('routineTitle').value=''; document.getElementById('routineTime').value=''; document.getElementById('routineLocation').value='';
+    document.getElementById('routineTitle').value=''; document.getElementById('routineTime').value=''; document.getElementById('routineEndTime').value=''; document.getElementById('routineLocation').value='';
     document.querySelectorAll('input[name="rDay"]').forEach(function(cb){cb.checked=false;});
     openModal('routineItemModal');
   });
