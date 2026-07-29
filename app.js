@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v217…';
+  b.textContent = 'v218…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v217'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v218'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -868,6 +868,7 @@ function getTasksForDate(ds) {
       id:       r.id,
       title:    ov.title    !== undefined ? ov.title    : r.title,
       time:     ov.time     !== undefined ? ov.time     : r.time,
+      endTime:  ov.endTime  !== undefined ? ov.endTime  : (r.endTime||''),
       location: ov.location !== undefined ? ov.location : r.location,
       color:'', type:'routine', done: c ? c.done : false
     };
@@ -4492,6 +4493,7 @@ window.openRoutineOverride = function(ds, routineId) {
   document.getElementById('routineOverrideModalTitle').textContent='Edit "'+r.title+'" — '+shortMonthDay(date)+' only';
   document.getElementById('routineOverrideTitle').value=ov.title!==undefined?ov.title:r.title;
   document.getElementById('routineOverrideTime').value=ov.time!==undefined?ov.time:(r.time||'');
+  document.getElementById('routineOverrideEndTime').value=ov.endTime!==undefined?ov.endTime:(r.endTime||'');
   document.getElementById('routineOverrideLocation').value=ov.location!==undefined?ov.location:(r.location||'');
   openModal('routineOverrideModal');
   setTimeout(function(){document.getElementById('routineOverrideTitle').focus();},80);
@@ -4505,6 +4507,7 @@ function saveRoutineOverrideModal() {
   data.routineOverrides[key]={
     title:title,
     time:document.getElementById('routineOverrideTime').value,
+    endTime:document.getElementById('routineOverrideEndTime').value,
     location:document.getElementById('routineOverrideLocation').value.trim()
   };
   saveRO(data.routineOverrides);
