@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v221…';
+  b.textContent = 'v222…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v221'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v222'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -7258,7 +7258,12 @@ function _doLogin() {
     var cats=_getPeopleCats();
     var html='<button class="people-cat-filter'+('' ===_activePeopleCat?' active':'')+'" data-cat="" onclick="window._setPeopleCatFilter(\'\')">All</button>';
     cats.forEach(function(c){
-      html+='<button class="people-cat-filter'+(c.id===_activePeopleCat?' active':'')+'" data-cat="'+c.id+'" onclick="window._setPeopleCatFilter(\''+c.id+'\')" style="'+(c.id===_activePeopleCat?'background:'+c.color+';border-color:'+c.color+';color:#fff':'border-color:'+c.color+';color:'+c.color)+'">'+escHtml(c.name)+'</button>';
+      var active=c.id===_activePeopleCat;
+      var style=active?'background:'+c.color+';border-color:'+c.color+';color:#fff':'border-color:'+c.color+';color:'+c.color;
+      html+='<span class="people-cat-filter-wrap">'+
+        '<button class="people-cat-filter'+(active?' active':'')+'" data-cat="'+c.id+'" onclick="window._setPeopleCatFilter(\''+c.id+'\')" style="'+style+'">'+escHtml(c.name)+'</button>'+
+        '<button class="people-cat-strip-del" onclick="event.stopPropagation();window._deletePeopleCat(\''+c.id+'\')" title="Delete category" style="color:'+c.color+'">×</button>'+
+      '</span>';
     });
     html+='<button class="people-cat-add-btn" id="peopleCatAddBtn" onclick="window._toggleCatNewForm()">+ Category</button>';
     strip.innerHTML=html;
@@ -7271,15 +7276,29 @@ function _doLogin() {
     f.style.display=showing?'none':'flex';
     if(!showing){ var inp=document.getElementById('peopleCatNewName'); if(inp){inp.value='';inp.focus();} }
   };
+  function _createCat(name){
+    var cats=_getPeopleCats();
+    var color=_PEOPLE_CAT_PALETTE[cats.length%_PEOPLE_CAT_PALETTE.length];
+    var c={id:uid(),name:name,color:color};
+    cats.push(c); _savePeopleCats(cats); _renderCatStrip(); return c;
+  }
   window._savePeopleCatNew=function(){
     var inp=document.getElementById('peopleCatNewName'); if(!inp) return;
     var name=inp.value.trim(); if(!name) return;
-    var cats=_getPeopleCats();
-    var color=_PEOPLE_CAT_PALETTE[cats.length%_PEOPLE_CAT_PALETTE.length];
-    cats.push({id:uid(),name:name,color:color});
-    _savePeopleCats(cats);
+    _createCat(name);
+    inp.value='';
     var f=document.getElementById('peopleCatNewForm'); if(f) f.style.display='none';
-    _renderCatStrip();
+  };
+  window._pickerAddCat=async function(pid){
+    var inp=document.getElementById('pickerCatInput_'+pid); if(!inp) return;
+    var name=inp.value.trim(); if(!name) return;
+    var c=_createCat(name);
+    // also immediately assign to this person
+    var p=_peopleCache.find(function(x){ return x.id===pid; }); if(!p) return;
+    var cats=(p.categories||[]).concat([c.id]);
+    p.categories=cats;
+    try{ await fetch(ESAV_URL+'/esav/people/'+pid,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({categories:cats})}); }catch(e){}
+    _renderPeople(_peopleCache);
   };
   window._deletePeopleCat=function(catId){
     var cats=_getPeopleCats().filter(function(c){ return c.id!==catId; });
@@ -7370,19 +7389,22 @@ function _doLogin() {
       // ── cat picker dropdown ──
       var pickerHtml='';
       if(_openCatPickerId===p.id){
-        if(!allCats.length){
-          pickerHtml='<div class="esav-cat-picker"><div class="esav-cat-picker-none">No categories yet — add one above.</div></div>';
-        } else {
-          pickerHtml='<div class="esav-cat-picker">'+allCats.map(function(c){
-            var checked=pCats.indexOf(c.id)>=0;
-            return '<div class="esav-cat-picker-item">'+
-              '<input type="checkbox"'+(checked?' checked':'')+' onchange="window._togglePersonCat(\''+p.id+'\',\''+c.id+'\')">'+
-              '<span class="esav-cat-picker-dot" style="background:'+c.color+'"></span>'+
-              '<span style="flex:1">'+escHtml(c.name)+'</span>'+
-              '<button class="esav-cat-picker-delete" onclick="event.stopPropagation();if(confirm(\'Delete category \\\''+escHtml(c.name)+'\\\'?\'))window._deletePeopleCat(\''+c.id+'\')" title="Delete category">×</button>'+
-            '</div>';
-          }).join('')+'</div>';
-        }
+        var catItems=allCats.length
+          ? allCats.map(function(c){
+              var checked=pCats.indexOf(c.id)>=0;
+              return '<div class="esav-cat-picker-item">'+
+                '<input type="checkbox"'+(checked?' checked':'')+' onchange="window._togglePersonCat(\''+p.id+'\',\''+c.id+'\')">'+
+                '<span class="esav-cat-picker-dot" style="background:'+c.color+'"></span>'+
+                '<span style="flex:1">'+escHtml(c.name)+'</span>'+
+                '<button class="esav-cat-picker-delete" onclick="event.stopPropagation();window._deletePeopleCat(\''+c.id+'\')" title="Delete category">×</button>'+
+              '</div>';
+            }).join('')
+          : '<div class="esav-cat-picker-none">No categories yet.</div>';
+        var newCatRow='<div class="esav-cat-picker-new-row">'+
+          '<input class="esav-cat-picker-new-input" id="pickerCatInput_'+p.id+'" placeholder="New category…" type="text" onclick="event.stopPropagation()" onkeydown="if(event.key===\'Enter\'){event.stopPropagation();window._pickerAddCat(\''+p.id+'\');}">'+
+          '<button class="esav-cat-picker-new-btn" onclick="event.stopPropagation();window._pickerAddCat(\''+p.id+'\')">Add</button>'+
+        '</div>';
+        pickerHtml='<div class="esav-cat-picker">'+catItems+newCatRow+'</div>';
       }
 
       return '<div class="esav-person-card '+cls+'" data-pid="'+p.id+'">'+
