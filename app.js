@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v223…';
+  b.textContent = 'v224…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v223'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v224'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -7250,6 +7250,7 @@ function _doLogin() {
   var _activePeopleCat=''; // '' = All
   var _openCatPickerId=null; // person id whose picker is open
   var _editingPersonId=null;
+  var _editingNoteKey=null; // {pid, ts}
 
   function _getPeopleCats(){ try{ return JSON.parse(localStorage.getItem('esav_person_cats')||'[]'); }catch(e){ return []; } }
   function _savePeopleCats(cats){ localStorage.setItem('esav_person_cats',JSON.stringify(cats)); }
@@ -7367,11 +7368,18 @@ function _doLogin() {
 
       var entriesHtml=history.length
         ? history.map(function(h){
-            return '<div class="esav-contact-entry">'+
+            var editingNote=_editingNoteKey&&_editingNoteKey.pid===p.id&&_editingNoteKey.ts===h.ts;
+            var noteEl=editingNote
+              ? '<input class="esav-note-edit-input" id="noteEdit_'+p.id+'_'+h.ts+'" value="'+escHtml(h.note||'')+'" onkeydown="if(event.key===\'Enter\')window._esavSaveNoteEdit(\''+p.id+'\','+h.ts+');if(event.key===\'Escape\')window._esavCancelNoteEdit()" />'
+                +'<button class="esav-note-edit-save" onclick="window._esavSaveNoteEdit(\''+p.id+'\','+h.ts+')">✓</button>'
+                +'<button class="esav-note-edit-cancel" onclick="window._esavCancelNoteEdit()">✕</button>'
+              : (h.note
+                  ?'<span class="esav-contact-entry-note">'+escHtml(h.note)+'</span>'
+                  :'<span class="esav-contact-entry-note esav-contact-entry-no-note">—</span>')+
+                '<button class="esav-note-edit-btn" onclick="window._esavEditNote(\''+p.id+'\','+h.ts+')" title="Edit note">✎</button>';
+            return '<div class="esav-contact-entry'+(editingNote?' editing':'')+'">'+
               '<span class="esav-contact-entry-date">'+_tsLabel(h.ts)+'</span>'+
-              (h.note
-                ?'<span class="esav-contact-entry-note">'+escHtml(h.note)+'</span>'
-                :'<span class="esav-contact-entry-note esav-contact-entry-no-note">—</span>')+
+              noteEl+
             '</div>';
           }).join('')
         : '<div class="esav-contact-entry-no-note" style="padding:2px 0">No conversations logged yet</div>';
@@ -7480,6 +7488,28 @@ function _doLogin() {
   window._esavDeletePerson=async function(id){
     if(!confirm('Remove this person?')) return;
     try{ await fetch(ESAV_URL+'/esav/people/'+id,{method:'DELETE'}); _loadPeople(); }catch(e){}
+  };
+  window._esavEditNote=function(pid,ts){ _editingNoteKey={pid:pid,ts:ts}; _editingPersonId=null; _renderPeople(_peopleCache); setTimeout(function(){ var inp=document.getElementById('noteEdit_'+pid+'_'+ts); if(inp){inp.focus();inp.select();} },30); };
+  window._esavCancelNoteEdit=function(){ _editingNoteKey=null; _renderPeople(_peopleCache); };
+  window._esavSaveNoteEdit=async function(pid,ts){
+    var inp=document.getElementById('noteEdit_'+pid+'_'+ts); if(!inp) return;
+    var newNote=inp.value.trim();
+    _editingNoteKey=null;
+    // update local cache
+    try{
+      var local=JSON.parse(localStorage.getItem('pnotes_'+pid)||'[]');
+      var li=local.find(function(h){ return Math.round(h.ts/1000)===Math.round(ts/1000); });
+      if(li) li.note=newNote;
+      localStorage.setItem('pnotes_'+pid,JSON.stringify(local));
+    }catch(e){}
+    // update server-side contactHistory via the person PUT
+    var p=_peopleCache.find(function(x){ return x.id===pid; });
+    if(p&&Array.isArray(p.contactHistory)){
+      var entry=p.contactHistory.find(function(h){ return Math.round(h.ts/1000)===Math.round(ts/1000); });
+      if(entry) entry.note=newNote;
+    }
+    _renderPeople(_peopleCache);
+    if(p) try{ await fetch(ESAV_URL+'/esav/people/'+pid,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({contactHistory:p.contactHistory})}); }catch(e){}
   };
   window._esavEditPerson=function(id){ _editingPersonId=id; _openCatPickerId=null; _renderPeople(_peopleCache); setTimeout(function(){ var inp=document.getElementById('esavPersonNameEdit_'+id); if(inp){inp.focus();inp.select();} },30); };
   window._esavCancelPersonEdit=function(){ _editingPersonId=null; _renderPeople(_peopleCache); };
