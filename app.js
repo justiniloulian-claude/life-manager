@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v225…';
+  b.textContent = 'v226…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v225'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v226'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -6961,7 +6961,9 @@ function _doLogin() {
 
   function _hebPeriodLabel(period, type, elId) {
     if (_hebPeriodCache[period]) return _hebPeriodCache[period];
-    var ds = type==='monthly' ? period+'-01' : period+'-01-01';
+    var moPts = period.split('-');
+    var lastDay = type==='monthly' ? new Date(parseInt(moPts[0],10), parseInt(moPts[1],10), 0).getDate() : 1;
+    var ds = type==='monthly' ? period+'-'+lastDay : period+'-01-01';
     var pts = ds.split('-');
     var url = 'https://www.hebcal.com/converter?cfg=json&gy='+pts[0]+'&gm='+Number(pts[1])+'&gd='+Number(pts[2])+'&g2h=1';
     fetch(url).then(function(r){ return r.json(); }).then(function(json){
