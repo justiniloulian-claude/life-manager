@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v229…';
+  b.textContent = 'v230…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v229'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v230'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -336,8 +336,111 @@ function colorByValue(val) { return COLORS.find(function(c){ return c.value===va
 // ============================================================
 // STATE
 // ============================================================
-var _dashSearch = '';
-var _calSearch = '';
+// ── Global search ──────────────────────────────────────────
+function _searchAllTasks(q) {
+  q = q.toLowerCase();
+  var data = getData();
+  var results = [];
+  // One-time tasks
+  Object.keys(data.tasks||{}).forEach(function(ds) {
+    (data.tasks[ds]||[]).forEach(function(t) {
+      if (!t._rc && ((t.title||'').toLowerCase().includes(q) || (t.location||'').toLowerCase().includes(q) || (t.notes||'').toLowerCase().includes(q))) {
+        results.push({type:'task', ds:ds, id:t.id, title:t.title, sub:ds});
+      }
+    });
+  });
+  // Routine tasks — show next scheduled occurrence
+  var today = toDateStr(new Date());
+  (data.routine||[]).forEach(function(r) {
+    if (!r || !(r.title||'').toLowerCase().includes(q) && !(r.location||'').toLowerCase().includes(q) && !(r.notes||'').toLowerCase().includes(q)) return;
+    // Find next date this routine runs (start from today, up to 90 days)
+    var base = new Date(); var found = null;
+    for (var i = 0; i < 90; i++) {
+      var d = new Date(base); d.setDate(base.getDate() + i);
+      if ((r.days||[]).includes(d.getDay())) { found = toDateStr(d); break; }
+    }
+    results.push({type:'routine', ds:found||today, id:r.id, title:r.title, sub:'Routine'+(r.days&&r.days.length?' ('+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].filter(function(_,i){return (r.days||[]).includes(i);}).join(', ')+')'  :'')});
+  });
+  // Sort: future/present first, then past descending
+  var now = today;
+  results.sort(function(a,b){
+    var af = a.ds >= now, bf = b.ds >= now;
+    if (af && !bf) return -1; if (!af && bf) return 1;
+    if (af) return a.ds < b.ds ? -1 : 1;
+    return a.ds > b.ds ? -1 : 1;
+  });
+  return results.slice(0, 40);
+}
+function _searchAllEvents(q) {
+  q = q.toLowerCase();
+  var data = getData();
+  var results = [];
+  (data.calEvents||[]).forEach(function(e) {
+    if (!e) return;
+    if ((e.title||'').toLowerCase().includes(q) || (e.location||'').toLowerCase().includes(q) || (e.notes||'').toLowerCase().includes(q)) {
+      var ds = e.date || '';
+      var sub = ds;
+      if (e.recurring && e.recurring !== 'none') sub += ' (recurring)';
+      results.push({type:'event', ds:ds, id:e.id, title:e.title, sub:sub});
+    }
+  });
+  var now = toDateStr(new Date());
+  results.sort(function(a,b){
+    var af = a.ds >= now, bf = b.ds >= now;
+    if (af && !bf) return -1; if (!af && bf) return 1;
+    if (af) return a.ds < b.ds ? -1 : 1;
+    return a.ds > b.ds ? -1 : 1;
+  });
+  return results.slice(0, 40);
+}
+function _initGlobalSearch(inputId, kind) {
+  var el = document.getElementById(inputId); if (!el) return;
+  var wrap = el.parentNode;
+  var dropdown = document.createElement('div');
+  dropdown.className = 'search-dropdown'; dropdown.style.display = 'none';
+  wrap.style.position = 'relative';
+  wrap.appendChild(dropdown);
+  function close() { dropdown.style.display = 'none'; dropdown.innerHTML = ''; }
+  function show(results) {
+    if (!results.length) { dropdown.innerHTML = '<div class="search-dd-empty">No results</div>'; dropdown.style.display = 'block'; return; }
+    dropdown.innerHTML = results.map(function(r, i) {
+      return '<div class="search-dd-item" data-idx="'+i+'"><div class="search-dd-title">'+escHtml(r.title||'')+'</div><div class="search-dd-sub">'+escHtml(r.sub||'')+'</div></div>';
+    }).join('');
+    dropdown.style.display = 'block';
+    dropdown.querySelectorAll('.search-dd-item').forEach(function(row, i) {
+      row.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        var r = results[i];
+        el.value = ''; close();
+        if (kind === 'task') {
+          var ds = r.ds;
+          var today = toDateStr(new Date());
+          var diff = (fromDateStr(ds) - new Date().setHours(0,0,0,0)) / 86400000;
+          state.dayOffset = Math.round(diff);
+          setDashView('single');
+          setTimeout(function() {
+            if (r.type === 'routine') openRoutineOverride(ds, r.id);
+            else openEditTask(ds, r.id);
+          }, 120);
+        } else {
+          var d = fromDateStr(r.ds);
+          state.calYear = d.getFullYear(); state.calMonth = d.getMonth();
+          showPage('calendar');
+          renderCalendar();
+          setTimeout(function() { openDayDetail(r.ds); }, 120);
+        }
+      });
+    });
+  }
+  el.addEventListener('input', function() {
+    var q = this.value.trim();
+    if (!q) { close(); return; }
+    var results = kind === 'task' ? _searchAllTasks(q) : _searchAllEvents(q);
+    show(results);
+  });
+  el.addEventListener('keydown', function(e) { if (e.key === 'Escape') { el.value=''; close(); } });
+  el.addEventListener('blur', function() { setTimeout(close, 150); });
+}
 
 const state = {
   dashView: 'seven',
@@ -969,8 +1072,8 @@ function deleteTask(ds,id) {
 // ============================================================
 // ROUTINE
 // ============================================================
-function addRoutineItem(d)    { var data=getData(); data.routine.push({id:uid(),title:d.title,time:d.time||'',endTime:d.endTime||'',location:d.location||'',days:d.days}); saveR(data.routine); }
-function updateRoutineItem(id,d){ var data=getData(); var r=data.routine.find(function(r){return r.id===id;}); if(r){r.title=d.title;r.time=d.time||'';r.endTime=d.endTime||'';r.location=d.location||'';r.days=d.days;} saveR(data.routine); }
+function addRoutineItem(d)    { var data=getData(); data.routine.push({id:uid(),title:d.title,time:d.time||'',endTime:d.endTime||'',location:d.location||'',days:d.days,priority:d.priority||false,notes:d.notes||''}); saveR(data.routine); }
+function updateRoutineItem(id,d){ var data=getData(); var r=data.routine.find(function(r){return r.id===id;}); if(r){r.title=d.title;r.time=d.time||'';r.endTime=d.endTime||'';r.location=d.location||'';r.days=d.days;r.priority=d.priority||false;r.notes=d.notes||'';} saveR(data.routine); }
 function deleteRoutineItem(id){ var data=getData(); saveR(data.routine.filter(function(r){return r.id!==id;})); }
 
 // ============================================================
@@ -1525,15 +1628,9 @@ function dayCardHTML(date, compact) {
     ? '<div class="day-card-name">'+shortDay(date)+chip+countBadge+'</div><div class="day-card-label">'+shortMonthDay(date)+'</div><div class="day-card-hdate" id="hdate-'+ds+'">...</div>'
     : '<div class="day-card-name">'+dayName(date)+chip+'</div><div class="day-card-label">'+monthDay(date)+'</div><div class="day-card-hdate" id="hdate-'+ds+'">...</div>';
   var displayTasks = compact ? tasks.filter(function(t){return !t.done;}) : tasks;
-  if(_dashSearch){
-    var q=_dashSearch.toLowerCase();
-    displayTasks=displayTasks.filter(function(t){
-      return (t.title&&t.title.toLowerCase().includes(q))||(t.location&&t.location.toLowerCase().includes(q))||(t.notes&&t.notes.toLowerCase().includes(q));
-    });
-  }
   var tHTML = displayTasks.length
     ? displayTasks.map(function(t){return taskHTML(t,ds,compact);}).join('')
-    : '<div class="empty-tasks">'+(compact?(_dashSearch?'No matches':'Nothing pending'):(_dashSearch?'No matches':'No tasks yet'))+'</div>';
+    : '<div class="empty-tasks">'+(compact?'Nothing pending':'No tasks yet')+'</div>';
 
   // In compact (7-day) mode: clickable header opens day popup, no zmanim strip
   // In full mode: zmanim strip shown
@@ -3694,14 +3791,12 @@ function renderCalendar() {
     else { dayNum=i-firstDay+1; cellDate=new Date(year,month,dayNum); }
     if (otherMonth) cell.classList.add('other-month');
     if (cellDate.toDateString()===now.toDateString()) cell.classList.add('is-today');
-    if (_calSearch) cell.classList.add('cal-search-dim');
     var ds=toDateStr(cellDate);
     var numEl=document.createElement('div'); numEl.className='cal-cell-top';
     numEl.innerHTML='<div class="cal-day-num">'+dayNum+'</div><div class="cal-hdate" id="chd-'+ds+'"></div>';
     cell.appendChild(numEl);
     var holidays=getHolidaysForDate(ds);
     var events=getEventsForDate(ds);
-    if(_calSearch){var cq=_calSearch.toLowerCase();events=events.filter(function(e){return(e.title&&e.title.toLowerCase().includes(cq))||(e.location&&e.location.toLowerCase().includes(cq))||(e.notes&&e.notes.toLowerCase().includes(cq));});if(events.length)cell.classList.remove('cal-search-dim');}
     if(holidays.length||events.length){
       var evDiv=document.createElement('div');
       if(isMobile()){
@@ -4540,40 +4635,52 @@ window.openRoutineOverride = function(ds, routineId) {
   var ov=data.routineOverrides[ds+'_'+routineId]||{};
   state.routineOverrideDs=ds; state.routineOverrideId=routineId;
   var date=fromDateStr(ds);
-  document.getElementById('routineOverrideModalTitle').textContent='Edit "'+r.title+'" — '+shortMonthDay(date)+' only';
+  document.getElementById('routineOverrideModalTitle').textContent='Edit "'+r.title+'" — '+shortMonthDay(date);
   document.getElementById('routineOverrideTitle').value=ov.title!==undefined?ov.title:r.title;
   document.getElementById('routineOverrideTime').value=ov.time!==undefined?ov.time:(r.time||'');
   document.getElementById('routineOverrideEndTime').value=ov.endTime!==undefined?ov.endTime:(r.endTime||'');
   document.getElementById('routineOverrideLocation').value=ov.location!==undefined?ov.location:(r.location||'');
-  document.getElementById('routineOverridePriorityToday').checked=!!(ov.priority);
-  document.getElementById('routineOverrideNotesToday').value=ov.notes||'';
-  document.getElementById('routineAlwaysPriority').checked=!!(r.priority);
-  document.getElementById('routineAlwaysNotes').value=r.notes||'';
+  document.getElementById('routineOverridePriority').checked=!!(ov.priority!==undefined?ov.priority:r.priority);
+  document.getElementById('routineOverrideNotes').value=ov.notes!==undefined?ov.notes:(r.notes||'');
   openModal('routineOverrideModal');
   setTimeout(function(){document.getElementById('routineOverrideTitle').focus();},80);
 };
-function saveRoutineOverrideModal() {
+function _getRoutineOverrideFields() {
   var title=document.getElementById('routineOverrideTitle').value.trim();
-  if (!title){document.getElementById('routineOverrideTitle').classList.add('error');document.getElementById('routineOverrideTitle').focus();return;}
+  if (!title){document.getElementById('routineOverrideTitle').classList.add('error');document.getElementById('routineOverrideTitle').focus();return null;}
   document.getElementById('routineOverrideTitle').classList.remove('error');
-  var data=getData();
-  var key=state.routineOverrideDs+'_'+state.routineOverrideId;
-  data.routineOverrides[key]={
+  return {
     title:title,
     time:document.getElementById('routineOverrideTime').value,
     endTime:document.getElementById('routineOverrideEndTime').value,
     location:document.getElementById('routineOverrideLocation').value.trim(),
-    priority:document.getElementById('routineOverridePriorityToday').checked,
-    notes:document.getElementById('routineOverrideNotesToday').value.trim()
+    priority:document.getElementById('routineOverridePriority').checked,
+    notes:document.getElementById('routineOverrideNotes').value.trim()
   };
+}
+function saveRoutineOverrideToday() {
+  var fields=_getRoutineOverrideFields(); if(!fields) return;
+  var data=getData();
+  var key=state.routineOverrideDs+'_'+state.routineOverrideId;
+  data.routineOverrides[key]=fields;
   saveRO(data.routineOverrides);
-  // Save "always" priority and notes back to the routine base
+  closeModal('routineOverrideModal');
+  refresh(); refreshDashDayModal();
+}
+function saveRoutineOverrideAlways() {
+  var fields=_getRoutineOverrideFields(); if(!fields) return;
+  var data=getData();
+  // Save to base routine
   var r=data.routine.find(function(r){return r.id===state.routineOverrideId;});
   if(r){
-    r.priority=document.getElementById('routineAlwaysPriority').checked;
-    r.notes=document.getElementById('routineAlwaysNotes').value.trim();
+    r.title=fields.title; r.time=fields.time; r.endTime=fields.endTime;
+    r.location=fields.location; r.priority=fields.priority; r.notes=fields.notes;
     saveR(data.routine);
   }
+  // Also clear any today-only override so base values show
+  var key=state.routineOverrideDs+'_'+state.routineOverrideId;
+  delete data.routineOverrides[key];
+  saveRO(data.routineOverrides);
   closeModal('routineOverrideModal');
   refresh(); refreshDashDayModal();
 }
@@ -4586,6 +4693,8 @@ window.openEditRoutineItem = function(id) {
   document.getElementById('routineTime').value=r.time||'';
   document.getElementById('routineEndTime').value=r.endTime||'';
   document.getElementById('routineLocation').value=r.location||'';
+  document.getElementById('routineItemPriority').checked=!!(r.priority);
+  document.getElementById('routineItemNotes').value=r.notes||'';
   document.querySelectorAll('input[name="rDay"]').forEach(function(cb){cb.checked=r.days.includes(+cb.value);});
   openModal('routineItemModal');
 };
@@ -5214,7 +5323,15 @@ function saveRoutineModal() {
   if (!title){ document.getElementById('routineTitle').classList.add('error'); document.getElementById('routineTitle').focus(); return; }
   document.getElementById('routineTitle').classList.remove('error');
   var days=Array.from(document.querySelectorAll('input[name="rDay"]:checked')).map(function(cb){return +cb.value;});
-  var d={title:title,time:document.getElementById('routineTime').value,endTime:document.getElementById('routineEndTime').value,location:document.getElementById('routineLocation').value.trim(),days:days};
+  var d={
+    title:title,
+    time:document.getElementById('routineTime').value,
+    endTime:document.getElementById('routineEndTime').value,
+    location:document.getElementById('routineLocation').value.trim(),
+    priority:document.getElementById('routineItemPriority').checked,
+    notes:document.getElementById('routineItemNotes').value.trim(),
+    days:days
+  };
   state.editRoutineId?updateRoutineItem(state.editRoutineId,d):addRoutineItem(d);
   state.editRoutineId=null; closeModal('routineItemModal'); renderRoutineList(); refresh();
 }
@@ -5656,13 +5773,9 @@ function initListeners() {
     setDashView('single');
   });
 
-  // Dashboard search
-  var dashSearchEl=document.getElementById('dashSearch');
-  if(dashSearchEl) dashSearchEl.addEventListener('input',function(){ _dashSearch=this.value.trim(); refresh(); });
-
-  // Calendar search
-  var calSearchEl=document.getElementById('calSearch');
-  if(calSearchEl) calSearchEl.addEventListener('input',function(){ _calSearch=this.value.trim(); renderCalendar(); });
+  // Global search
+  _initGlobalSearch('dashSearch', 'task');
+  _initGlobalSearch('calSearch', 'event');
 
   // Single day nav
   document.getElementById('closeMissedTasksModal').addEventListener('click', function(){ closeModal('missedTasksModal'); });
@@ -5719,7 +5832,8 @@ function initListeners() {
   // Routine override modal
   document.getElementById('closeRoutineOverrideModal').addEventListener('click', function(){ closeModal('routineOverrideModal'); });
   document.getElementById('cancelRoutineOverride').addEventListener('click',     function(){ closeModal('routineOverrideModal'); });
-  document.getElementById('saveRoutineOverride').addEventListener('click', saveRoutineOverrideModal);
+  document.getElementById('saveRoutineOverrideToday').addEventListener('click', saveRoutineOverrideToday);
+  document.getElementById('saveRoutineOverrideAlways').addEventListener('click', saveRoutineOverrideAlways);
   document.getElementById('skipRoutineDay').addEventListener('click', function(){
     if(!confirm('Skip "'+document.getElementById('routineOverrideTitle').value+'" for this day only?'))return;
     var data=getData();
@@ -5739,6 +5853,7 @@ function initListeners() {
     state.editRoutineId=null;
     document.getElementById('routineItemModalTitle').textContent='Add Routine Task';
     document.getElementById('routineTitle').value=''; document.getElementById('routineTime').value=''; document.getElementById('routineEndTime').value=''; document.getElementById('routineLocation').value='';
+    document.getElementById('routineItemPriority').checked=false; document.getElementById('routineItemNotes').value='';
     document.querySelectorAll('input[name="rDay"]').forEach(function(cb){cb.checked=false;});
     openModal('routineItemModal');
   });

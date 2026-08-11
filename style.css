@@ -986,20 +986,35 @@ body.dark-mode .dash-search-input:focus { border-color: #888; background: #333; 
 }
 .cal-search-input:focus { border-color: #555; background: #fff; }
 body.dark-mode .cal-search-input { background: #2a2a2a; border-color: #444; color: #eee; }
-.cal-search-dim { opacity: 0.3; }
-.cal-search-dim:hover { opacity: 1; }
+/* ── Global search dropdown ──────────────────────── */
+.search-dropdown {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: #fff; border: 1.5px solid #e0e0e0; border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.13); z-index: 9999;
+  max-height: 320px; overflow-y: auto;
+}
+body.dark-mode .search-dropdown { background: #222; border-color: #444; box-shadow: 0 6px 24px rgba(0,0,0,0.5); }
+.search-dd-item {
+  padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #f0f0f0;
+  transition: background 0.1s;
+}
+.search-dd-item:last-child { border-bottom: none; }
+.search-dd-item:hover { background: #f5f5f5; }
+body.dark-mode .search-dd-item { border-bottom-color: #333; }
+body.dark-mode .search-dd-item:hover { background: #2e2e2e; }
+.search-dd-title { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+body.dark-mode .search-dd-title { color: #eee; }
+.search-dd-sub { font-size: 11px; color: #888; margin-top: 2px; }
+body.dark-mode .search-dd-sub { color: #666; }
+.search-dd-empty { padding: 12px 14px; font-size: 13px; color: #888; text-align: center; }
 
 /* ── Routine task priority ───────────────────────── */
 .routine-priority-icon { font-size: 11px; margin-right: 3px; }
 .task-title.is-routine-priority { font-weight: 700; }
 
-/* ── Routine override modal sections ─────────────── */
-.routine-section-label {
-  font-size: 11px; font-weight: 700; letter-spacing: .06em;
-  text-transform: uppercase; color: #888; margin: 12px 0 6px;
-  border-bottom: 1px solid #eee; padding-bottom: 4px;
-}
-body.dark-mode .routine-section-label { color: #666; border-color: #333; }
+/* ── Routine override modal footer ─────────────── */
+.routine-override-footer { flex-wrap: wrap; gap: 8px; }
+.routine-override-footer .btn-secondary { font-size: 13px; padding: 8px 12px; }
 .routine-priority-label {
   display: flex; align-items: center; gap: 8px;
   cursor: pointer; font-size: 13px; margin-bottom: 10px;

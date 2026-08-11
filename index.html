@@ -728,6 +728,12 @@
       <input type="time" id="routineEndTime" class="field">
       <label class="field-label">Location <span class="optional">optional</span></label>
       <input type="text" id="routineLocation" class="field" placeholder="e.g. Synagogue">
+      <label class="field-label routine-priority-label">
+        <input type="checkbox" id="routineItemPriority" class="routine-priority-check">
+        ⚡ Priority task
+      </label>
+      <label class="field-label">Notes <span class="optional">optional</span></label>
+      <textarea id="routineItemNotes" class="field" rows="2" placeholder="Notes shown every day for this task…"></textarea>
       <label class="field-label">Repeat on</label>
       <div class="day-picker">
         <label class="day-pick"><input type="checkbox" name="rDay" value="0"><span>Sun</span></label>
@@ -1508,7 +1514,6 @@
       <button class="modal-close" id="closeRoutineOverrideModal">&times;</button>
     </div>
     <div class="modal-body">
-      <div class="routine-section-label">Today only</div>
       <label class="field-label">Task title</label>
       <input type="text" id="routineOverrideTitle" class="field" placeholder="e.g. Mincha">
       <label class="field-label">Start Time <span class="optional">optional</span></label>
@@ -1518,24 +1523,17 @@
       <label class="field-label">Location <span class="optional">optional</span></label>
       <input type="text" id="routineOverrideLocation" class="field" placeholder="e.g. Different shul">
       <label class="field-label routine-priority-label">
-        <input type="checkbox" id="routineOverridePriorityToday" class="routine-priority-check">
-        ⚡ Priority today only
+        <input type="checkbox" id="routineOverridePriority" class="routine-priority-check">
+        ⚡ Priority
       </label>
-      <label class="field-label">Notes for today <span class="optional">optional</span></label>
-      <textarea id="routineOverrideNotesToday" class="field" rows="2" placeholder="Notes just for this day…"></textarea>
-
-      <div class="routine-section-label" style="margin-top:16px">Always (every day)</div>
-      <label class="field-label routine-priority-label">
-        <input type="checkbox" id="routineAlwaysPriority" class="routine-priority-check">
-        ⚡ Priority every day
-      </label>
-      <label class="field-label">Notes (every day) <span class="optional">optional</span></label>
-      <textarea id="routineAlwaysNotes" class="field" rows="2" placeholder="Notes shown every day for this task…"></textarea>
+      <label class="field-label">Notes <span class="optional">optional</span></label>
+      <textarea id="routineOverrideNotes" class="field" rows="2" placeholder="Notes for this task…"></textarea>
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer routine-override-footer">
       <button id="cancelRoutineOverride" class="btn-cancel">Cancel</button>
-      <button id="skipRoutineDay" class="btn-secondary" style="color:#e53e3e;border-color:#feb2b2">Skip This Day</button>
-      <button id="saveRoutineOverride" class="btn-primary">Save</button>
+      <button id="skipRoutineDay" class="btn-secondary" style="color:#e53e3e;border-color:#feb2b2">Skip Day</button>
+      <button id="saveRoutineOverrideToday" class="btn-secondary">Save for Today</button>
+      <button id="saveRoutineOverrideAlways" class="btn-primary">Save Always</button>
     </div>
   </div>
 </div>
