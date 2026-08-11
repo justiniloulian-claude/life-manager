@@ -133,6 +133,9 @@
       <input type="date" id="dateJumpInput" class="date-jump-input" title="Jump to any date">
     </div>
   </div>
+  <div class="dash-search-row">
+    <input type="text" id="dashSearch" class="dash-search-input" placeholder="🔍 Search tasks…" autocomplete="off">
+  </div>
 
   <!-- Single Day View -->
   <div id="singleDayView" class="view">
@@ -525,6 +528,7 @@
       <button id="calNextBtn" class="btn-nav">&#8594;</button>
       <button id="calTodayBtn" class="btn-today" style="margin-left:6px">Today</button>
     </div>
+    <input type="text" id="calSearch" class="cal-search-input" placeholder="🔍 Search events…" autocomplete="off">
     <div style="display:flex;gap:8px;align-items:center;position:relative">
       <button id="addCalEventBtn" class="btn-primary">+ Add Event</button>
       <button id="printCalBtn" class="btn-nav btn-print-dash" title="Print Calendar">🖨 Print</button>
@@ -1498,13 +1502,13 @@
 
 <!-- Routine Override Modal (one-time edit for a specific day) -->
 <div id="routineOverrideModal" class="modal">
-  <div class="modal-box" style="max-width:400px">
+  <div class="modal-box" style="max-width:420px">
     <div class="modal-header">
       <h2 id="routineOverrideModalTitle">Edit for This Day</h2>
       <button class="modal-close" id="closeRoutineOverrideModal">&times;</button>
     </div>
     <div class="modal-body">
-      <p class="modal-note">This change only applies to this one day. Your routine stays the same for every other week.</p>
+      <div class="routine-section-label">Today only</div>
       <label class="field-label">Task title</label>
       <input type="text" id="routineOverrideTitle" class="field" placeholder="e.g. Mincha">
       <label class="field-label">Start Time <span class="optional">optional</span></label>
@@ -1513,11 +1517,25 @@
       <input type="time" id="routineOverrideEndTime" class="field">
       <label class="field-label">Location <span class="optional">optional</span></label>
       <input type="text" id="routineOverrideLocation" class="field" placeholder="e.g. Different shul">
+      <label class="field-label routine-priority-label">
+        <input type="checkbox" id="routineOverridePriorityToday" class="routine-priority-check">
+        ⚡ Priority today only
+      </label>
+      <label class="field-label">Notes for today <span class="optional">optional</span></label>
+      <textarea id="routineOverrideNotesToday" class="field" rows="2" placeholder="Notes just for this day…"></textarea>
+
+      <div class="routine-section-label" style="margin-top:16px">Always (every day)</div>
+      <label class="field-label routine-priority-label">
+        <input type="checkbox" id="routineAlwaysPriority" class="routine-priority-check">
+        ⚡ Priority every day
+      </label>
+      <label class="field-label">Notes (every day) <span class="optional">optional</span></label>
+      <textarea id="routineAlwaysNotes" class="field" rows="2" placeholder="Notes shown every day for this task…"></textarea>
     </div>
     <div class="modal-footer">
       <button id="cancelRoutineOverride" class="btn-cancel">Cancel</button>
       <button id="skipRoutineDay" class="btn-secondary" style="color:#e53e3e;border-color:#feb2b2">Skip This Day</button>
-      <button id="saveRoutineOverride" class="btn-primary">Save for This Day</button>
+      <button id="saveRoutineOverride" class="btn-primary">Save</button>
     </div>
   </div>
 </div>

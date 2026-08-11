@@ -964,6 +964,49 @@ textarea.field { resize: vertical; }
 }
 .date-jump-input:focus { border-color: #1a1a1a; }
 
+/* ── Dashboard search bar ─────────────────────────── */
+.dash-search-row { padding: 4px 16px 6px; }
+.dash-search-input {
+  width: 100%; box-sizing: border-box;
+  padding: 7px 12px; border-radius: 20px;
+  border: 1.5px solid #e0e0e0; font-size: 13px;
+  background: #f9f9f9; color: #1a1a1a; outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.dash-search-input:focus { border-color: #555; background: #fff; }
+body.dark-mode .dash-search-input { background: #2a2a2a; border-color: #444; color: #eee; }
+body.dark-mode .dash-search-input:focus { border-color: #888; background: #333; }
+
+/* ── Calendar search bar ─────────────────────────── */
+.cal-search-input {
+  padding: 6px 12px; border-radius: 18px;
+  border: 1.5px solid #e0e0e0; font-size: 13px;
+  background: #f9f9f9; color: #1a1a1a; outline: none;
+  min-width: 180px; transition: border-color 0.15s;
+}
+.cal-search-input:focus { border-color: #555; background: #fff; }
+body.dark-mode .cal-search-input { background: #2a2a2a; border-color: #444; color: #eee; }
+.cal-search-dim { opacity: 0.3; }
+.cal-search-dim:hover { opacity: 1; }
+
+/* ── Routine task priority ───────────────────────── */
+.routine-priority-icon { font-size: 11px; margin-right: 3px; }
+.task-title.is-routine-priority { font-weight: 700; }
+
+/* ── Routine override modal sections ─────────────── */
+.routine-section-label {
+  font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: #888; margin: 12px 0 6px;
+  border-bottom: 1px solid #eee; padding-bottom: 4px;
+}
+body.dark-mode .routine-section-label { color: #666; border-color: #333; }
+.routine-priority-label {
+  display: flex; align-items: center; gap: 8px;
+  cursor: pointer; font-size: 13px; margin-bottom: 10px;
+}
+.routine-priority-check { width: 15px; height: 15px; accent-color: #f59e0b; cursor: pointer; }
+.field-label.routine-priority-label { font-weight: 500; }
+
 /* ===== FUTURE VIEW (Short Term + Long Term) ===== */
 .future-layout {
   display: grid;
