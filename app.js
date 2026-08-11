@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v230…';
+  b.textContent = 'v231…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v230'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v231'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -1028,7 +1028,7 @@ function getTasksForDate(ds) {
     all=ordered;
   }
   var inc=all.filter(function(t){return !t.done;});
-  if (state.priorityFilter) inc=inc.filter(function(t){return t.priority==='priority'||t.priority==='mustdo';});
+  if (state.priorityFilter) inc=inc.filter(function(t){return t.priority==='priority'||t.priority==='mustdo'||t.priority===true;});
   var don=all.filter(function(t){return t.done;});
   // Partial sort: timed tasks enforce time order among themselves;
   // untimed tasks stay exactly where drag placed them.
