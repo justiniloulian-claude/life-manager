@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v231…';
+  b.textContent = 'v232…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v231'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v232'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -4754,7 +4754,17 @@ function renderNoteViewChecklist() {
       '</div>';
   }).join('');
 }
-window.nvToggle = function(i){ state.viewNoteCheckItems[i].done=!state.viewNoteCheckItems[i].done; renderNoteViewChecklist(); };
+function _sortCheckItems(items){
+  var undone=items.filter(function(x){return !x.done;});
+  var done=items.filter(function(x){return x.done;});
+  return undone.concat(done);
+}
+window.nvToggle = function(i){
+  state.viewNoteCheckItems[i].done=!state.viewNoteCheckItems[i].done;
+  state.viewNoteCheckItems=_sortCheckItems(state.viewNoteCheckItems);
+  renderNoteViewChecklist();
+  saveNoteViewModal();
+};
 window.nvUpdate = function(i,v){ state.viewNoteCheckItems[i].text=v; };
 window.nvRemove = function(i){ state.viewNoteCheckItems.splice(i,1); renderNoteViewChecklist(); };
 window.nvCheckEnter = function(e, i) {
@@ -4774,7 +4784,7 @@ window.nvCheckEnter = function(e, i) {
 window.openNoteView = function(id) {
   var data=getData(); var n=data.notes.find(function(n){return n.id===id;}); if(!n)return;
   state.viewingNoteId=id;
-  state.viewNoteCheckItems=(n.items||[]).map(function(i){return {id:i.id||uid(),text:i.text,done:!!i.done};});
+  state.viewNoteCheckItems=_sortCheckItems((n.items||[]).map(function(i){return {id:i.id||uid(),text:i.text,done:!!i.done};}));
 
   // Apply note color to the box
   var box=document.querySelector('#noteViewModal .note-view-box');
