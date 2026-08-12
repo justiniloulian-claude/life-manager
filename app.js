@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v232…';
+  b.textContent = 'v233…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v232'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v233'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -4763,22 +4763,20 @@ window.nvToggle = function(i){
   state.viewNoteCheckItems[i].done=!state.viewNoteCheckItems[i].done;
   state.viewNoteCheckItems=_sortCheckItems(state.viewNoteCheckItems);
   renderNoteViewChecklist();
-  saveNoteViewModal();
 };
 window.nvUpdate = function(i,v){ state.viewNoteCheckItems[i].text=v; };
 window.nvRemove = function(i){ state.viewNoteCheckItems.splice(i,1); renderNoteViewChecklist(); };
 window.nvCheckEnter = function(e, i) {
   if (e.key !== 'Enter') return;
   e.preventDefault();
-  // Commit the current item's text from the input value
-  var input = e.target;
-  state.viewNoteCheckItems[i].text = input.value;
-  // Insert a new blank item after index i
-  state.viewNoteCheckItems.splice(i + 1, 0, {id: uid(), text: '', done: false});
+  state.viewNoteCheckItems[i].text = e.target.value;
+  var newItem = {id: uid(), text: '', done: false};
+  state.viewNoteCheckItems.splice(i + 1, 0, newItem);
+  state.viewNoteCheckItems = _sortCheckItems(state.viewNoteCheckItems);
   renderNoteViewChecklist();
-  // Focus the new item
+  var newIdx = state.viewNoteCheckItems.findIndex(function(x){return x.id===newItem.id;});
   var inputs = document.getElementById('noteViewCheckItems').querySelectorAll('.note-view-check-input');
-  if (inputs[i + 1]) inputs[i + 1].focus();
+  if (inputs[newIdx]) inputs[newIdx].focus();
 };
 
 window.openNoteView = function(id) {
@@ -5455,17 +5453,20 @@ function renderCheckItems() {
     return '<div class="check-input-row">'+'<input type="checkbox"'+(item.done?' checked':'')+' onchange="toggleCheckItem('+i+')">'+'<input type="text" value="'+escHtml(item.text)+'" placeholder="List item..." oninput="updateCheckItem('+i+', this.value)" onkeydown="createCheckEnter(event,'+i+')">'+'<button class="btn-icon" onclick="removeCheckItem('+i+')">✕</button></div>';
   }).join('');
 }
-window.toggleCheckItem = function(i){ state.noteCheckItems[i].done=!state.noteCheckItems[i].done; renderCheckItems(); };
+window.toggleCheckItem = function(i){ state.noteCheckItems[i].done=!state.noteCheckItems[i].done; state.noteCheckItems=_sortCheckItems(state.noteCheckItems); renderCheckItems(); };
 window.updateCheckItem = function(i,v){ state.noteCheckItems[i].text=v; };
 window.removeCheckItem = function(i){ state.noteCheckItems.splice(i,1); renderCheckItems(); };
 window.createCheckEnter = function(e,i){
   if(e.key!=='Enter')return;
   e.preventDefault();
   state.noteCheckItems[i].text=e.target.value;
-  state.noteCheckItems.splice(i+1,0,{id:uid(),text:'',done:false});
+  var newItem={id:uid(),text:'',done:false};
+  state.noteCheckItems.splice(i+1,0,newItem);
+  state.noteCheckItems=_sortCheckItems(state.noteCheckItems);
   renderCheckItems();
+  var newIdx=state.noteCheckItems.findIndex(function(x){return x.id===newItem.id;});
   var inputs=document.getElementById('noteCheckItems').querySelectorAll('input[type="text"]');
-  if(inputs[i+1])inputs[i+1].focus();
+  if(inputs[newIdx])inputs[newIdx].focus();
 };
 
 function populateFolderSelect(selectedIds) {
@@ -6421,9 +6422,13 @@ function initListeners() {
   document.getElementById('noteViewContent').addEventListener('paste', cleanPaste);
   document.getElementById('noteContent').addEventListener('paste', cleanPaste);
   document.getElementById('noteViewAddCheckItem').addEventListener('click', function(){
-    state.viewNoteCheckItems.push({id:uid(),text:'',done:false}); renderNoteViewChecklist();
+    var newItem={id:uid(),text:'',done:false};
+    state.viewNoteCheckItems.push(newItem);
+    state.viewNoteCheckItems=_sortCheckItems(state.viewNoteCheckItems);
+    renderNoteViewChecklist();
+    var newIdx=state.viewNoteCheckItems.findIndex(function(x){return x.id===newItem.id;});
     var inputs=document.getElementById('noteViewCheckItems').querySelectorAll('.note-view-check-input');
-    if(inputs.length) inputs[inputs.length-1].focus();
+    if(inputs[newIdx]) inputs[newIdx].focus();
   });
   document.getElementById('addNoteBtn').addEventListener('click', openNoteModal);
   document.getElementById('closeNoteModal').addEventListener('click', function(){ closeModal('noteModal'); });
@@ -6432,9 +6437,13 @@ function initListeners() {
   document.getElementById('noteTypeText').addEventListener('click',  function(){ setNoteType('text'); });
   document.getElementById('noteTypeCheck').addEventListener('click', function(){ setNoteType('checklist'); });
   document.getElementById('addCheckItem').addEventListener('click', function(){
-    state.noteCheckItems.push({id:uid(),text:'',done:false}); renderCheckItems();
+    var newItem={id:uid(),text:'',done:false};
+    state.noteCheckItems.push(newItem);
+    state.noteCheckItems=_sortCheckItems(state.noteCheckItems);
+    renderCheckItems();
+    var newIdx=state.noteCheckItems.findIndex(function(x){return x.id===newItem.id;});
     var inputs=document.getElementById('noteCheckItems').querySelectorAll('input[type="text"]');
-    if (inputs.length) inputs[inputs.length-1].focus();
+    if(inputs[newIdx])inputs[newIdx].focus();
   });
   document.getElementById('notesSearch').addEventListener('input', function(e){ state.notesSearchQuery=e.target.value; renderNotesMain(); });
   document.getElementById('notesSearchMobile').addEventListener('input', function(){
