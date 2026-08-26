@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v233…';
+  b.textContent = 'v234…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v233'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v234'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -941,6 +941,40 @@ async function _initTodayHeb(){
     if(typeof _goalsCache!=='undefined'&&_goalsCache&&_goalsCache.length) _renderGoals(_goalsCache);
   }catch(e){}
 }
+// ── Hebrew month-end dates (for "end of Hebrew month" recurrence) ──────────────
+var _hebMonthEndDates = null; // Set<'YYYY-MM-DD'>, null until loaded
+async function _initHebMonthEnds() {
+  try {
+    var cached = JSON.parse(localStorage.getItem('_hebMonthEndsCache') || 'null');
+    if (cached && cached.ts && Date.now() - cached.ts < 30 * 24 * 60 * 60 * 1000) {
+      _hebMonthEndDates = new Set(cached.dates);
+      return;
+    }
+  } catch(e) {}
+  var hy = _todayHebMonth ? _todayHebMonth.year : (new Date().getFullYear() + 3760);
+  var rcByKey = {}; // key → earliest Gregorian date string (to handle 2-day Rosh Chodesh)
+  for (var y = hy; y <= hy + 2; y++) {
+    try {
+      var res = await fetch('https://www.hebcal.com/hebcal?v=1&cfg=json&year='+y+'&maj=on&min=off&mod=off&nx=on&ss=off&mf=off&c=off&i=off&lg=en');
+      var json = await res.json();
+      (json.items || []).forEach(function(item) {
+        var ds = (item.date || '').slice(0, 10); if (!ds) return;
+        var isRC = item.category === 'roshchodesh';
+        var isRH = item.category === 'holiday' && (item.title || '').indexOf('Rosh Hashana') !== -1;
+        if (!isRC && !isRH) return;
+        var key = (isRH ? 'RoshHashana' : item.title) + '_' + y;
+        if (!rcByKey[key] || ds < rcByKey[key]) rcByKey[key] = ds;
+      });
+    } catch(e) {}
+  }
+  var dates = [];
+  Object.keys(rcByKey).forEach(function(k) {
+    var d = fromDateStr(rcByKey[k]); d.setDate(d.getDate() - 1);
+    dates.push(toDateStr(d));
+  });
+  _hebMonthEndDates = new Set(dates);
+  try { localStorage.setItem('_hebMonthEndsCache', JSON.stringify({ts: Date.now(), dates: dates})); } catch(e) {}
+}
 function _curHebPeriod(){ return _todayHebMonth?(_todayHebMonth.year+'-'+_todayHebMonth.month):''; }
 function _curHebYear(){ return _todayHebMonth?String(_todayHebMonth.year):''; }
 function _hebPeriodDisplay(p){ var s=p.split('-'); return s.length>=2?s[1]+' '+s[0]:p; }
@@ -1111,6 +1145,9 @@ function isRecurringOccurrence(ev, ds) {
     var dIM=new Date(check.getFullYear(),check.getMonth()+1,0).getDate();
     return check.getDate()===Math.min(start.getDate(),dIM);
   }
+  if(ev.recurring==='hebrew-monthly'){
+    return !!_hebMonthEndDates && _hebMonthEndDates.has(ds);
+  }
   return false;
 }
 function getEventsForDate(ds){
@@ -1143,12 +1180,20 @@ function deleteCalEvent(id){ var data=getData(); saveCE(data.calEvents.filter(fu
 // ============================================================
 // CALENDAR UI HELPERS
 // ============================================================
+function _syncRecurUnitUI(){
+  var unit=document.getElementById('calEventRecurUnit').value;
+  var isHeb=unit==='hebrew-months';
+  document.getElementById('calEventRecurN').style.display=isHeb?'none':'';
+  var everySpan=document.querySelector('#calEventRecurGroup .recur-interval-row > span');
+  if(everySpan)everySpan.style.display=isHeb?'none':'';
+}
 function getRecurFromUI(){
   var doRecur=document.getElementById('calEventDoRecur').checked;
   if(!doRecur)return{recurring:'none',recurringN:null,recurringUnit:null,recurringUntil:null};
-  var n=parseInt(document.getElementById('calEventRecurN').value,10)||1;
   var unit=document.getElementById('calEventRecurUnit').value||'weeks';
   var until=document.getElementById('calEventUntil').value||null;
+  if(unit==='hebrew-months') return{recurring:'hebrew-monthly',recurringN:null,recurringUnit:null,recurringUntil:until};
+  var n=parseInt(document.getElementById('calEventRecurN').value,10)||1;
   return{recurring:'custom',recurringN:n,recurringUnit:unit,recurringUntil:until};
 }
 // Draft reminder list while modal is open
@@ -1217,11 +1262,17 @@ function populateCalEventUI(ev){
   document.getElementById('calEventDoRecur').checked=isRecur;
   document.getElementById('calEventRecurGroup').style.display=isRecur?'':'none';
   if(isRecur){
-    var n=ev.recurringN||(ev.recurring==='biweekly'?2:1);
-    var unit=ev.recurringUnit||(ev.recurring==='biweekly'?'weeks':ev.recurring==='monthly'?'months':'weeks');
-    document.getElementById('calEventRecurN').value=n;
-    document.getElementById('calEventRecurUnit').value=unit;
+    if(ev.recurring==='hebrew-monthly'){
+      document.getElementById('calEventRecurUnit').value='hebrew-months';
+      document.getElementById('calEventRecurN').value=1;
+    } else {
+      var n=ev.recurringN||(ev.recurring==='biweekly'?2:1);
+      var unit=ev.recurringUnit||(ev.recurring==='biweekly'?'weeks':ev.recurring==='monthly'?'months':'weeks');
+      document.getElementById('calEventRecurN').value=n;
+      document.getElementById('calEventRecurUnit').value=unit;
+    }
     document.getElementById('calEventUntil').value=ev.recurringUntil||'';
+    _syncRecurUnitUI();
   }
   _calReminderDraft=(ev.reminders||[]).map(normalizeReminder);
   renderCalReminderList();
@@ -4868,7 +4919,8 @@ window.openDayDetail = function(ds) {
     }).join('');
     body.innerHTML=holHTML+events.map(function(ev){
       var isRec=ev.recurring&&ev.recurring!=='none';
-      var recIcon=isRec?'<span class="cal-recurring-icon" title="Recurring: '+escHtml(ev.recurring)+'">🔄</span>':'';
+      var recLabel=ev.recurring==='hebrew-monthly'?'End of Hebrew month':ev.recurring;
+      var recIcon=isRec?'<span class="cal-recurring-icon" title="Recurring: '+escHtml(recLabel)+'">🔄</span>':'';
       var delBtns=isRec
         ? '<button class="btn-icon" onclick="delCalEvOcc(\''+ev.id+'\',\''+ds+'\',\'single\')" title="Skip this occurrence">✕</button>'+
           '<button class="btn-icon" onclick="delCalEvOcc(\''+ev.id+'\',\''+ds+'\',\'future\')" title="Delete this & all future" style="font-size:10px">✕✕</button>'
@@ -6295,7 +6347,9 @@ function initListeners() {
   document.getElementById('saveCalEvent').addEventListener('click', saveCalEventModal);
   document.getElementById('calEventDoRecur').addEventListener('change',function(){
     document.getElementById('calEventRecurGroup').style.display=this.checked?'':'none';
+    if(this.checked)_syncRecurUnitUI();
   });
+  document.getElementById('calEventRecurUnit').addEventListener('change', _syncRecurUnitUI);
   if(document.getElementById('closeEditCalScopeModal'))
     document.getElementById('closeEditCalScopeModal').addEventListener('click',function(){closeModal('editCalScopeModal');});
   document.getElementById('closeDayDetailModal').addEventListener('click', function(){ closeModal('dayDetailModal'); });
@@ -7164,7 +7218,7 @@ function _doLogin() {
   // ── Goals ──────────────────────────────────────────────────
   var _CAT_COLORS={health:'#16a34a',spiritual:'#7c3aed',learning:'#2563eb',relationships:'#db2777',work:'#d97706',personal:'#64748b'};
   var _goalsCache=[], _editingGoalId=null, _dragGoalId=null;
-  _initTodayHeb();
+  _initTodayHeb(); _initHebMonthEnds();
 
   function _isoWeekStr(d) {
     var dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
