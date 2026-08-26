@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v235…';
+  b.textContent = 'v236…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v235'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v236'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -5443,7 +5443,7 @@ function saveCalEventModal() {
     addCalEvent(d);
     if(d.date){var nd2=fromDateStr(d.date);state.calYear=nd2.getFullYear();state.calMonth=nd2.getMonth();}
   }
-  if(document.getElementById('calEventAddToDashboard').checked&&d.date) addTask(d.date,{title:d.title,time:d.time,color:d.color});
+  if(document.getElementById('calEventAddToDashboard').checked){var _tds=d.date||toDateStr(new Date());addTask(_tds,{title:d.title,time:d.time,color:d.color});refresh();}
   closeModal('calEventModal'); renderCalendar();
 }
 
@@ -5489,7 +5489,7 @@ window.executeEditCalEvent = function(scope) {
     saveCE(updated);
     addCalEvent(Object.assign({},d,{date:ds}));
   }
-  if(state.pendingAddToDash&&ds) addTask(ds,{title:d.title,time:d.time||'',color:d.color||''});
+  if(state.pendingAddToDash&&ds){addTask(ds,{title:d.title,time:d.time||'',color:d.color||''});refresh();}
   state.pendingEditCalData=null; state.pendingEditCalDs=null; state.pendingAddToDash=false;
   closeModal('editCalScopeModal'); renderCalendar();
 };
