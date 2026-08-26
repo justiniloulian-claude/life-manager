@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v234…';
+  b.textContent = 'v235…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v234'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v235'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -951,11 +951,12 @@ async function _initHebMonthEnds() {
       return;
     }
   } catch(e) {}
-  var hy = _todayHebMonth ? _todayHebMonth.year : (new Date().getFullYear() + 3760);
-  var rcByKey = {}; // key → earliest Gregorian date string (to handle 2-day Rosh Chodesh)
-  for (var y = hy; y <= hy + 2; y++) {
+  // Use Gregorian year with yt=G so API returns proper Gregorian dates
+  var baseYear = new Date().getFullYear();
+  var rcByKey = {}; // key → earliest Gregorian date string (handles 2-day Rosh Chodesh)
+  for (var y = baseYear - 1; y <= baseYear + 2; y++) {
     try {
-      var res = await fetch('https://www.hebcal.com/hebcal?v=1&cfg=json&year='+y+'&maj=on&min=off&mod=off&nx=on&ss=off&mf=off&c=off&i=off&lg=en');
+      var res = await fetch('https://www.hebcal.com/hebcal?v=1&cfg=json&year='+y+'&yt=G&maj=on&min=off&mod=off&nx=on&ss=off&mf=off&c=off&i=off&lg=en');
       var json = await res.json();
       (json.items || []).forEach(function(item) {
         var ds = (item.date || '').slice(0, 10); if (!ds) return;
