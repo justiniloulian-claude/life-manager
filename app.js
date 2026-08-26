@@ -945,7 +945,7 @@ async function _initTodayHeb(){
 var _hebMonthEndDates = null; // Set<'YYYY-MM-DD'>, null until loaded
 async function _initHebMonthEnds() {
   try {
-    var cached = JSON.parse(localStorage.getItem('_hebMonthEndsCache') || 'null');
+    var cached = JSON.parse(localStorage.getItem('_hebMonthEndsCache2') || 'null');
     if (cached && cached.ts && Date.now() - cached.ts < 30 * 24 * 60 * 60 * 1000) {
       _hebMonthEndDates = new Set(cached.dates);
       return;
@@ -974,7 +974,7 @@ async function _initHebMonthEnds() {
     dates.push(toDateStr(d));
   });
   _hebMonthEndDates = new Set(dates);
-  try { localStorage.setItem('_hebMonthEndsCache', JSON.stringify({ts: Date.now(), dates: dates})); } catch(e) {}
+  try { localStorage.setItem('_hebMonthEndsCache2', JSON.stringify({ts: Date.now(), dates: dates})); } catch(e) {}
 }
 function _curHebPeriod(){ return _todayHebMonth?(_todayHebMonth.year+'-'+_todayHebMonth.month):''; }
 function _curHebYear(){ return _todayHebMonth?String(_todayHebMonth.year):''; }
