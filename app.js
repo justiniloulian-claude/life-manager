@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v236…';
+  b.textContent = 'v237…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v236'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v237'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -1050,8 +1050,15 @@ function getTasksForDate(ds) {
       color:'', type:'routine', done: c ? c.done : false
     };
   }).filter(Boolean);
-  var oneTasks=(data.tasks[ds]||[]).filter(function(t){return !t._rc;});
-  var all=routineTasks.concat(oneTasks);
+  var oneTasks=(data.tasks[ds]||[]).filter(function(t){return !t._rc&&!t._calEv;});
+  // Recurring calendar events with addToDashboard=true auto-generate tasks on each occurrence
+  var calEvTasks=data.calEvents.filter(function(ev){
+    return ev.addToDashboard&&!ev._overrideFor&&ev.recurring&&ev.recurring!=='none'&&isRecurringOccurrence(ev,ds);
+  }).map(function(ev){
+    var c=(data.tasks[ds]||[]).find(function(t){return t._calEv===ev.id;});
+    return {id:ev.id,_calEv:ev.id,title:ev.title,time:ev.time||'',endTime:'',location:ev.location||'',notes:ev.notes||'',color:ev.color||'',priority:'standard',type:'cal-event',done:c?c.done:false};
+  });
+  var all=routineTasks.concat(calEvTasks).concat(oneTasks);
   // Apply stored drag order if available (covers routine + one-time tasks)
   var orderData=JSON.parse(localStorage.getItem('dm_task_order')||'{}');
   var order=orderData[ds];
@@ -1076,7 +1083,12 @@ function getTasksForDate(ds) {
 function toggleDone(ds,id,isRoutine) {
   var data=getData();
   if (!data.tasks[ds]) data.tasks[ds]=[];
-  if (isRoutine) {
+  if (isRoutine==='cal') {
+    // Recurring calendar event task — store completion keyed by _calEv
+    var ex=data.tasks[ds].find(function(t){return t._calEv===id;});
+    if (ex){ex.done=!ex.done;ex.doneAt=ex.done?new Date().toISOString():null;}
+    else data.tasks[ds].push({id:uid(),_calEv:id,done:true,doneAt:new Date().toISOString()});
+  } else if (isRoutine) {
     var ex=data.tasks[ds].find(function(t){return t._rc===id;});
     if (ex){ex.done=!ex.done;ex.doneAt=ex.done?new Date().toISOString():null;}
     else data.tasks[ds].push({id:uid(),_rc:id,done:true,doneAt:new Date().toISOString()});
@@ -1168,12 +1180,12 @@ function getEventsForDate(ds){
 }
 function addCalEvent(d){
   var data=getData();
-  data.calEvents.push({id:uid(),title:d.title,date:d.date,time:d.time||'',location:d.location||'',notes:d.notes||'',color:d.color||'',recurring:d.recurring||'none',recurringN:d.recurringN||null,recurringUnit:d.recurringUnit||null,recurringUntil:d.recurringUntil||null,exceptions:[],reminders:d.reminders||[],fromTask:false});
+  data.calEvents.push({id:uid(),title:d.title,date:d.date,time:d.time||'',location:d.location||'',notes:d.notes||'',color:d.color||'',recurring:d.recurring||'none',recurringN:d.recurringN||null,recurringUnit:d.recurringUnit||null,recurringUntil:d.recurringUntil||null,exceptions:[],reminders:d.reminders||[],fromTask:false,addToDashboard:d.addToDashboard||false});
   saveCE(data.calEvents);
 }
 function updateCalEvent(id,d){
   var data=getData(); var e=data.calEvents.find(function(e){return e.id===id;});
-  if(e){e.title=d.title;if(d.date)e.date=d.date;e.time=d.time||'';e.location=d.location||'';e.notes=d.notes||'';e.color=d.color||'';e.recurring=d.recurring||'none';e.recurringN=d.recurringN||null;e.recurringUnit=d.recurringUnit||null;e.recurringUntil=d.recurringUntil||null;e.reminders=d.reminders||[];}
+  if(e){e.title=d.title;if(d.date)e.date=d.date;e.time=d.time||'';e.location=d.location||'';e.notes=d.notes||'';e.color=d.color||'';e.recurring=d.recurring||'none';e.recurringN=d.recurringN||null;e.recurringUnit=d.recurringUnit||null;e.recurringUntil=d.recurringUntil||null;e.reminders=d.reminders||[];e.addToDashboard=d.addToDashboard||false;}
   saveCE(data.calEvents);
 }
 function deleteCalEvent(id){ var data=getData(); saveCE(data.calEvents.filter(function(e){return e.id!==id;})); }
@@ -1278,6 +1290,7 @@ function populateCalEventUI(ev){
   _calReminderDraft=(ev.reminders||[]).map(normalizeReminder);
   renderCalReminderList();
   buildColorPicker('calEventColorPicker',ev.color||'',function(v){state.selectedCalEventColor=v;});
+  document.getElementById('calEventAddToDashboard').checked=!!(ev.addToDashboard);
 }
 
 // Calendar reminder dot/banner helpers
@@ -1615,37 +1628,44 @@ function buildColorPicker(containerId,selectedVal,onSelect) {
 // ============================================================
 // noActions = true in 7-day compact cards (no edit/delete/notes buttons)
 function taskHTML(task, ds, noActions) {
+  var isCalEv = task.type === 'cal-event';
   var isR = task.type === 'routine';
-  var itemCls = isR ? 'is-routine' : '';
+  var itemCls = isR ? 'is-routine' : (isCalEv ? 'is-cal-event' : '');
   var isRPriority = isR && task.priority;
   var priorityCls = isR ? (isRPriority ? 'is-routine-priority' : '') : ('task-p-'+(task.priority||'standard'));
   var hasBlock = !!(task.time && task.endTime);
   var tb = task.time ? '<span class="badge badge-time'+(hasBlock?' badge-time-block':'')+'">'+fmt12(task.time)+(hasBlock?' – '+fmt12(task.endTime):'')+'</span>' : '';
   var lb = task.location ? '<span class="badge badge-loc">'+escHtml(task.location)+'</span>'  : '';
   var hasTaskNotes = task.notes && task.notes.trim();
-  var linkedCount = (!isR && task.linkedNoteIds && task.linkedNoteIds.length) ? task.linkedNoteIds.length : 0;
+  var linkedCount = (!isR && !isCalEv && task.linkedNoteIds && task.linkedNoteIds.length) ? task.linkedNoteIds.length : 0;
   var notesDot = hasTaskNotes ? '<span class="task-has-notes" title="Has notes"></span>' : '';
   var priorityIcon = isRPriority ? '<span class="routine-priority-icon">⚡</span>' : '';
+  var calIcon = isCalEv ? '<span class="cal-event-task-icon" title="Recurring calendar event">📅</span>' : '';
+  // Third arg for checkTask/taskClick: true=routine, 'cal'=cal-event, false=one-time
+  var chkArg = isCalEv ? "'cal'" : (isR ? 'true' : 'false');
   var actionsHTML = '';
   if (!noActions) {
     var eb = isR
       ? '<button class="btn-icon" onclick="openRoutineOverride(\''+ds+'\',\''+task.id+'\')">✏️</button>'
-      : '<button class="btn-icon" onclick="openEditTask(\''+ds+'\',\''+task.id+'\')">✏️</button>';
-    // Trash: routine = skip today, regular = delete
+      : isCalEv
+        ? '<button class="btn-icon" onclick="openEditCalEvent(\''+task.id+'\',\''+ds+'\')">✏️</button>'
+        : '<button class="btn-icon" onclick="openEditTask(\''+ds+'\',\''+task.id+'\')">✏️</button>';
+    // Trash: routine=skip today, cal-event=skip this occurrence, regular=delete
     var db = isR
       ? '<button class="btn-icon" onclick="skipRoutineDay(\''+ds+'\',\''+task.id+'\')" title="Skip today">🗑</button>'
-      : '<button class="btn-icon" onclick="removeTask(\''+ds+'\',\''+task.id+'\')">🗑</button>';
-    var moveBtn = '<button class="btn-icon task-move-btn" onclick="openMoveTaskModal(\''+ds+'\',\''+task.id+'\','+isR+')" title="Move to another day">→</button>';
+      : isCalEv
+        ? '<button class="btn-icon" onclick="skipCalEvTask(\''+ds+'\',\''+task.id+'\')" title="Skip today">🗑</button>'
+        : '<button class="btn-icon" onclick="removeTask(\''+ds+'\',\''+task.id+'\')">🗑</button>';
+    var moveBtn = !isCalEv ? '<button class="btn-icon task-move-btn" onclick="openMoveTaskModal(\''+ds+'\',\''+task.id+'\','+isR+')" title="Move to another day">→</button>' : '';
     var nb = hasTaskNotes ? '<button class="btn-icon task-notes-btn" onclick="toggleTaskNotes(this)" title="View notes">📋</button>' : '';
-    // Note: for routine tasks the notes btn is already included above via hasTaskNotes
-    var linkBtn = !isR ? '<button class="btn-icon task-link-btn'+(linkedCount?' has-links':'')+'" onclick="openTaskNotesLink(\''+ds+'\',\''+task.id+'\')" title="'+(linkedCount?linkedCount+' linked note'+(linkedCount>1?'s':''):'Link notes')+'">📎'+(linkedCount?'<span class="link-count">'+linkedCount+'</span>':'')+'</button>' : '';
+    var linkBtn = !isR && !isCalEv ? '<button class="btn-icon task-link-btn'+(linkedCount?' has-links':'')+'" onclick="openTaskNotesLink(\''+ds+'\',\''+task.id+'\')" title="'+(linkedCount?linkedCount+' linked note'+(linkedCount>1?'s':''):'Link notes')+'">📎'+(linkedCount?'<span class="link-count">'+linkedCount+'</span>':'')+'</button>' : '';
     actionsHTML = '<div class="task-actions">'+linkBtn+nb+eb+db+moveBtn+'</div>';
   }
   var notesPanel = (!noActions && hasTaskNotes)
     ? '<div class="task-notes-panel" style="display:none">'+escHtml(task.notes)+'</div>' : '';
   var itemClick = noActions
     ? ' onclick="openDashDayPopup(\''+ds+'\')"'
-    : ' onclick="taskClick(\''+ds+'\',\''+task.id+'\','+isR+',event)"';
+    : ' onclick="taskClick(\''+ds+'\',\''+task.id+'\','+chkArg+',event)"';
   var dragAttrs = ' draggable="true"'
     +' ondragstart="taskDragStart(event,\''+ds+'\',\''+task.id+'\')"'
     +' ondragover="taskDragOver(event)"'
@@ -1655,11 +1675,11 @@ function taskHTML(task, ds, noActions) {
   var dragHandle = !noActions
     ? '<span class="task-drag-handle" onclick="event.stopPropagation()" title="Drag to reorder">⠿</span>'
     : '';
-  var ctxMenu=!isR?' oncontextmenu="taskContextMenu(event,\''+ds+'\',\''+task.id+'\')"':'';
-  return '<div class="task-item '+itemCls+(hasBlock?' task-time-block':'')+(task.done?' is-done':'')+(noActions?' task-compact-click':' task-clickable')+'" id="ti-'+task.id+'" data-ds="'+ds+'" data-tid="'+task.id+'" data-isroutine="'+isR+'"'+itemClick+dragAttrs+ctxMenu+'>' +
+  var ctxMenu = (!isR && !isCalEv) ? ' oncontextmenu="taskContextMenu(event,\''+ds+'\',\''+task.id+'\')"' : '';
+  return '<div class="task-item '+itemCls+(hasBlock?' task-time-block':'')+(task.done?' is-done':'')+(noActions?' task-compact-click':' task-clickable')+'" id="ti-'+task.id+'" data-ds="'+ds+'" data-tid="'+task.id+'" data-isroutine="'+chkArg+'"'+itemClick+dragAttrs+ctxMenu+'>' +
     dragHandle+
-    '<input type="checkbox" class="task-check"'+(task.done?' checked':'')+' onclick="event.stopPropagation()" onchange="checkTask(\''+ds+'\',\''+task.id+'\','+isR+')">' +
-    '<div class="task-body"><div class="task-title '+priorityCls+'">'+priorityIcon+escHtml(task.title)+notesDot+'</div>' +
+    '<input type="checkbox" class="task-check"'+(task.done?' checked':'')+' onclick="event.stopPropagation()" onchange="checkTask(\''+ds+'\',\''+task.id+'\','+chkArg+')">' +
+    '<div class="task-body"><div class="task-title '+priorityCls+'">'+calIcon+priorityIcon+escHtml(task.title)+notesDot+'</div>' +
     '<div class="task-meta">'+tb+lb+'</div>'+notesPanel+'</div>' +
     actionsHTML+'</div>';
 }
@@ -4113,8 +4133,18 @@ window.compactCardClick = function(ds, e) {
 };
 window.taskClick = function(ds, id, isR, e) {
   if (e.target.closest('button,input')) return;
-  if (isR) { openRoutineOverride(ds, id); }
+  if (isR === 'cal') { openEditCalEvent(id, ds); }
+  else if (isR) { openRoutineOverride(ds, id); }
   else { openEditTask(ds, id); }
+};
+// Skip a recurring cal-event task for this one day (mark done/hidden)
+window.skipCalEvTask = function(ds, evId) {
+  var data=getData();
+  if(!data.tasks[ds]) data.tasks[ds]=[];
+  var ex=data.tasks[ds].find(function(t){return t._calEv===evId;});
+  if(ex){ex.done=true;ex.doneAt=new Date().toISOString();}
+  else data.tasks[ds].push({id:uid(),_calEv:evId,done:true,doneAt:new Date().toISOString()});
+  saveT(data.tasks); refresh(); refreshDashDayModal();
 };
 window.openDashDayPopup = function(ds) {
   state.dashDayModalDs = ds;
@@ -5421,7 +5451,8 @@ function saveCalEventModal() {
     recurringN:recur.recurringN,
     recurringUnit:recur.recurringUnit,
     recurringUntil:recur.recurringUntil,
-    reminders:getRemindersFromUI()
+    reminders:getRemindersFromUI(),
+    addToDashboard:document.getElementById('calEventAddToDashboard').checked
   };
   if(state.editCalEventId){
     var data=getData();
@@ -5443,7 +5474,11 @@ function saveCalEventModal() {
     addCalEvent(d);
     if(d.date){var nd2=fromDateStr(d.date);state.calYear=nd2.getFullYear();state.calMonth=nd2.getMonth();}
   }
-  if(document.getElementById('calEventAddToDashboard').checked){var _tds=d.date||toDateStr(new Date());addTask(_tds,{title:d.title,time:d.time,color:d.color});refresh();}
+  // For non-recurring events: create a standalone dashboard task now.
+  // For recurring events: addToDashboard is saved on the event; getTasksForDate generates tasks automatically.
+  var _isRecur=d.recurring&&d.recurring!=='none';
+  if(d.addToDashboard&&!_isRecur){var _tds=d.date||toDateStr(new Date());addTask(_tds,{title:d.title,time:d.time,color:d.color});}
+  refresh();
   closeModal('calEventModal'); renderCalendar();
 }
 
@@ -5489,7 +5524,10 @@ window.executeEditCalEvent = function(scope) {
     saveCE(updated);
     addCalEvent(Object.assign({},d,{date:ds}));
   }
-  if(state.pendingAddToDash&&ds){addTask(ds,{title:d.title,time:d.time||'',color:d.color||''});refresh();}
+  // For single-occurrence edits with addToDashboard: create a one-time task (the event itself won't recur there).
+  // For future/all edits: addToDashboard is already saved on the updated event; virtual tasks handle it.
+  if(state.pendingAddToDash&&ds&&scope==='single'){addTask(ds,{title:d.title,time:d.time||'',color:d.color||''});}
+  refresh();
   state.pendingEditCalData=null; state.pendingEditCalDs=null; state.pendingAddToDash=false;
   closeModal('editCalScopeModal'); renderCalendar();
 };
