@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v237…';
+  b.textContent = 'v238…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v237'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v238'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -199,7 +199,6 @@ function _rerender(){
     if(state.currentPage==='financial') renderFinancial();
     if(state.currentPage==='learning')  renderLearning();
   }catch(e){}
-  try{ updateEsavBadge(); }catch(e){}
 }
 
 function _loadFromFS(uid, cb){
@@ -667,7 +666,7 @@ document.addEventListener('keydown',function(e){
   else if(k==='7')    {showPage('dashboard');setDashView('seven');}         // 7 → 7-Day
   else if(k==='c'||k==='C'){showPage('dashboard');setDashView('cheshbon');} // C → Cheshbon
   else if(k==='h'||k==='H'){showPage('dashboard');setDashView('health');}   // H → Health
-  else if(k==='e'||k==='E'){showPage('dashboard');setDashView('reminders');}// E → Esav
+
   else if(k==='u'||k==='U'){showPage('dashboard');setDashView('future');}   // U → Future (Upcoming)
   // Main pages
   else if(k==='n'||k==='N'){showPage('notes');}                             // N → Notes
@@ -1823,7 +1822,6 @@ function renderSeven() {
 function refresh() {
   if (state.dashView==='single') renderSingle();
   else if (state.dashView==='seven') renderSeven();
-  try { updateEsavBadge(); } catch(e) {}
 }
 function refreshDashDayModal() {
   if (!state.dashDayModalDs) return;
@@ -3104,128 +3102,50 @@ window.removeHealthActivity = function(ds, id){
 };
 
 // ============================================================
-// ── Esav unread tracking ────────────────────────────────────────────────────
-function _getKeptUnread() {
-  try { return JSON.parse(localStorage.getItem('esav_kept_unread')||'[]'); } catch(e){ return []; }
-}
-function _setKeptUnread(arr) { localStorage.setItem('esav_kept_unread', JSON.stringify(arr)); }
-
-function _getLastReadTs() { return Number(localStorage.getItem('esav_last_read_ts')||'0'); }
-function _setLastReadTs(ts) { localStorage.setItem('esav_last_read_ts', String(ts)); }
-
-function _isUnread(entry) {
-  var kept = _getKeptUnread();
-  if (kept.indexOf(entry.id) !== -1) return true;
-  return new Date(entry.sentAt).getTime() > _getLastReadTs();
-}
-
-function updateEsavBadge() {
-  var badge = document.getElementById('esavBadge');
-  if (!badge) return;
-  try {
-    var raw = localStorage.getItem('esav_log');
-    var log = raw ? JSON.parse(raw) : [];
-    var count = log.filter(function(e){ return _isUnread(e); }).length;
-    if (count > 0) {
-      badge.textContent = count > 99 ? '99+' : String(count);
-      badge.style.display = '';
-    } else {
-      badge.style.display = 'none';
-    }
-  } catch(e) { badge.style.display = 'none'; }
-}
-window.updateEsavBadge = updateEsavBadge;
-
-// RENDER — REMINDERS
 // ============================================================
-function renderReminders() {
-  var el=document.getElementById('remindersList'); if(!el)return;
-
-  // Mark all current messages as read (clear badge) — kept-unread overrides this
-  _setLastReadTs(Date.now());
-  updateEsavBadge();
-
-  var raw=localStorage.getItem('esav_log');
-  var log=raw?JSON.parse(raw):[];
-
-  if(!log.length){
-    el.innerHTML='<div class="stl-empty">No messages from Esav yet. Esav\'s proactive updates, morning briefings, and reminders will appear here.</div>';
-    return;
-  }
-
-  var kept = _getKeptUnread();
-
-  el.innerHTML=log.map(function(entry){
-    var d=new Date(entry.sentAt);
-    var dateStr=d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' · '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-    var typeLabel={
-      'morning-briefing':'☀️ Morning Briefing',
-      'reminder':'🔔 Reminder',
-      'proactive':'💬 Esav',
-      'notification':'🔔 Notification',
-      'reply':'💬 You',
-      'esav-reply':'💬 Esav'
-    }[entry.type]||'💬 Esav';
-
-    var isKeptUnread = kept.indexOf(entry.id) !== -1;
-    var unreadCls = isKeptUnread ? ' unread' : '';
-    var keepBtn = '<button class="esav-keep-unread-btn" onclick="window.esavToggleUnread(\''+escHtml(entry.id)+'\')">'+(isKeptUnread?'Mark read':'Keep unread')+'</button>';
-
-    return '<div class="esav-log-item'+unreadCls+'" data-id="'+escHtml(entry.id)+'">'+
-      '<div class="esav-log-meta">'+
-        '<span class="esav-log-type">'+typeLabel+'</span>'+
-        '<span class="esav-log-date">'+escHtml(dateStr)+'</span>'+
-      '</div>'+
-      '<div class="esav-log-body">'+escHtml(entry.body||entry.title||'')+'</div>'+
-      '<div class="esav-log-actions">'+keepBtn+'</div>'+
-    '</div>';
-  }).join('');
-}
-
-window.esavToggleUnread = function(id) {
-  var kept = _getKeptUnread();
-  var idx = kept.indexOf(id);
-  if (idx === -1) { kept.push(id); } else { kept.splice(idx, 1); }
-  _setKeptUnread(kept);
-  renderReminders();
-  updateEsavBadge();
-};
-
+// GOALS — localStorage-based rendering
 // ============================================================
-// RENDER — ESAV GOALS
-// ============================================================
-function renderEsavGoals() {
-  var el = document.getElementById('esavGoalsList');
-  if (!el) return;
-  var raw = localStorage.getItem('esav_goals');
-  var goals = raw ? JSON.parse(raw) : [];
-  var active = goals.filter(function(g){ return !g.done; });
-  var done   = goals.filter(function(g){ return g.done; });
-
-  if (!goals.length) {
-    el.innerHTML = '<div class="stl-empty">No goals yet. Tell Esav your goals and they\'ll appear here.</div>';
-    return;
-  }
-
+function renderGoals() {
+  var el = document.getElementById('esavGoalsList'); if (!el) return;
+  var goals;
+  try { goals = JSON.parse(localStorage.getItem('esav_goals') || '[]'); } catch(e) { goals = []; }
+  if (!goals.length) { el.innerHTML = '<div class="stl-empty">No goals yet. Add one below.</div>'; return; }
   function goalHtml(g) {
-    var cat = g.category ? '<span class="esav-goal-cat">'+escHtml(g.category)+'</span>' : '';
-    var date = g.targetDate ? '<span class="esav-goal-date">Target: '+escHtml(g.targetDate)+'</span>' : '';
-    var desc = g.description ? '<div class="esav-goal-desc">'+escHtml(g.description)+'</div>' : '';
+    var catColors = {health:'#16a34a',spiritual:'#7c3aed',learning:'#2563eb',relationships:'#db2777',work:'#d97706',personal:'#6366f1'};
+    var cc = catColors[g.category] || '#888';
+    var cat = g.category ? '<span class="esav-goal-cat" style="background:'+cc+'22;color:'+cc+'">'+escHtml(g.category)+'</span>' : '';
+    var tf = g.timeframe ? '<span style="font-size:11px;color:#9ca3af;margin-left:4px">'+escHtml(g.timeframe)+'</span>' : '';
     return '<div class="esav-goal-item'+(g.done?' done':'')+'">'+
-      '<div class="esav-goal-header">'+
-        '<span class="esav-goal-check">'+(g.done?'✓':'○')+'</span>'+
-        '<span class="esav-goal-title">'+escHtml(g.title)+'</span>'+
-        cat+date+
-      '</div>'+desc+
+      '<button class="esav-goal-check" onclick="window._toggleGoal(\''+g.id+'\','+(!g.done)+')">'+
+        (g.done?'✓':'○')+
+      '</button>'+
+      '<div class="esav-goal-body">'+
+        '<div class="esav-goal-title-row">'+
+          '<span class="esav-goal-title">'+escHtml(g.text||g.title||'')+'</span>'+cat+tf+
+        '</div>'+
+      '</div>'+
+      '<button class="btn-icon" style="flex-shrink:0" onclick="window._deleteGoal(\''+g.id+'\')">🗑</button>'+
     '</div>';
   }
-
-  var html = '';
-  if (active.length) html += active.map(goalHtml).join('');
-  if (done.length)   html += '<div class="esav-goals-done-label">Completed</div>' + done.map(goalHtml).join('');
+  var active = goals.filter(function(g){return !g.done;});
+  var done   = goals.filter(function(g){return g.done;});
+  var html = active.map(goalHtml).join('');
+  if (done.length) html += '<div class="esav-goals-done-label">Completed</div>' + done.map(goalHtml).join('');
   el.innerHTML = html;
 }
-window.renderEsavGoals = renderEsavGoals;
+window.renderGoals = renderGoals;
+
+window._toggleGoal = function(id, done) {
+  var goals; try { goals = JSON.parse(localStorage.getItem('esav_goals')||'[]'); } catch(e){ goals=[]; }
+  var g = goals.find(function(x){return x.id===id;});
+  if (g) { g.done = done; localStorage.setItem('esav_goals', JSON.stringify(goals)); renderGoals(); }
+};
+window._deleteGoal = function(id) {
+  var goals; try { goals = JSON.parse(localStorage.getItem('esav_goals')||'[]'); } catch(e){ goals=[]; }
+  if (!confirm('Delete this goal?')) return;
+  goals = goals.filter(function(g){return g.id!==id;});
+  localStorage.setItem('esav_goals', JSON.stringify(goals)); renderGoals();
+};
 
 // ============================================================
 // RENDER — PEOPLE / RELATIONSHIP CRM
@@ -4189,7 +4109,7 @@ window.setCheshTab = function(tab) {
 // ============================================================
 function setDashView(viewName) {
   var viewMap = {single:'singleDayView',seven:'sevenDayView',future:'futureView',cheshbon:'cheshbonView',health:'healthView',people:'peopleView',reminders:'remindersView'};
-  var pillMap = {single:'pillDay',seven:'pillSeven',future:'pillFuture',cheshbon:'pillCheshbon',health:'pillHealth',people:'pillPeople',reminders:'pillReminders'};
+  var pillMap = {single:'pillDay',seven:'pillSeven',future:'pillFuture',cheshbon:'pillCheshbon',health:'pillHealth'};
   // Clear Shabbat timer when leaving 7-day view
   if(viewName!=='seven'&&_shabbatTimer){clearInterval(_shabbatTimer);_shabbatTimer=null;}
   Object.values(viewMap).forEach(function(v){ var el=document.getElementById(v); if(el)el.classList.remove('active'); });
@@ -4203,7 +4123,7 @@ function setDashView(viewName) {
   if (viewName==='cheshbon')  { setCheshTab('daily'); }
   if (viewName==='health')    renderHealth();
   if (viewName==='people')    renderCRM();
-  if (viewName==='reminders') { renderReminders(); renderEsavGoals(); }
+
 }
 
 // ============================================================
@@ -4227,7 +4147,7 @@ function showPage(pageId) {
   var activeMob=document.querySelector('.mob-nav-btn[data-page="'+pageId+'"]');
   if (activeMob) activeMob.classList.add('active');
   // Learning & Financial live under the More button
-  if (pageId==='learning'||pageId==='financial') {
+  if (pageId==='learning'||pageId==='financial'||pageId==='goals'||pageId==='people') {
     var moreBtn=document.getElementById('mobMoreBtn');
     if(moreBtn) moreBtn.classList.add('active');
   }
@@ -4240,6 +4160,8 @@ function showPage(pageId) {
   if (pageId==='notes')     renderNotes();
   if (pageId==='learning')  renderLearning();
   if (pageId==='financial') renderFinancial();
+  if (pageId==='goals')     { renderGoals(); _initGoalsUI(); }
+  if (pageId==='people')    { if(window._loadPeople) window._loadPeople(); }
 }
 
 // ============================================================
@@ -5107,6 +5029,7 @@ window.openEditReminder = function(id) {
   document.getElementById('reminderCategory').value=r.category||'';
   openModal('reminderModal');
 };
+function renderReminders() {} // stub — remindersList removed with Esav UI
 window.deleteRem = function(id){ if(confirm('Delete this reminder?')){ deleteReminder(id); renderReminders(); } };
 
 // Learning
@@ -5824,7 +5747,7 @@ function initListeners() {
   document.getElementById('pillFuture').addEventListener('click',   function(){ setDashView('future'); });
   document.getElementById('pillCheshbon').addEventListener('click', function(){ setDashView('cheshbon'); });
   document.getElementById('pillHealth').addEventListener('click',   function(){ setDashView('health'); });
-  document.getElementById('pillReminders').addEventListener('click', function(){ setDashView('reminders'); });
+
   var pillPeopleEl=document.getElementById('pillPeople');
   if(pillPeopleEl) pillPeopleEl.addEventListener('click', function(){ setDashView('people'); });
 
@@ -5836,35 +5759,6 @@ function initListeners() {
     if(state.dashView==='single') renderSingle();
     else if(state.dashView==='seven') renderSeven();
   });
-
-  // Esav tab reply bar
-  (function(){
-    var input = document.getElementById('esavTabInput');
-    var btn   = document.getElementById('esavTabSend');
-    if (!input || !btn) return;
-
-    function sendTabReply() {
-      var text = input.value.trim();
-      if (!text) return;
-      input.value = '';
-      input.style.height = 'auto';
-      btn.disabled = true;
-      btn.textContent = '…';
-      window._esavSendText(text).finally(function(){
-        btn.disabled = false;
-        btn.textContent = '↑';
-      });
-    }
-
-    btn.addEventListener('click', sendTabReply);
-    input.addEventListener('keydown', function(e){
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTabReply(); }
-    });
-    input.addEventListener('input', function(){
-      this.style.height = 'auto';
-      this.style.height = Math.min(this.scrollHeight, 100) + 'px';
-    });
-  })();
 
   // Date jump
   document.getElementById('dateJumpInput').addEventListener('change', function(e){
@@ -6901,686 +6795,82 @@ function _doLogin() {
     });
 }
 
+
 // ============================================================
-// ESAV — PERSONAL ASSISTANT  (v211 redesign)
+// GOALS UI — init add button
+// ============================================================
+function _initGoalsUI() {
+  var goalInput    = document.getElementById('esavGoalInput');
+  var goalAddBtn   = document.getElementById('esavGoalAddBtn');
+  var goalTimeframe= document.getElementById('esavGoalTimeframe');
+  var goalPeriod   = document.getElementById('esavGoalPeriod');
+  var goalPeriodWeek= document.getElementById('esavGoalPeriodWeek');
+  var goalCat      = document.getElementById('esavGoalCategory');
+  if (!goalAddBtn || goalAddBtn._initDone) return;
+  goalAddBtn._initDone = true;
+
+  function _syncPeriodPicker() {
+    var tf = goalTimeframe ? goalTimeframe.value : 'monthly';
+    if (tf === 'yearly') {
+      if (goalPeriod) goalPeriod.style.display = 'none';
+      if (goalPeriodWeek) goalPeriodWeek.style.display = 'none';
+    } else if (tf === 'monthly') {
+      if (goalPeriod) goalPeriod.style.display = '';
+      if (goalPeriodWeek) goalPeriodWeek.style.display = 'none';
+      if (goalPeriod && !goalPeriod.options.length) {
+        var now = new Date();
+        var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        for (var i = 0; i < 12; i++) {
+          var opt = document.createElement('option');
+          opt.value = (now.getFullYear())+'-'+(i+1);
+          opt.textContent = months[i]+' '+now.getFullYear();
+          if (i === now.getMonth()) opt.selected = true;
+          goalPeriod.appendChild(opt);
+        }
+      }
+    } else {
+      if (goalPeriod) goalPeriod.style.display = 'none';
+      if (goalPeriodWeek) { goalPeriodWeek.style.display = ''; if (!goalPeriodWeek.value) goalPeriodWeek.value = new Date().toISOString().slice(0,10); }
+    }
+  }
+  if (goalTimeframe) { goalTimeframe.addEventListener('change', _syncPeriodPicker); _syncPeriodPicker(); }
+
+  goalAddBtn.addEventListener('click', function() {
+    var text = goalInput ? goalInput.value.trim() : '';
+    if (!text) return;
+    var tf = goalTimeframe ? goalTimeframe.value : 'monthly';
+    var period = tf === 'monthly' ? (goalPeriod && goalPeriod.value ? goalPeriod.value : '') :
+                 tf === 'weekly'  ? (goalPeriodWeek && goalPeriodWeek.value ? goalPeriodWeek.value : '') : '';
+    var cat = goalCat ? goalCat.value : '';
+    var goals; try { goals = JSON.parse(localStorage.getItem('esav_goals')||'[]'); } catch(e) { goals=[]; }
+    goals.push({id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), text:text, timeframe:tf, period:period, category:cat, done:false, createdAt:Date.now()});
+    localStorage.setItem('esav_goals', JSON.stringify(goals));
+    if (goalInput) goalInput.value = '';
+    renderGoals();
+  });
+  if (goalInput) goalInput.addEventListener('keydown', function(e){ if(e.key==='Enter') goalAddBtn.click(); });
+}
+window._initGoalsUI = _initGoalsUI;
+
+// ============================================================
+// PEOPLE CRM — localStorage-based
 // ============================================================
 (function(){
-  var ESAV_URL = 'https://192-241-151-231.sslip.io';
-  var _history = [];
-
-  // ── DOM refs ──────────────────────────────────────────────
-  var fab              = document.getElementById('esavFab');
-  var sheet            = document.getElementById('esavSheet');
-  var backdrop         = document.getElementById('esavSheetBackdrop');
-  var sheetIdle        = document.getElementById('esavSheetIdle');
-  var sheetRec         = document.getElementById('esavSheetRecState');
-  var sheetPlayback    = document.getElementById('esavSheetPlaybackState');
-  var sheetThinking    = document.getElementById('esavSheetThinkingState');
-  var sheetResponse    = document.getElementById('esavSheetResponseState');
-  var sheetTextRow     = document.getElementById('esavSheetTextRow');
-  var sheetTimer       = document.getElementById('esavSheetTimer');
-  var sheetRecLabel    = document.getElementById('esavSheetRecLabel');
-  var sheetPauseBtn    = document.getElementById('esavSheetPauseBtn');
-  var sheetStopBtn     = document.getElementById('esavSheetStopBtn');
-  var sheetCancelRec   = document.getElementById('esavSheetCancelRec');
-  var sheetPlayBtn     = document.getElementById('esavSheetPlayBtn');
-  var sheetProgressBar = document.getElementById('esavSheetProgressBar');
-  var sheetDuration    = document.getElementById('esavSheetDuration');
-  var sheetRerecord    = document.getElementById('esavSheetRerecordBtn');
-  var sheetSendVoice   = document.getElementById('esavSheetSendVoiceBtn');
-  var sheetAudio       = document.getElementById('esavSheetAudio');
-  var sheetMicBtn      = document.getElementById('esavSheetMicBtn');
-  var sheetTextInput   = document.getElementById('esavSheetTextInput');
-  var sheetSendText    = document.getElementById('esavSheetSendTextBtn');
-  var sheetResponseText= document.getElementById('esavSheetResponseText');
-  var tabMessages      = document.getElementById('esavTabMessages');
-  var tabInput         = document.getElementById('esavTabInput');
-  var tabSend          = document.getElementById('esavTabSend');
-  var tabMicBtn        = document.getElementById('esavTabMicBtn');
-
-  // ── Recording state ────────────────────────────────────────
-  var mediaRecorder, audioChunks = [], isRecording = false, isPaused = false;
-  var _recSeconds = 0, _recInterval = null, _currentBlob = null, _isTabRecording = false;
-  var _sheetStateName = 'idle';
-
-  function _startTimer(el){ _recSeconds=0; _updateTimer(el); _recInterval=setInterval(function(){ _recSeconds++; _updateTimer(el); },1000); }
-  function _stopTimer(){ clearInterval(_recInterval); _recInterval=null; _recSeconds=0; }
-  function _updateTimer(el){ var m=Math.floor(_recSeconds/60),s=_recSeconds%60; if(el) el.textContent=m+':'+(s<10?'0':'')+s; }
-
-  function _getAudioMime(){
-    var types=['audio/mp4','audio/mpeg','audio/webm;codecs=opus','audio/webm','audio/ogg'];
-    for(var i=0;i<types.length;i++){ if(typeof MediaRecorder!=='undefined'&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(types[i])) return types[i]; }
-    return '';
-  }
-
-  // ── Sheet state machine ────────────────────────────────────
-  function _showSheetState(name){
-    _sheetStateName = name;
-    sheetIdle.style.display     = name==='idle'     ? '' : 'none';
-    sheetRec.style.display      = name==='rec'      ? '' : 'none';
-    sheetPlayback.style.display = name==='playback' ? '' : 'none';
-    sheetThinking.style.display = name==='thinking' ? '' : 'none';
-    sheetResponse.style.display = name==='response' ? '' : 'none';
-    sheetTextRow.style.display  = name==='thinking' ? 'none' : '';
-    if(name==='response'){ var inp=document.getElementById('esavSheetTextInput'); if(inp){ inp.placeholder='Reply…'; setTimeout(function(){inp.focus();},100); } }
-    else { var inp2=document.getElementById('esavSheetTextInput'); if(inp2) inp2.placeholder='Or type a message…'; }
-  }
-
-  function openSheet(){
-    sheet.classList.add('open');
-    backdrop.classList.add('open');
-    _showSheetState('idle');
-    _registerPush();
-  }
-  function closeSheet(){
-    sheet.classList.remove('open');
-    backdrop.classList.remove('open');
-    if(isRecording) _cancelRecording('sheet');
-    _stopTimer();
-    _currentBlob=null;
-    if(sheetAudio&&sheetAudio.src){ sheetAudio.pause(); sheetAudio.src=''; }
-    _showSheetState('idle');
-    sheetTextInput.value=''; sheetTextInput.style.height='auto';
-  }
-
-  fab.addEventListener('click', function(){
-    if(sheet.classList.contains('open')){ closeSheet(); } else { openSheet(); }
-  });
-  backdrop.addEventListener('click', closeSheet);
-
-  // ── Recording ──────────────────────────────────────────────
-  async function _startRecording(source){
-    _isTabRecording = (source==='tab');
-    try {
-      var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioChunks = [];
-      var mime = _getAudioMime();
-      mediaRecorder = mime ? new MediaRecorder(stream,{mimeType:mime}) : new MediaRecorder(stream);
-      mediaRecorder.ondataavailable = function(e){ if(e.data&&e.data.size>0) audioChunks.push(e.data); };
-      mediaRecorder.onstop = _onRecordingStop;
-      mediaRecorder.start(250);
-      isRecording=true; isPaused=false;
-      if(_isTabRecording){ tabMicBtn.textContent='⏹'; tabMicBtn.title='Stop recording'; _startTimer(null); }
-      else { _showSheetState('rec'); sheetPauseBtn.textContent='⏸ Pause'; sheetRecLabel.textContent='Recording'; _startTimer(sheetTimer); }
-    } catch(e){
-      if(_isTabRecording) _addTabBubble('Mic error: '+e.name,'esav');
-      else _showSheetState('idle');
-    }
-  }
-
-  function _togglePause(){
-    if(!mediaRecorder||!isRecording) return;
-    if(isPaused){
-      mediaRecorder.resume(); isPaused=false;
-      sheetPauseBtn.textContent='⏸ Pause'; sheetRecLabel.textContent='Recording';
-      _recInterval=setInterval(function(){ _recSeconds++; _updateTimer(sheetTimer); },1000);
-    } else {
-      mediaRecorder.pause(); isPaused=true;
-      clearInterval(_recInterval); _recInterval=null;
-      sheetPauseBtn.textContent='▶ Resume'; sheetRecLabel.textContent='Paused';
-    }
-  }
-
-  function _stopRecording(){
-    if(!mediaRecorder||!isRecording) return;
-    if(isPaused) mediaRecorder.resume();
-    mediaRecorder.stop();
-    mediaRecorder.stream.getTracks().forEach(function(t){ t.stop(); });
-    isRecording=false; isPaused=false; _stopTimer();
-  }
-
-  function _cancelRecording(source){
-    if(mediaRecorder&&isRecording){
-      mediaRecorder.onstop=null;
-      if(isPaused) mediaRecorder.resume();
-      mediaRecorder.stop();
-      mediaRecorder.stream.getTracks().forEach(function(t){ t.stop(); });
-    }
-    isRecording=false; isPaused=false; audioChunks=[]; _stopTimer();
-    if(source==='tab'){ tabMicBtn.textContent='🎤'; tabMicBtn.title='Tap to speak'; }
-    else _showSheetState('idle');
-  }
-
-  function _onRecordingStop(){
-    var mime=(mediaRecorder&&mediaRecorder.mimeType)||_getAudioMime()||'audio/webm';
-    _currentBlob=new Blob(audioChunks,{type:mime}); audioChunks=[];
-    if(_isTabRecording){
-      tabMicBtn.textContent='🎤'; tabMicBtn.title='Tap to speak';
-      _sendAudioBlob(_currentBlob,'tab');
-    } else {
-      var url=URL.createObjectURL(_currentBlob);
-      sheetAudio.src=url; sheetAudio.load();
-      sheetAudio.onloadedmetadata=function(){
-        var d=Math.round(sheetAudio.duration), m=Math.floor(d/60), s=d%60;
-        sheetDuration.textContent=m+':'+(s<10?'0':'')+s;
-      };
-      sheetProgressBar.style.width='0%'; sheetPlayBtn.textContent='▶';
-      _showSheetState('playback');
-    }
-  }
-
-  // ── Playback controls ──────────────────────────────────────
-  sheetPlayBtn.addEventListener('click', function(){
-    if(!sheetAudio.src) return;
-    if(sheetAudio.paused){ sheetAudio.play(); sheetPlayBtn.textContent='⏸'; }
-    else { sheetAudio.pause(); sheetPlayBtn.textContent='▶'; }
-  });
-  sheetAudio.addEventListener('ended', function(){ sheetPlayBtn.textContent='▶'; });
-  sheetAudio.addEventListener('timeupdate', function(){
-    if(sheetAudio.duration) sheetProgressBar.style.width=(sheetAudio.currentTime/sheetAudio.duration*100)+'%';
-  });
-
-  // ── Send ───────────────────────────────────────────────────
-  function _getClientContext(){
-    var parts=[], page=state.currentPage||'dashboard';
-    if(page==='dashboard'){
-      var view=state.dashView||'single';
-      var vName={single:'Today',seven:'7-Day',cheshbon:'Cheshbon',health:'Health',reminders:'Esav'}[view]||view;
-      parts.push('Dashboard – '+vName+' view, date: '+toDateStr(new Date()));
-    } else if(page==='calendar'){
-      var yr=state.calYear||new Date().getFullYear(), mo=String((state.calMonth||new Date().getMonth())+1).padStart(2,'0');
-      parts.push('Calendar tab, viewing '+yr+'-'+mo);
-    } else {
-      parts.push('Tab: '+page);
-    }
-    return parts.join(', ');
-  }
-
-  function _fetchWithTimeout(url, opts, ms){
-    var ctrl=new AbortController();
-    var tid=setTimeout(function(){ ctrl.abort(); },ms||30000);
-    return fetch(url,Object.assign({},opts,{signal:ctrl.signal})).finally(function(){ clearTimeout(tid); });
-  }
-
-  async function _sendAudioBlob(blob, source){
-    if(source==='sheet') _showSheetState('thinking');
-    else _addTabBubble('🎤 Sending voice…','thinking');
-    var mime=blob.type||'audio/webm', ext=mime.includes('mp4')?'mp4':mime.includes('ogg')?'ogg':'webm';
-    var form=new FormData();
-    form.append('audio',blob,'voice.'+ext);
-    form.append('history',JSON.stringify(_history));
-    form.append('context',_getClientContext());
-    try {
-      var res=await _fetchWithTimeout(ESAV_URL+'/assistant',{method:'POST',body:form},35000);
-      var data; try{ data=await res.json(); }catch(e){ data={error:'parse'}; }
-      if(data.error){ _removeLastThinking(); _handleResponse(null,"Esav couldn't process that — please try again.",source); return; }
-      var reply=data.response||'Done!';
-      if(source==='tab'&&data.transcript) _removeLastThinking();
-      _handleResponse(data.transcript||'',reply,source);
-      _afterHistory(data.transcript||'',reply);
-      if(data.results&&data.results.length) _syncData();
-    } catch(e){
-      _removeLastThinking();
-      _handleResponse(null, e.name==='AbortError' ? 'Esav is taking too long — please try again.' : "Esav couldn't process that — please try again.", source);
-    }
-  }
-
-  async function _sendText(text, source){
-    if(!text||!text.trim()) return;
-    if(source==='sheet') _showSheetState('thinking');
-    else _addTabBubble(text,'user');
-    try {
-      var res=await _fetchWithTimeout(ESAV_URL+'/assistant/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,history:_history,context:_getClientContext()})},35000);
-      var data; try{ data=await res.json(); }catch(e){ data={error:'parse'}; }
-      var reply=data.error?"Esav couldn't process that — please try again.":(data.response||'Done!');
-      _handleResponse(source==='sheet'?text:null,reply,source);
-      if(!data.error){ _afterHistory(text,reply); if(data.results&&data.results.length) _syncData(); }
-    } catch(e){
-      _handleResponse(null, e.name==='AbortError' ? 'Esav is taking too long — please try again.' : 'Could not reach Esav. Check your connection.', source);
-    }
-  }
-
-  // ── Chat history persistence ───────────────────────────────
-  function _saveChatEntry(role, text){
-    try{
-      var log=JSON.parse(localStorage.getItem('esav_chat_history')||'[]');
-      log.push({role:role,text:text,ts:Date.now()});
-      if(log.length>100) log=log.slice(log.length-100);
-      localStorage.setItem('esav_chat_history',JSON.stringify(log));
-    }catch(e){}
-  }
-  function _restoreChatHistory(){
-    if(!tabMessages) return;
-    try{
-      tabMessages.innerHTML='';
-      var log=JSON.parse(localStorage.getItem('esav_chat_history')||'[]');
-      if(!log.length){ tabMessages.innerHTML='<div class="stl-empty" style="padding:16px 0;color:var(--c-muted)">No messages yet today</div>'; return; }
-      log.forEach(function(e){ _addTabBubble(e.text,e.role,true); });
-      tabMessages.scrollTop=tabMessages.scrollHeight;
-    }catch(e){}
-  }
-
-  function _handleResponse(userText, reply, source){
-    if(source==='sheet'){
-      sheetResponseText.textContent=reply;
-      _showSheetState('response');
-      // No auto-close — user taps Done to dismiss
-      if(userText) _saveChatEntry('user', userText);
-      _saveChatEntry('esav', reply);
-    } else {
-      _addTabBubble(reply,'esav'); // _addTabBubble saves to chat history
-    }
-    // do NOT write to esav_log — that's for proactive messages only
-    if(window.updateEsavBadge) updateEsavBadge();
-  }
-
-  function _afterHistory(user, assistant){
-    if(user) _history.push({role:'user',content:user});
-    _history.push({role:'assistant',content:assistant});
-    if(_history.length>40) _history=_history.slice(_history.length-40);
-  }
-
-  function _syncData(){
-    if(window._esavSync) window._esavSync(function(){ try{ refresh(); renderCalendar(); }catch(e){} });
-    else setTimeout(function(){ try{ refresh(); renderCalendar(); }catch(e){}; },1500);
-  }
-
-  function _logLocalMsg(body){
-    try {
-      var raw=localStorage.getItem('esav_log'), log=raw?JSON.parse(raw):[];
-      log.unshift({id:'local_'+Date.now(),type:'esav-reply',body:body,sentAt:new Date().toISOString()});
-      if(log.length>100) log.splice(100);
-      localStorage.setItem('esav_log',JSON.stringify(log));
-    } catch(e){}
-  }
-
-  // ── Tab chat bubbles ───────────────────────────────────────
-  function _addTabBubble(text, role, skipSave){
-    if(!text||!tabMessages) return;
-    var el=document.createElement('div');
-    el.className='esav-bubble '+role; el.textContent=text;
-    tabMessages.appendChild(el); tabMessages.scrollTop=tabMessages.scrollHeight;
-    if(!skipSave && role!=='thinking') _saveChatEntry(role,text);
-  }
-  function _removeLastThinking(){
-    if(!tabMessages) return;
-    var els=tabMessages.querySelectorAll('.esav-bubble.thinking');
-    if(els.length) els[els.length-1].remove();
-  }
-
-  window._esavSendText = function(text){ _sendText(text,'tab'); };
-
-  // ── Sheet event wiring ─────────────────────────────────────
-  sheetMicBtn.addEventListener('click', function(){ _startRecording('sheet'); });
-  sheetPauseBtn.addEventListener('click', _togglePause);
-  sheetStopBtn.addEventListener('click', _stopRecording);
-  sheetCancelRec.addEventListener('click', function(){ _cancelRecording('sheet'); });
-  sheetRerecord.addEventListener('click', function(){
-    if(sheetAudio.src){ sheetAudio.pause(); sheetAudio.src=''; }
-    _currentBlob=null; _showSheetState('idle');
-  });
-  sheetSendVoice.addEventListener('click', function(){ if(_currentBlob) _sendAudioBlob(_currentBlob,'sheet'); });
-  document.getElementById('esavSheetDoneBtn').addEventListener('click', closeSheet);
-  // Enter key sends when in playback state (voice recorded, viewing send/redo options)
-  document.addEventListener('keydown', function(e){
-    if(e.key==='Enter' && !e.shiftKey && sheet.classList.contains('open') && _sheetStateName==='playback'){
-      e.preventDefault(); sheetSendVoice.click();
-    }
-  });
-  sheetTextInput.addEventListener('input', function(){ this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,100)+'px'; });
-  sheetTextInput.addEventListener('keydown', function(e){
-    if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); var t=this.value.trim(); this.value=''; this.style.height='auto'; _sendText(t,'sheet'); }
-  });
-  sheetSendText.addEventListener('click', function(){
-    var t=sheetTextInput.value.trim(); sheetTextInput.value=''; sheetTextInput.style.height='auto'; _sendText(t,'sheet');
-  });
-
-  // ── Tab event wiring ───────────────────────────────────────
-  if(tabMicBtn) tabMicBtn.addEventListener('click', function(){
-    if(isRecording&&_isTabRecording) _stopRecording(); else if(!isRecording) _startRecording('tab');
-  });
-  if(tabInput) tabInput.addEventListener('input', function(){ this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,100)+'px'; });
-  if(tabInput) tabInput.addEventListener('keydown', function(e){
-    if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); var t=this.value.trim(); this.value=''; this.style.height='auto'; _sendText(t,'tab'); }
-  });
-  if(tabSend) tabSend.addEventListener('click', function(){
-    var t=tabInput.value.trim(); tabInput.value=''; tabInput.style.height='auto'; _sendText(t,'tab');
-  });
-
-  // ── Sub-tab switching ──────────────────────────────────────
-  var _panels={goals:'esavGoalsPanel',people:'esavPeoplePanel',messages:'esavMessagesPanel',chat:'esavChatPanel'};
-  document.querySelectorAll('.esav-subtab').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      var tab=this.dataset.tab;
-      document.querySelectorAll('.esav-subtab').forEach(function(b){ b.classList.remove('active'); });
-      this.classList.add('active');
-      Object.keys(_panels).forEach(function(k){
-        var el=document.getElementById(_panels[k]); if(el) el.style.display=k===tab?'':'none';
-      });
-      if(tab==='goals') _loadGoals();
-      if(tab==='people') _loadPeople();
-      if(tab==='messages'){ _loadMessages(); _clearMsgBadge(); }
-      if(tab==='chat' && tabMessages){ _restoreChatHistory(); }
-    });
-  });
-
-  // ── Goals ──────────────────────────────────────────────────
-  var _CAT_COLORS={health:'#16a34a',spiritual:'#7c3aed',learning:'#2563eb',relationships:'#db2777',work:'#d97706',personal:'#64748b'};
-  var _goalsCache=[], _editingGoalId=null, _dragGoalId=null;
-  _initTodayHeb(); _initHebMonthEnds();
-
-  function _isoWeekStr(d) {
-    var dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
-    var day=dt.getUTCDay()||7; dt.setUTCDate(dt.getUTCDate()+4-day);
-    var ys=new Date(Date.UTC(dt.getUTCFullYear(),0,1));
-    var wk=Math.ceil((((dt-ys)/86400000)+1)/7);
-    return dt.getUTCFullYear()+'-W'+String(wk).padStart(2,'0');
-  }
-  function _monthStr(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
-  function _yearStr(d) { return String(d.getFullYear()); }
-  function _fmtMonthPeriod(p){ var pts=p.split('-'); var months=['January','February','March','April','May','June','July','August','September','October','November','December']; return (months[parseInt(pts[1],10)-1]||pts[1])+' '+pts[0]; }
-  function _fmtWeekPeriod(p){
-    var m=p.match(/^(\d{4})-W(\d{2})$/); if(!m) return p;
-    var yr=parseInt(m[1]); var wk=parseInt(m[2]);
-    var jan4=new Date(yr,0,4);
-    var mon=new Date(jan4); mon.setDate(jan4.getDate()-(jan4.getDay()||7)+1+(wk-1)*7);
-    return 'Week of '+mon.toLocaleDateString([],{month:'short',day:'numeric'});
-  }
-
-  // ── Frequency helpers ──────────────────────────────────────
-  function _freqToDays(num, unit){
-    var n=parseInt(num)||1;
-    if(unit==='years')  return n*365;
-    if(unit==='months') return n*30;
-    if(unit==='weeks')  return n*7;
-    return n;
-  }
-  function _freqLabel(days){
-    if(days%365===0) return 'Every '+(days/365)+' year'+(days/365>1?'s':'');
-    if(days%30===0)  return 'Every '+(days/30)+' month'+(days/30>1?'s':'');
-    if(days%7===0)   return 'Every '+(days/7)+' week'+(days/7>1?'s':'');
-    return 'Every '+days+' day'+(days>1?'s':'');
-  }
-  function _nextContactDate(lastContact, frequencyDays){
-    if(!lastContact) return null;
-    var d=new Date(lastContact+frequencyDays*86400000);
-    return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-  }
-  function _daysAgoStr(ts){
-    var d=Math.floor((Date.now()-ts)/86400000);
-    return d===0?'Today':d===1?'Yesterday':(d+' days ago');
-  }
-  function _tsLabel(ts){
-    var dt=new Date(ts);
-    return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-  }
-
-  // ── Goals ──────────────────────────────────────────────────
-  async function _loadGoals(){
-    var el=document.getElementById('esavGoalsList'); if(!el) return;
-    el.innerHTML='<div class="stl-empty" style="padding:12px 0">Loading…</div>';
-    try{
-      var res=await fetch(ESAV_URL+'/esav/goals'); _goalsCache=await res.json(); _renderGoals(_goalsCache);
-      if(!el._dragReady){ _setupGoalDrag(el); el._dragReady=true; }
-    }catch(e){ el.innerHTML='<div class="stl-empty">Could not load goals.</div>'; }
-  }
-
-  function _renderGoals(goals){
-    var el=document.getElementById('esavGoalsList'); if(!el) return;
-    if(!goals.length){ el.innerHTML='<div class="stl-empty">No goals yet. Add one below.</div>'; return; }
-    var now=new Date();
-    var curWeek=_isoWeekStr(now), curHebP=_curHebPeriod(), curHebYr=_curHebYear();
-
-    function goalHtml(g, draggable, showRollover){
-      var cc=_CAT_COLORS[g.category]||'#888';
-      var cat=g.category?'<span class="esav-goal-cat" style="background:'+cc+'22;color:'+cc+'">'+escHtml(g.category)+'</span>':'';
-      var editing=(_editingGoalId===g.id);
-      var tf=g.timeframe||'yearly';
-      var periodVal=g.period||'';
-      var titleEl, metaEl='';
-      if(editing){
-        titleEl='<input class="esav-goal-edit-input" id="esavGoalEdit_'+g.id+'" value="'+escHtml(g.text)+'" onkeydown="if(event.key===\'Enter\')window._esavSaveGoalEdit(\''+g.id+'\');if(event.key===\'Escape\')window._esavCancelGoalEdit()" />';
-        var periodWidget;
-        if(tf==='monthly'){
-          periodWidget='<select class="esav-goal-edit-period" id="esavGoalEditPeriod_'+g.id+'">'+_hebMonthSelectHtml(periodVal||curHebP)+'</select>';
-        } else if(tf==='weekly'){
-          periodWidget='<input class="esav-goal-edit-period" id="esavGoalEditPeriod_'+g.id+'" type="week" value="'+escHtml(periodVal)+'">';
-        } else {
-          periodWidget='<span style="font-size:11px;color:#9ca3af">'+escHtml(curHebYr)+'</span>';
-        }
-        metaEl='<div class="esav-goal-edit-meta">'+
-          '<select class="esav-goal-edit-tf" id="esavGoalEditTf_'+g.id+'" onchange="window._esavGoalTfChange(\''+g.id+'\')">'+
-            '<option value="yearly"'+(tf==='yearly'?' selected':'')+'>Yearly</option>'+
-            '<option value="monthly"'+(tf==='monthly'?' selected':'')+'>Monthly</option>'+
-            '<option value="weekly"'+(tf==='weekly'?' selected':'')+'>Weekly</option>'+
-          '</select>'+
-          '<span id="esavGoalEditPeriodWrap_'+g.id+'">'+periodWidget+'</span>'+
-        '</div>';
-      } else {
-        titleEl='<span class="esav-goal-title">'+escHtml(g.text)+'</span>';
-      }
-      var rollBtn=showRollover&&!g.done?'<button class="esav-goal-rollover" onclick="window._esavRolloverGoal(\''+g.id+'\')" title="Move to this week">→ This week</button>':'';
-      return '<div class="esav-goal-item'+(g.done?' done':'')+(editing?' editing':'')+'"'+(draggable&&!editing?' draggable="true"':'')+' data-id="'+g.id+'">'+
-        (draggable&&!editing?'<span class="esav-goal-drag-handle" title="Drag to reorder">⠿</span>':'')+
-        '<button class="esav-goal-check" onclick="window._esavToggleGoal(\''+g.id+'\','+(!g.done)+')">'+(g.done?'✓':'○')+'</button>'+
-        '<div class="esav-goal-body">'+
-          '<div class="esav-goal-title-row">'+titleEl+(cat&&!editing?' '+cat:'')+'</div>'+
-          metaEl+
-        '</div>'+
-        '<div class="esav-goal-controls">'+
-          rollBtn+
-          (!g.done&&!editing?'<button class="esav-goal-ctrl-btn" onclick="window._esavEditGoal(\''+g.id+'\')" title="Edit">✎</button>':'')+
-          (editing?'<button class="esav-goal-ctrl-btn esav-goal-save-btn" onclick="window._esavSaveGoalEdit(\''+g.id+'\')" title="Save">✓</button>':'')+
-          (editing?'<button class="esav-goal-ctrl-btn" onclick="window._esavCancelGoalEdit()" title="Cancel" style="color:#aaa">✕</button>':'')+
-          (!editing?'<button class="esav-goal-delete" onclick="window._esavDeleteGoal(\''+g.id+'\')" title="Delete">×</button>':'')+
-        '</div>'+
-      '</div>';
-    }
-
-    function renderGroup(list, draggable, showRollover){
-      var active=list.filter(function(g){return !g.done;});
-      var done=list.filter(function(g){return g.done;});
-      var h=active.map(function(g){return goalHtml(g,draggable,showRollover);}).join('');
-      if(done.length) h+='<div class="esav-goals-done-label">Done</div>'+done.map(function(g){return goalHtml(g,false,false);}).join('');
-      return h;
-    }
-
-    var yearly=goals.filter(function(g){return (g.timeframe||'yearly')==='yearly';});
-    var monthly=goals.filter(function(g){return g.timeframe==='monthly';});
-    var weekly=goals.filter(function(g){return g.timeframe==='weekly';});
-    var thisWeek=weekly.filter(function(g){return g.period===curWeek;});
-    var pastWeeks=weekly.filter(function(g){return g.period!==curWeek;});
-    var html='';
-
-    // ── Yearly ──
-    if(yearly.length){
-      html+='<div class="goals-section-header">Yearly</div>';
-      var yrs=[]; yearly.forEach(function(g){var y=g.period||curHebYr;if(yrs.indexOf(y)<0)yrs.push(y);}); yrs.sort().reverse();
-      yrs.forEach(function(yr){
-        var grp=yearly.filter(function(g){return (g.period||curHebYr)===yr;});
-        var yrElId='gpl_y_'+yr;
-        html+='<div class="goals-period-label" id="'+yrElId+'"><span>'+escHtml(yr)+'</span></div>'+renderGroup(grp,true,false);
-      });
-    }
-
-    // ── Monthly ──
-    if(monthly.length){
-      html+='<div class="goals-section-header">Monthly</div>';
-      var mos=[]; monthly.forEach(function(g){var m=g.period||curHebP;if(mos.indexOf(m)<0)mos.push(m);});
-      mos.sort(function(a,b){
-        var ap=a.split('-'),bp=b.split('-');
-        var ay=parseInt(ap[0],10)||0,by=parseInt(bp[0],10)||0;
-        if(ay!==by) return by-ay;
-        return _hebMonthIdx(bp[1])-_hebMonthIdx(ap[1]);
-      });
-      mos.forEach(function(mo){
-        var grp=monthly.filter(function(g){return (g.period||curHebP)===mo;});
-        var isCur=mo===curHebP;
-        var moElId='gpl_m_'+mo.replace(/[^a-z0-9]/gi,'_');
-        var moLbl=_hebPeriodDisplay(mo);
-        var chip=isCur?' <span class="goals-current-chip">This month</span>':'';
-        html+='<div class="goals-period-label'+(isCur?' is-current':'')+'" id="'+moElId+'"><span>'+escHtml(moLbl)+'</span>'+chip+'</div>'+renderGroup(grp,true,false);
-      });
-    }
-
-    // ── Weekly ──
-    if(weekly.length){
-      html+='<div class="goals-section-header">Weekly</div>';
-      if(thisWeek.length){
-        html+='<div class="goals-period-label is-current">This week <span class="goals-current-chip">Current</span></div>'+renderGroup(thisWeek,true,false);
-      } else {
-        html+='<div class="goals-period-label is-current">This week <span class="goals-current-chip">Current</span></div><div class="stl-empty" style="font-size:12px;padding:6px 0">No goals for this week yet.</div>';
-      }
-      if(pastWeeks.length){
-        var incPast=pastWeeks.filter(function(g){return !g.done;}).length;
-        html+='<div class="goals-past-toggle" onclick="this.nextElementSibling.classList.toggle(\'open\')">▸ Past weeks'+(incPast?' ('+incPast+' incomplete)':'')+'</div>';
-        html+='<div class="goals-past-section">';
-        var pws=[]; pastWeeks.forEach(function(g){var w=g.period||'';if(pws.indexOf(w)<0)pws.push(w);}); pws.sort().reverse();
-        pws.forEach(function(pw){
-          var grp=pastWeeks.filter(function(g){return (g.period||'')===pw;});
-          html+='<div class="goals-period-label">'+_fmtWeekPeriod(pw)+'</div>'+renderGroup(grp,false,true);
-        });
-        html+='</div>';
-      }
-    }
-
-    if(!yearly.length&&!monthly.length&&!weekly.length) html='<div class="stl-empty">No goals yet. Add one below.</div>';
-    el.innerHTML=html;
-    if(_editingGoalId){
-      var inp=document.getElementById('esavGoalEdit_'+_editingGoalId);
-      if(inp){ inp.focus(); inp.select(); }
-    }
-  }
-
-  function _setupGoalDrag(el){
-    el.addEventListener('dragstart',function(e){
-      var item=e.target.closest('.esav-goal-item[draggable]'); if(!item) return;
-      _dragGoalId=item.dataset.id;
-      item.classList.add('dragging');
-      e.dataTransfer.effectAllowed='move';
-    });
-    el.addEventListener('dragend',function(){
-      el.querySelectorAll('.esav-goal-item').forEach(function(i){ i.classList.remove('dragging','drag-over'); });
-      _dragGoalId=null;
-    });
-    el.addEventListener('dragover',function(e){
-      var item=e.target.closest('.esav-goal-item[draggable]'); if(!item) return;
-      e.preventDefault();
-      el.querySelectorAll('.esav-goal-item').forEach(function(i){ i.classList.remove('drag-over'); });
-      item.classList.add('drag-over');
-    });
-    el.addEventListener('drop',function(e){
-      e.preventDefault();
-      var item=e.target.closest('.esav-goal-item[draggable]'); if(!item||!_dragGoalId) return;
-      var dropId=item.dataset.id; if(_dragGoalId===dropId) return;
-      var active=_goalsCache.filter(function(g){ return !g.done; });
-      var done=_goalsCache.filter(function(g){ return g.done; });
-      var fromIdx=active.findIndex(function(g){ return g.id===_dragGoalId; });
-      var toIdx=active.findIndex(function(g){ return g.id===dropId; });
-      if(fromIdx<0||toIdx<0) return;
-      var moved=active.splice(fromIdx,1)[0];
-      active.splice(toIdx,0,moved);
-      var newOrder=active.concat(done);
-      _goalsCache=newOrder; _dragGoalId=null;
-      _renderGoals(newOrder);
-      fetch(ESAV_URL+'/esav/goals',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(newOrder)}).catch(function(){});
-    });
-  }
-
-  window._esavToggleGoal=async function(id,done){
-    try{ await fetch(ESAV_URL+'/esav/goals/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({done:done})}); _loadGoals(); }catch(e){}
-  };
-  window._esavDeleteGoal=async function(id){
-    if(!confirm('Delete this goal?')) return;
-    try{ await fetch(ESAV_URL+'/esav/goals/'+id,{method:'DELETE'}); _loadGoals(); }catch(e){}
-  };
-  window._esavEditGoal=function(id){ _editingGoalId=id; _renderGoals(_goalsCache); };
-  window._esavSaveGoalEdit=async function(id){
-    var inp=document.getElementById('esavGoalEdit_'+id); if(!inp) return;
-    var text=inp.value.trim(); if(!text) return;
-    var tfEl=document.getElementById('esavGoalEditTf_'+id);
-    var tf=tfEl?tfEl.value:'yearly';
-    var periodEl=document.getElementById('esavGoalEditPeriod_'+id);
-    var period;
-    if(tf==='yearly') period=_curHebYear()||String(new Date().getFullYear());
-    else period=periodEl?periodEl.value:_curHebPeriod();
-    _editingGoalId=null;
-    try{ await fetch(ESAV_URL+'/esav/goals/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text,timeframe:tf,period:period})}); _loadGoals(); }catch(e){}
-  };
-  window._esavCancelGoalEdit=function(){ _editingGoalId=null; _renderGoals(_goalsCache); };
-  window._esavGoalTfChange=function(id){
-    var tfEl=document.getElementById('esavGoalEditTf_'+id); if(!tfEl) return;
-    var tf=tfEl.value;
-    var wrap=document.getElementById('esavGoalEditPeriodWrap_'+id); if(!wrap) return;
-    var now=new Date();
-    if(tf==='yearly'){
-      wrap.innerHTML='<span style="font-size:11px;color:#9ca3af">'+escHtml(_curHebYear())+'</span>';
-    } else if(tf==='monthly'){
-      wrap.innerHTML='<select class="esav-goal-edit-period" id="esavGoalEditPeriod_'+id+'">'+_hebMonthSelectHtml(_curHebPeriod())+'</select>';
-    } else {
-      wrap.innerHTML='<input class="esav-goal-edit-period" id="esavGoalEditPeriod_'+id+'" type="week" value="'+_isoWeekStr(now)+'">';
-    }
-  };
-  window._esavRolloverGoal=async function(id){
-    var curWeek=_isoWeekStr(new Date());
-    try{ await fetch(ESAV_URL+'/esav/goals/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({period:curWeek})}); _loadGoals(); }catch(e){}
-  };
-
-  // ── Period picker: sync with timeframe selection ──
-  var goalTimeframe=document.getElementById('esavGoalTimeframe');
-  var goalPeriod=document.getElementById('esavGoalPeriod'); // <select> for Hebrew months
-  var goalPeriodWeek=document.getElementById('esavGoalPeriodWeek'); // <input type="week">
-  function _syncPeriodPicker(){
-    var tf=goalTimeframe?goalTimeframe.value:'monthly';
-    if(tf==='yearly'){
-      if(goalPeriod) goalPeriod.style.display='none';
-      if(goalPeriodWeek) goalPeriodWeek.style.display='none';
-    } else if(tf==='monthly'){
-      if(goalPeriod){ goalPeriod.style.display=''; goalPeriod.innerHTML=_hebMonthSelectHtml(_curHebPeriod()); }
-      if(goalPeriodWeek) goalPeriodWeek.style.display='none';
-    } else {
-      if(goalPeriod) goalPeriod.style.display='none';
-      if(goalPeriodWeek){ goalPeriodWeek.style.display=''; if(!goalPeriodWeek.value) goalPeriodWeek.value=_isoWeekStr(new Date()); }
-    }
-  }
-  if(goalTimeframe){ goalTimeframe.addEventListener('change',_syncPeriodPicker); _syncPeriodPicker(); }
-
-  var goalAddBtn=document.getElementById('esavGoalAddBtn');
-  var goalInput=document.getElementById('esavGoalInput');
-  var goalCat=document.getElementById('esavGoalCategory');
-  if(goalAddBtn) goalAddBtn.addEventListener('click', async function(){
-    var text=(goalInput?goalInput.value:'').trim();
-    if(!text) return;
-    var tf=goalTimeframe?goalTimeframe.value:'monthly';
-    var now=new Date();
-    var period;
-    if(tf==='yearly') period=_curHebYear()||String(now.getFullYear());
-    else if(tf==='monthly') period=(goalPeriod&&goalPeriod.value)?goalPeriod.value:_curHebPeriod();
-    else period=(goalPeriodWeek&&goalPeriodWeek.value)?goalPeriodWeek.value:_isoWeekStr(now);
-    var body={text:text,timeframe:tf,period:period,category:goalCat?goalCat.value:''};
-    try{
-      await fetch(ESAV_URL+'/esav/goals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-      if(goalInput) goalInput.value='';
-      _loadGoals();
-    }catch(e){}
-  });
-  if(goalInput) goalInput.addEventListener('keydown',function(e){ if(e.key==='Enter') goalAddBtn.click(); });
-
-  // ── People — local note cache (works before server restart) ──
-  function _localNotes(pid){ try{ return JSON.parse(localStorage.getItem('pnotes_'+pid)||'[]'); }catch(e){ return []; } }
-  function _saveLocalNote(pid,ts,note){ var arr=_localNotes(pid); arr.unshift({ts:ts,note:note}); try{ localStorage.setItem('pnotes_'+pid,JSON.stringify(arr.slice(0,50))); }catch(e){} }
-  function _mergeHistory(serverHistory, pid){
-    var local=_localNotes(pid);
-    var all=serverHistory.concat(local);
-    var seen={};
-    return all.filter(function(h){ var k=Math.round(h.ts/1000); if(seen[k]) return false; seen[k]=true; return true; })
-              .sort(function(a,b){ return b.ts-a.ts; });
-  }
-
-  // ── People categories ──────────────────────────────────────
+  var _peopleCache = [];
   var _PEOPLE_CAT_PALETTE=['#7c3aed','#2563eb','#16a34a','#db2777','#d97706','#0891b2','#dc2626','#65a30d','#6366f1','#0d9488'];
-  var _activePeopleCat=''; // '' = All
-  var _openCatPickerId=null; // person id whose picker is open
+  var _activePeopleCat='';
+  var _openCatPickerId=null;
   var _editingPersonId=null;
-  var _editingNoteKey=null; // {pid, ts}
+  var _editingNoteKey=null;
 
   function _getPeopleCats(){ try{ return JSON.parse(localStorage.getItem('esav_person_cats')||'[]'); }catch(e){ return []; } }
   function _savePeopleCats(cats){ localStorage.setItem('esav_person_cats',JSON.stringify(cats)); }
+  function _savePeople(people){ localStorage.setItem('esav_contacts',JSON.stringify(people)); }
 
   function _renderCatStrip(){
     var strip=document.getElementById('peopleCatStrip'); if(!strip) return;
     var cats=_getPeopleCats();
-    var html='<button class="people-cat-filter'+('' ===_activePeopleCat?' active':'')+'" data-cat="" onclick="window._setPeopleCatFilter(\'\')">All</button>';
+    var html='<button class="people-cat-filter'+(!_activePeopleCat?' active':'')+'" data-cat="" onclick="window._setPeopleCatFilter(\'\')">All</button>';
     cats.forEach(function(c){
       var active=c.id===_activePeopleCat;
       var style=active?'background:'+c.color+';border-color:'+c.color+';color:#fff':'border-color:'+c.color+';color:'+c.color;
@@ -7589,105 +6879,65 @@ function _doLogin() {
         '<button class="people-cat-strip-del" onclick="event.stopPropagation();window._deletePeopleCat(\''+c.id+'\')" title="Delete category" style="color:'+c.color+'">×</button>'+
       '</span>';
     });
-    html+='<button class="people-cat-add-btn" id="peopleCatAddBtn" onclick="window._toggleCatNewForm()">+ Category</button>';
+    html+='<button class="people-cat-add-btn" id="peopleCatAddBtn" onclick="var f=document.getElementById(\'peopleCatNewForm\');if(f){f.style.display=f.style.display===\'none\'?\'\':\'none\';}">+ Category</button>';
     strip.innerHTML=html;
   }
 
-  window._setPeopleCatFilter=function(catId){ _activePeopleCat=catId; _renderCatStrip(); _loadPeople(); };
-  window._toggleCatNewForm=function(){
-    var f=document.getElementById('peopleCatNewForm'); if(!f) return;
-    var showing=f.style.display!=='none';
-    f.style.display=showing?'none':'flex';
-    if(!showing){ var inp=document.getElementById('peopleCatNewName'); if(inp){inp.value='';inp.focus();} }
+  window._setPeopleCatFilter=function(catId){ _activePeopleCat=catId; _renderCatStrip(); _renderPeople(_peopleCache); };
+  window._deletePeopleCat=function(id){
+    var cats=_getPeopleCats().filter(function(c){return c.id!==id;});
+    _savePeopleCats(cats);
+    _peopleCache.forEach(function(p){ p.categories=(p.categories||[]).filter(function(cid){return cid!==id;}); });
+    _savePeople(_peopleCache); _renderCatStrip(); _renderPeople(_peopleCache);
   };
-  function _createCat(name){
-    var cats=_getPeopleCats();
-    var color=_PEOPLE_CAT_PALETTE[cats.length%_PEOPLE_CAT_PALETTE.length];
-    var c={id:uid(),name:name,color:color};
-    cats.push(c); _savePeopleCats(cats); _renderCatStrip(); return c;
-  }
   window._savePeopleCatNew=function(){
     var inp=document.getElementById('peopleCatNewName'); if(!inp) return;
     var name=inp.value.trim(); if(!name) return;
-    _createCat(name);
+    var cats=_getPeopleCats();
+    var c={id:'cat_'+Date.now().toString(36),name:name,color:_PEOPLE_CAT_PALETTE[cats.length%_PEOPLE_CAT_PALETTE.length]};
+    cats.push(c); _savePeopleCats(cats);
     inp.value='';
     var f=document.getElementById('peopleCatNewForm'); if(f) f.style.display='none';
-  };
-  window._pickerAddCat=async function(pid){
-    var inp=document.getElementById('pickerCatInput_'+pid); if(!inp) return;
-    var name=inp.value.trim(); if(!name) return;
-    var c=_createCat(name);
-    // also immediately assign to this person
-    var p=_peopleCache.find(function(x){ return x.id===pid; }); if(!p) return;
-    var cats=(p.categories||[]).concat([c.id]);
-    p.categories=cats;
-    try{ await fetch(ESAV_URL+'/esav/people/'+pid,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({categories:cats})}); }catch(e){}
-    _renderPeople(_peopleCache);
-  };
-  window._deletePeopleCat=function(catId){
-    var cats=_getPeopleCats().filter(function(c){ return c.id!==catId; });
-    _savePeopleCats(cats);
-    if(_activePeopleCat===catId) _activePeopleCat='';
-    _renderCatStrip(); _loadPeople();
+    _renderCatStrip(); _renderPeople(_peopleCache);
   };
   window._openCatPicker=function(pid){
     if(_openCatPickerId===pid){ _openCatPickerId=null; _renderPeople(_peopleCache); return; }
     _openCatPickerId=pid; _renderPeople(_peopleCache);
-    setTimeout(function(){
-      document.addEventListener('click',function _closePicker(e){
-        if(!e.target.closest('.esav-cat-picker')&&!e.target.closest('.esav-person-cat-assign-btn')&&!e.target.closest('.esav-person-cat-pill')){
-          _openCatPickerId=null; _renderPeople(_peopleCache);
-          document.removeEventListener('click',_closePicker);
-        }
-      });
-    },10);
   };
-  window._togglePersonCat=async function(pid,catId){
-    var p=_peopleCache.find(function(x){ return x.id===pid; }); if(!p) return;
-    var cats=(p.categories||[]).slice();
-    var idx=cats.indexOf(catId);
-    if(idx>=0) cats.splice(idx,1); else cats.push(catId);
-    p.categories=cats; // optimistic
-    _renderPeople(_peopleCache);
-    try{ await fetch(ESAV_URL+'/esav/people/'+pid,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({categories:cats})}); }catch(e){}
+  window._togglePersonCat=function(pid,cid){
+    var p=_peopleCache.find(function(x){return x.id===pid;}); if(!p) return;
+    var idx=(p.categories||[]).indexOf(cid);
+    if(!p.categories) p.categories=[];
+    if(idx>=0) p.categories.splice(idx,1); else p.categories.push(cid);
+    _savePeople(_peopleCache); _openCatPickerId=null; _renderPeople(_peopleCache);
   };
 
-  // ── People ─────────────────────────────────────────────────
-  var _peopleCache=[];
-  async function _loadPeople(){
-    var el=document.getElementById('esavPeopleList'); if(!el) return;
-    el.innerHTML='<div class="stl-empty" style="padding:12px 0">Loading…</div>';
-    try{ var res=await fetch(ESAV_URL+'/esav/people'); _peopleCache=await res.json(); _renderCatStrip(); _renderPeople(_peopleCache); }
-    catch(e){ el.innerHTML='<div class="stl-empty">Could not load people.</div>'; }
-  }
+  function _freqToDays(n,unit){ n=parseInt(n)||1; return unit==='days'?n:unit==='weeks'?n*7:unit==='months'?n*30:n*365; }
+  function _nextContactDate(lastMs, days){ if(!lastMs||!days) return null; var d=new Date(lastMs+days*86400000); return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+  function _daysAgoStr(ts){ if(!ts) return 'never'; var d=Math.floor((Date.now()-ts)/86400000); return d===0?'today':d===1?'yesterday':d+' days ago'; }
+
+  function _localNotes(pid){ try{ return JSON.parse(localStorage.getItem('pnotes_'+pid)||'[]'); }catch(e){ return []; } }
+  function _saveLocalNote(pid,ts,note){ var arr=_localNotes(pid); arr.unshift({ts:ts,note:note}); try{ localStorage.setItem('pnotes_'+pid,JSON.stringify(arr.slice(0,50))); }catch(e){} }
 
   function _renderPeople(people){
     var el=document.getElementById('esavPeopleList'); if(!el) return;
-    var allCats=_getPeopleCats();
-    var catMap={}; allCats.forEach(function(c){ catMap[c.id]=c; });
-
-    // filter by active category
-    var visible=_activePeopleCat
-      ? people.filter(function(p){ return (p.categories||[]).indexOf(_activePeopleCat)>=0; })
-      : people;
-
-    if(!visible.length){ el.innerHTML='<div class="stl-empty">'+(people.length?'No one in this category.':'No one added yet.')+'</div>'; return; }
-
+    var allCats=_getPeopleCats(); var catMap={}; allCats.forEach(function(c){ catMap[c.id]=c; });
+    var visible=_activePeopleCat ? people.filter(function(p){return (p.categories||[]).indexOf(_activePeopleCat)>=0;}) : people;
+    if(!visible.length){ el.innerHTML='<div class="stl-empty">'+(people.length?'No one in this category.':'No contacts yet. Add someone below.')+'</div>'; return; }
+    var now=Date.now();
     var sorted=visible.slice().sort(function(a,b){
-      var aNext=(a.lastContact||0)+a.frequencyDays*86400000;
-      var bNext=(b.lastContact||0)+b.frequencyDays*86400000;
+      var aNext=(a.lastContact||0)+((a.frequencyDays||30)*86400000);
+      var bNext=(b.lastContact||0)+((b.frequencyDays||30)*86400000);
       return aNext-bNext;
     });
-
     el.innerHTML=sorted.map(function(p){
-      var overdue=p.daysOverdue>0;
-      var urgent=!p.lastContact||p.daysOverdue>7;
+      var daysOverdue=p.lastContact?Math.floor((now-p.lastContact)/86400000)-p.frequencyDays:999;
+      var overdue=daysOverdue>0; var urgent=!p.lastContact||daysOverdue>7;
       var cls=urgent?'esav-person-urgent':overdue?'esav-person-overdue':'esav-person-ok';
       var nextDate=_nextContactDate(p.lastContact,p.frequencyDays);
-      var statusText=!p.lastContact?'Never contacted':overdue?(p.daysOverdue+' day'+(p.daysOverdue>1?'s':'')+' overdue'):(nextDate?'Next: '+nextDate:'On track');
-      var last=p.lastContact?_daysAgoStr(p.lastContact):'Never';
-      var history=_mergeHistory(p.contactHistory||[], p.id);
-
+      var statusText=!p.lastContact?'Never contacted':overdue?(daysOverdue+' day'+(daysOverdue>1?'s':'')+' overdue'):(nextDate?'Next: '+nextDate:'On track');
+      var last=_daysAgoStr(p.lastContact);
+      var history=_localNotes(p.id).concat((p.contactHistory||[]).filter(function(h){var lts=Math.round(h.ts/1000);return !_localNotes(p.id).some(function(l){return Math.round(l.ts/1000)===lts;});})).sort(function(a,b){return b.ts-a.ts;});
       var entriesHtml=history.length
         ? history.map(function(h){
             var editingNote=_editingNoteKey&&_editingNoteKey.pid===p.id&&_editingNoteKey.ts===h.ts;
@@ -7695,273 +6945,116 @@ function _doLogin() {
               ? '<input class="esav-note-edit-input" id="noteEdit_'+p.id+'_'+h.ts+'" value="'+escHtml(h.note||'')+'" onkeydown="if(event.key===\'Enter\')window._esavSaveNoteEdit(\''+p.id+'\','+h.ts+');if(event.key===\'Escape\')window._esavCancelNoteEdit()" />'
                 +'<button class="esav-note-edit-save" onclick="window._esavSaveNoteEdit(\''+p.id+'\','+h.ts+')">✓</button>'
                 +'<button class="esav-note-edit-cancel" onclick="window._esavCancelNoteEdit()">✕</button>'
-              : (h.note
-                  ?'<span class="esav-contact-entry-note">'+escHtml(h.note)+'</span>'
-                  :'<span class="esav-contact-entry-note esav-contact-entry-no-note">—</span>')+
-                '<button class="esav-note-edit-btn" onclick="window._esavEditNote(\''+p.id+'\','+h.ts+')" title="Edit note">✎</button>'+
-                '<button class="esav-note-edit-btn esav-note-del-btn" onclick="window._esavDeleteNote(\''+p.id+'\','+h.ts+')" title="Delete entry">🗑</button>';
+              : (h.note?'<span class="esav-contact-entry-note">'+escHtml(h.note)+'</span>':'<span class="esav-contact-entry-note esav-contact-entry-no-note">—</span>')+
+                '<button class="esav-note-edit-btn" onclick="window._esavEditNote(\''+p.id+'\','+h.ts+')" title="Edit">✎</button>'+
+                '<button class="esav-note-edit-btn esav-note-del-btn" onclick="window._esavDeleteNote(\''+p.id+'\','+h.ts+')" title="Delete">🗑</button>';
             return '<div class="esav-contact-entry'+(editingNote?' editing':'')+'">'+
-              '<span class="esav-contact-entry-date">'+_tsLabel(h.ts)+'</span>'+
-              noteEl+
-            '</div>';
+              '<span class="esav-contact-entry-date">'+new Date(h.ts).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+'</span>'+
+              noteEl+'</div>';
           }).join('')
         : '<div class="esav-contact-entry-no-note" style="padding:2px 0">No conversations logged yet</div>';
-
-      // ── category pills ──
-      var pCats=p.categories||[];
-      var pillsHtml=pCats.map(function(cid){
-        var c=catMap[cid]; if(!c) return '';
-        return '<span class="esav-person-cat-pill" style="background:'+c.color+'22;color:'+c.color+'">'+
-          escHtml(c.name)+
-          '<span class="cat-remove" onclick="event.stopPropagation();window._togglePersonCat(\''+p.id+'\',\''+cid+'\')">×</span>'+
-          '</span>';
-      }).join('');
+      var editing=_editingPersonId===p.id;
+      var pCats=(p.categories||[]).map(function(cid){var c=catMap[cid];if(!c)return '';return '<span class="esav-person-cat-pill" style="background:'+c.color+'22;color:'+c.color+'">'+escHtml(c.name)+'<span class="cat-remove" onclick="event.stopPropagation();window._togglePersonCat(\''+p.id+'\',\''+cid+'\')">×</span></span>';}).join('');
       var assignBtn='<button class="esav-person-cat-assign-btn" onclick="event.stopPropagation();window._openCatPicker(\''+p.id+'\')">+ tag</button>';
-
-      // ── cat picker dropdown ──
-      var pickerHtml='';
-      if(_openCatPickerId===p.id){
-        var catItems=allCats.length
-          ? allCats.map(function(c){
-              var checked=pCats.indexOf(c.id)>=0;
-              return '<div class="esav-cat-picker-item">'+
-                '<input type="checkbox"'+(checked?' checked':'')+' onchange="window._togglePersonCat(\''+p.id+'\',\''+c.id+'\')">'+
-                '<span class="esav-cat-picker-dot" style="background:'+c.color+'"></span>'+
-                '<span style="flex:1">'+escHtml(c.name)+'</span>'+
-                '<button class="esav-cat-picker-delete" onclick="event.stopPropagation();window._deletePeopleCat(\''+c.id+'\')" title="Delete category">×</button>'+
-              '</div>';
-            }).join('')
-          : '<div class="esav-cat-picker-none">No categories yet.</div>';
-        var newCatRow='<div class="esav-cat-picker-new-row">'+
-          '<input class="esav-cat-picker-new-input" id="pickerCatInput_'+p.id+'" placeholder="New category…" type="text" onclick="event.stopPropagation()" onkeydown="if(event.key===\'Enter\'){event.stopPropagation();window._pickerAddCat(\''+p.id+'\');}">'+
-          '<button class="esav-cat-picker-new-btn" onclick="event.stopPropagation();window._pickerAddCat(\''+p.id+'\')">Add</button>'+
-        '</div>';
-        pickerHtml='<div class="esav-cat-picker">'+catItems+newCatRow+'</div>';
-      }
-
-      var editing=(_editingPersonId===p.id);
-      var nameEl=editing
-        ? '<input class="esav-person-name-input" id="esavPersonNameEdit_'+p.id+'" value="'+escHtml(p.name)+'" onkeydown="if(event.key===\'Enter\')window._esavSavePersonEdit(\''+p.id+'\');if(event.key===\'Escape\')window._esavCancelPersonEdit()" />'
-        : '<div class="esav-person-name">'+escHtml(p.name)+'</div>';
-      var actionsEl=editing
-        ? '<button class="esav-person-btn esav-person-save-btn" onclick="window._esavSavePersonEdit(\''+p.id+'\')">✓ Save</button>'+
-          '<button class="esav-person-btn" onclick="window._esavCancelPersonEdit()" style="color:#aaa">✕</button>'
-        : '<button class="esav-person-btn esav-person-edit-btn" onclick="window._esavEditPerson(\''+p.id+'\')" title="Edit">✎</button>'+
-          (nextDate?'<button class="esav-person-btn esav-person-task-btn" onclick="window._esavAddTaskDirect(\''+escHtml(p.name)+'\',\''+escHtml(nextDate)+'\')">+ Task</button>':'')+
-          '<button class="esav-person-btn esav-person-delete-btn" onclick="window._esavDeletePerson(\''+p.id+'\')">×</button>';
-
-      return '<div class="esav-person-card '+cls+'" data-pid="'+p.id+'">'+
-        '<div class="esav-person-main">'+
-          '<div class="esav-person-avatar">'+escHtml(p.name.charAt(0).toUpperCase())+'</div>'+
-          '<div class="esav-person-info">'+
-            nameEl+
-            '<div class="esav-person-meta">'+escHtml(_freqLabel(p.frequencyDays))+' · Last: '+last+'</div>'+
-            '<div class="esav-person-status">'+statusText+'</div>'+
-            '<div class="esav-person-cats-wrap">'+
-              '<div class="esav-person-cats">'+pillsHtml+assignBtn+'</div>'+
-              pickerHtml+
-            '</div>'+
-          '</div>'+
-          '<div class="esav-person-actions">'+actionsEl+'</div>'+
-        '</div>'+
-        '<div class="esav-person-notes">'+
-          '<div class="esav-person-notes-label">Notes</div>'+
-          '<div class="esav-convo-list" id="esavConvoList_'+p.id+'">'+entriesHtml+'</div>'+
-          '<div class="esav-convo-input-row">'+
-            '<input id="esavConvoNote_'+p.id+'" class="esav-convo-input" type="text" placeholder="Spoke with '+escHtml(p.name)+'… add a note" />'+
-            '<button class="esav-convo-log-btn" onclick="window._esavLogConvo(\''+p.id+'\')">✓ Spoke</button>'+
-          '</div>'+
-        '</div>'+
-      '</div>';
+      var openPicker=_openCatPickerId===p.id;
+      var pickerHtml=openPicker?'<div class="esav-cat-picker">'+allCats.map(function(c){var sel=(p.categories||[]).indexOf(c.id)>=0;return '<button class="esav-cat-pick-btn'+(sel?' selected':'')+'" onclick="window._togglePersonCat(\''+p.id+'\',\''+c.id+'\')" style="background:'+(sel?c.color:'transparent')+';border-color:'+c.color+';color:'+(sel?'#fff':c.color)+'" title="'+escHtml(c.name)+'">'+escHtml(c.name)+'</button>';}).join('')+'</div>':'';
+      var noteInp='<div class="esav-note-input-row"><input class="esav-add-input" id="esavNoteInput_'+p.id+'" placeholder="Add a note…" style="flex:1" onkeydown="if(event.key===\'Enter\')window._esavLogConvo(\''+p.id+'\')"><button class="esav-add-btn" onclick="window._esavLogConvo(\''+p.id+'\')">Log</button></div>';
+      var nameEl=editing?'<input class="esav-goal-edit-input" id="esavPersonNameEdit_'+p.id+'" value="'+escHtml(p.name)+'" style="width:120px;margin-right:6px" onkeydown="if(event.key===\'Enter\')window._esavSavePersonEdit(\''+p.id+'\');if(event.key===\'Escape\')window._esavCancelPersonEdit()" />':'<span class="esav-person-name">'+escHtml(p.name)+'</span>';
+      return '<div class="esav-person-item '+cls+'">'
+        +'<div class="esav-person-header">'
+          +'<div class="esav-person-info">'+nameEl+'<span class="esav-person-status">'+escHtml(statusText)+'</span></div>'
+          +'<div class="esav-person-actions">'
+            +(editing?'<button class="esav-goal-check" onclick="window._esavSavePersonEdit(\''+p.id+'\')">✓</button><button class="btn-icon" onclick="window._esavCancelPersonEdit()">✕</button>':'')
+            +(!editing?'<button class="btn-icon" onclick="window._esavEditPerson(\''+p.id+'\')">✏️</button>':'')
+            +'<button class="btn-icon" onclick="window._deletePerson(\''+p.id+'\')">🗑</button>'
+          +'</div>'
+        +'</div>'
+        +'<div class="esav-person-meta">Last: '+last+' · '+Math.round((p.frequencyDays||30)/7)+' wk frequency</div>'
+        +'<div class="esav-person-cats">'+pCats+assignBtn+'</div>'
+        +pickerHtml
+        +'<div class="esav-person-history">'+entriesHtml+'</div>'
+        +noteInp
+      +'</div>';
     }).join('');
-
-    sorted.forEach(function(p){
-      var inp=document.getElementById('esavConvoNote_'+p.id);
-      if(inp) inp.addEventListener('keydown',function(e){ if(e.key==='Enter') window._esavLogConvo(p.id); });
-    });
   }
+  window._renderPeople = _renderPeople;
 
-  window._esavLogConvo=async function(id){
-    var inp=document.getElementById('esavConvoNote_'+id);
-    var note=inp?inp.value.trim():'';
-    var ts=Date.now();
-    // save locally immediately so it shows right away
-    _saveLocalNote(id, ts, note);
-    if(inp) inp.value='';
-    // update the list in place without waiting for server
-    var listEl=document.getElementById('esavConvoList_'+id);
-    if(listEl){
-      var newEntry='<div class="esav-contact-entry">'+
-        '<span class="esav-contact-entry-date">'+_tsLabel(ts)+'</span>'+
-        (note?'<span class="esav-contact-entry-note">'+escHtml(note)+'</span>':'<span class="esav-contact-entry-note esav-contact-entry-no-note">—</span>')+
-      '</div>';
-      if(listEl.querySelector('.esav-contact-entry-no-note')) listEl.innerHTML='';
-      listEl.insertAdjacentHTML('afterbegin', newEntry);
-    }
-    // also save to server in background
-    try{ await fetch(ESAV_URL+'/esav/people/'+id+'/contact',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({note:note})}); }catch(e){}
+  window._loadPeople = function(){
+    try { _peopleCache = JSON.parse(localStorage.getItem('esav_contacts')||'[]'); } catch(e) { _peopleCache=[]; }
+    _peopleCache.forEach(function(p){ if(!p.categories) p.categories=[]; });
+    _renderCatStrip(); _renderPeople(_peopleCache);
   };
 
-  window._esavAddTaskDirect=function(name,nextDate){
-    var chatBtn=document.querySelector('.esav-subtab[data-tab="chat"]');
-    if(chatBtn) chatBtn.click();
-    setTimeout(function(){ _sendText('Add a task on '+nextDate+': Reach out to '+name,'tab'); },100);
+  window._esavLogConvo = function(pid){
+    var inp=document.getElementById('esavNoteInput_'+pid); var note=inp?inp.value.trim():'';
+    var now=Date.now();
+    var p=_peopleCache.find(function(x){return x.id===pid;}); if(!p) return;
+    p.lastContact=now; if(!p.contactHistory) p.contactHistory=[];
+    p.contactHistory.unshift({ts:now,note:note});
+    _saveLocalNote(pid,now,note);
+    _savePeople(_peopleCache);
+    if(inp) inp.value=''; _renderPeople(_peopleCache);
   };
 
-  window._esavDeletePerson=async function(id){
+  window._deletePerson=function(id){
     if(!confirm('Remove this person?')) return;
-    try{ await fetch(ESAV_URL+'/esav/people/'+id,{method:'DELETE'}); _loadPeople(); }catch(e){}
+    _peopleCache=_peopleCache.filter(function(p){return p.id!==id;});
+    _savePeople(_peopleCache); _renderPeople(_peopleCache);
   };
-  window._esavDeleteNote=async function(pid,ts){
-    // remove from local cache
-    try{
-      var local=JSON.parse(localStorage.getItem('pnotes_'+pid)||'[]');
-      local=local.filter(function(h){ return Math.round(h.ts/1000)!==Math.round(ts/1000); });
-      localStorage.setItem('pnotes_'+pid,JSON.stringify(local));
-    }catch(e){}
-    // remove from server contactHistory
-    var p=_peopleCache.find(function(x){ return x.id===pid; });
-    if(p&&Array.isArray(p.contactHistory)){
-      p.contactHistory=p.contactHistory.filter(function(h){ return Math.round(h.ts/1000)!==Math.round(ts/1000); });
-      // update lastContact to most recent remaining entry
-      if(p.contactHistory.length) p.lastContact=p.contactHistory[0].ts;
-      else p.lastContact=null;
-    }
-    _renderPeople(_peopleCache);
-    if(p) try{ await fetch(ESAV_URL+'/esav/people/'+pid,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({contactHistory:p.contactHistory,lastContact:p.lastContact})}); }catch(e){}
-  };
-  window._esavEditNote=function(pid,ts){ _editingNoteKey={pid:pid,ts:ts}; _editingPersonId=null; _renderPeople(_peopleCache); setTimeout(function(){ var inp=document.getElementById('noteEdit_'+pid+'_'+ts); if(inp){inp.focus();inp.select();} },30); };
-  window._esavCancelNoteEdit=function(){ _editingNoteKey=null; _renderPeople(_peopleCache); };
-  window._esavSaveNoteEdit=async function(pid,ts){
-    var inp=document.getElementById('noteEdit_'+pid+'_'+ts); if(!inp) return;
-    var newNote=inp.value.trim();
-    _editingNoteKey=null;
-    // update local cache
-    try{
-      var local=JSON.parse(localStorage.getItem('pnotes_'+pid)||'[]');
-      var li=local.find(function(h){ return Math.round(h.ts/1000)===Math.round(ts/1000); });
-      if(li) li.note=newNote;
-      localStorage.setItem('pnotes_'+pid,JSON.stringify(local));
-    }catch(e){}
-    // update server-side contactHistory via the person PUT
-    var p=_peopleCache.find(function(x){ return x.id===pid; });
-    if(p&&Array.isArray(p.contactHistory)){
-      var entry=p.contactHistory.find(function(h){ return Math.round(h.ts/1000)===Math.round(ts/1000); });
-      if(entry) entry.note=newNote;
-    }
-    _renderPeople(_peopleCache);
-    if(p) try{ await fetch(ESAV_URL+'/esav/people/'+pid,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({contactHistory:p.contactHistory})}); }catch(e){}
-  };
-  window._esavEditPerson=function(id){ _editingPersonId=id; _openCatPickerId=null; _renderPeople(_peopleCache); setTimeout(function(){ var inp=document.getElementById('esavPersonNameEdit_'+id); if(inp){inp.focus();inp.select();} },30); };
+
+  window._esavEditPerson=function(id){ _editingPersonId=id; _openCatPickerId=null; _renderPeople(_peopleCache); setTimeout(function(){var inp=document.getElementById('esavPersonNameEdit_'+id);if(inp){inp.focus();inp.select();}},30); };
   window._esavCancelPersonEdit=function(){ _editingPersonId=null; _renderPeople(_peopleCache); };
-  window._esavSavePersonEdit=async function(id){
+  window._esavSavePersonEdit=function(id){
     var inp=document.getElementById('esavPersonNameEdit_'+id); if(!inp) return;
     var name=inp.value.trim(); if(!name) return;
-    _editingPersonId=null;
-    var p=_peopleCache.find(function(x){ return x.id===id; }); if(p) p.name=name;
-    _renderPeople(_peopleCache);
-    try{ await fetch(ESAV_URL+'/esav/people/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})}); }catch(e){}
+    var p=_peopleCache.find(function(x){return x.id===id;}); if(!p) return;
+    p.name=name; _editingPersonId=null; _savePeople(_peopleCache); _renderPeople(_peopleCache);
   };
 
-  var personAddBtn=document.getElementById('esavPersonAddBtn');
-  var personName=document.getElementById('esavPersonName');
-  var personFreqNum=document.getElementById('esavPersonFreqNum');
-  var personFreqUnit=document.getElementById('esavPersonFreqUnit');
-  if(personAddBtn) personAddBtn.addEventListener('click', async function(){
-    var name=personName?personName.value.trim():'';
-    var freq=_freqToDays(personFreqNum?personFreqNum.value:2, personFreqUnit?personFreqUnit.value:'weeks');
-    if(!name) return;
-    try{
-      await fetch(ESAV_URL+'/esav/people',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,frequencyDays:freq})});
-      if(personName)    personName.value='';
-      if(personFreqNum) personFreqNum.value='2';
-      if(personFreqUnit)personFreqUnit.value='weeks';
-      _loadPeople();
-    }catch(e){}
-  });
-  if(personName) personName.addEventListener('keydown',function(e){ if(e.key==='Enter') personAddBtn.click(); });
+  window._esavEditNote=function(pid,ts){ _editingNoteKey={pid:pid,ts:ts}; _renderPeople(_peopleCache); setTimeout(function(){var inp=document.getElementById('noteEdit_'+pid+'_'+ts);if(inp){inp.focus();inp.select();}},30); };
+  window._esavCancelNoteEdit=function(){ _editingNoteKey=null; _renderPeople(_peopleCache); };
+  window._esavSaveNoteEdit=function(pid,ts){
+    var inp=document.getElementById('noteEdit_'+pid+'_'+ts); var note=inp?inp.value.trim():'';
+    var p=_peopleCache.find(function(x){return x.id===pid;}); if(!p) return;
+    var h=(p.contactHistory||[]).find(function(x){return x.ts===ts;});
+    if(h) h.note=note;
+    var local=_localNotes(pid); var lh=local.find(function(x){return x.ts===ts;});
+    if(lh){ lh.note=note; try{localStorage.setItem('pnotes_'+pid,JSON.stringify(local));}catch(e){} }
+    _editingNoteKey=null; _savePeople(_peopleCache); _renderPeople(_peopleCache);
+  };
+  window._esavDeleteNote=function(pid,ts){
+    var p=_peopleCache.find(function(x){return x.id===pid;}); if(!p) return;
+    p.contactHistory=(p.contactHistory||[]).filter(function(h){return h.ts!==ts;});
+    var local=_localNotes(pid).filter(function(h){return h.ts!==ts;});
+    try{localStorage.setItem('pnotes_'+pid,JSON.stringify(local));}catch(e){}
+    _savePeople(_peopleCache); _renderPeople(_peopleCache);
+  };
 
-  // ── People category form wiring ────────────────────────────
-  var catNewSave=document.getElementById('peopleCatNewSave');
-  var catNewCancel=document.getElementById('peopleCatNewCancel');
-  var catNewName=document.getElementById('peopleCatNewName');
-  if(catNewSave) catNewSave.addEventListener('click', window._savePeopleCatNew);
-  if(catNewCancel) catNewCancel.addEventListener('click', function(){ var f=document.getElementById('peopleCatNewForm'); if(f) f.style.display='none'; });
-  if(catNewName) catNewName.addEventListener('keydown', function(e){ if(e.key==='Enter') window._savePeopleCatNew(); if(e.key==='Escape'){ var f=document.getElementById('peopleCatNewForm'); if(f) f.style.display='none'; } });
-
-  // ── Messages ───────────────────────────────────────────────
-  var TYPE_LABEL={morning:'☀️ Morning',evening:'🌙 Evening',proactive:'💬 Esav','people-reminder':'👥 Reminder','morning-briefing':'☀️ Morning'};
-
-  async function _loadMessages(){
-    var el=document.getElementById('remindersList'); if(!el) return;
-    el.innerHTML='<div class="stl-empty" style="padding:12px 0">Loading…</div>';
-    try {
-      var res=await fetch(ESAV_URL+'/esav/messages');
-      _renderMessages(await res.json());
-    } catch(e){ el.innerHTML='<div class="stl-empty">Could not load messages.</div>'; }
-  }
-
-  function _renderMessages(msgs){
-    var el=document.getElementById('remindersList'); if(!el) return;
-    if(!msgs.length){ el.innerHTML='<div class="stl-empty">No messages yet. Morning and evening briefs appear here.</div>'; return; }
-    el.innerHTML=msgs.slice(0,50).map(function(m){
-      var label=TYPE_LABEL[m.type]||'💬 Esav';
-      var date=m.ts?new Date(m.ts).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
-      return '<div class="esav-log-item'+(m.read?'':' unread')+'">'+
-        '<div class="esav-log-meta"><span class="esav-log-type">'+label+'</span><span class="esav-log-date">'+escHtml(date)+'</span></div>'+
-        '<div class="esav-log-body">'+escHtml(m.body||'')+'</div>'+
-      '</div>';
-    }).join('');
-  }
-
-  function _clearMsgBadge(){ var b=document.getElementById('esavMsgBadge'); if(b) b.style.display='none'; }
-
-  // ── Push registration ──────────────────────────────────────
-  async function _registerPush(){
-    if(!('serviceWorker' in navigator)||!('PushManager' in window)) return;
-    try {
-      var perm=await Notification.requestPermission(); if(perm!=='granted') return;
-      var reg=await navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'});
-      if(!reg.active){
-        var sw=reg.installing||reg.waiting;
-        if(sw) await new Promise(function(resolve){ sw.addEventListener('statechange',function(e){ if(e.target.state==='activated') resolve(); }); setTimeout(resolve,6000); });
-        reg=(await navigator.serviceWorker.getRegistration())||reg;
+  // ── Person add form ──────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', function(){
+    var personAddBtn=document.getElementById('esavPersonAddBtn');
+    var personName=document.getElementById('esavPersonName');
+    var personFreqNum=document.getElementById('esavPersonFreqNum');
+    var personFreqUnit=document.getElementById('esavPersonFreqUnit');
+    if(personAddBtn && !personAddBtn._initDone){
+      personAddBtn._initDone=true;
+      function doAdd(){
+        var name=personName?personName.value.trim():''; if(!name) return;
+        var freq=_freqToDays(personFreqNum?personFreqNum.value:2, personFreqUnit?personFreqUnit.value:'weeks');
+        _peopleCache.push({id:'p_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),name:name,frequencyDays:freq,lastContact:null,contactHistory:[],categories:[]});
+        if(personName) personName.value='';
+        if(personFreqNum) personFreqNum.value='2';
+        if(personFreqUnit) personFreqUnit.value='weeks';
+        _savePeople(_peopleCache); _renderPeople(_peopleCache);
       }
-      var existing=await reg.pushManager.getSubscription();
-      if(existing){ _sendSubToServer(existing); return; }
-      var keyRes=await fetch(ESAV_URL+'/push/vapid-key'), keyData=await keyRes.json();
-      var sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:_urlBase64ToUint8Array(keyData.key)});
-      _sendSubToServer(sub);
-    } catch(e){}
-  }
-  async function _sendSubToServer(sub){
-    try{ await fetch(ESAV_URL+'/push/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(sub)}); }catch(e){}
-  }
-  function _urlBase64ToUint8Array(b64){
-    var padding='='.repeat((4-b64.length%4)%4), base64=(b64+padding).replace(/-/g,'+').replace(/_/g,'/');
-    var raw=atob(base64), output=new Uint8Array(raw.length);
-    for(var i=0;i<raw.length;i++) output[i]=raw.charCodeAt(i);
-    return output;
-  }
-
-  // ── FAB: hide on Esav tab, show elsewhere ─────────────────
-  setInterval(function(){
-    var rem=document.getElementById('remindersView');
-    var onEsav=rem&&rem.classList.contains('active');
-    fab.style.display=onEsav?'none':'flex';
-  },400);
-
-  // ── Auto-load Goals when Esav tab opens ───────────────────
-  window._esavSync=function(cb){ if(window._pollForUpdates) _pollForUpdates(); if(cb) setTimeout(cb,1500); };
-
-  (function _watchEsavTab(){
-    var prev=false;
-    setInterval(function(){
-      var rem=document.getElementById('remindersView');
-      var active=rem&&rem.classList.contains('active');
-      if(active&&!prev){ _loadGoals(); prev=true; }
-      if(!active) prev=false;
-    },300);
-  })();
-
+      personAddBtn.addEventListener('click', doAdd);
+      if(personName) personName.addEventListener('keydown',function(e){if(e.key==='Enter') doAdd();});
+    }
+    var catNewSave=document.getElementById('peopleCatNewSave');
+    var catNewCancel=document.getElementById('peopleCatNewCancel');
+    var catNewName=document.getElementById('peopleCatNewName');
+    if(catNewSave&&!catNewSave._initDone){catNewSave._initDone=true;catNewSave.addEventListener('click',window._savePeopleCatNew);}
+    if(catNewCancel&&!catNewCancel._initDone){catNewCancel._initDone=true;catNewCancel.addEventListener('click',function(){var f=document.getElementById('peopleCatNewForm');if(f)f.style.display='none';});}
+    if(catNewName&&!catNewName._initDone){catNewName._initDone=true;catNewName.addEventListener('keydown',function(e){if(e.key==='Enter')window._savePeopleCatNew();if(e.key==='Escape'){var f=document.getElementById('peopleCatNewForm');if(f)f.style.display='none';}});}
+  });
 })();

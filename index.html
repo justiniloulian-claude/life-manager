@@ -43,71 +43,12 @@
       <button class="header-nav-tab" data-page="notes">Notes</button>
       <button class="header-nav-tab" data-page="learning">Learning</button>
       <button class="header-nav-tab" data-page="financial">Financial</button>
+      <button class="header-nav-tab" data-page="goals">Goals</button>
+      <button class="header-nav-tab" data-page="people">People</button>
     </nav>
     <button id="darkModeToggle" class="btn-nav header-dark-toggle" title="Toggle dark mode">🌙</button>
   </div>
 </header>
-
-<!-- ===== ESAV BOTTOM SHEET ===== -->
-<div id="esavSheetBackdrop" class="esav-sheet-backdrop"></div>
-<div id="esavSheet" class="esav-sheet">
-  <div class="esav-sheet-handle"></div>
-  <div class="esav-sheet-body">
-    <!-- Idle: mic button -->
-    <div id="esavSheetIdle" class="esav-sheet-state">
-      <button id="esavSheetMicBtn" class="esav-sheet-mic-btn" title="Tap to speak">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="9" y1="22" x2="15" y2="22"/></svg>
-      </button>
-      <p class="esav-sheet-hint">Tap to speak</p>
-    </div>
-    <!-- Recording state -->
-    <div id="esavSheetRecState" class="esav-sheet-state" style="display:none">
-      <div class="esav-sheet-rec-row">
-        <span class="esav-sheet-rec-dot"></span>
-        <span id="esavSheetTimer" class="esav-sheet-rec-timer">0:00</span>
-        <span id="esavSheetRecLabel" class="esav-sheet-rec-label">Recording</span>
-      </div>
-      <div class="esav-sheet-ctrl-row">
-        <button id="esavSheetPauseBtn" class="esav-sheet-ctrl-btn">⏸ Pause</button>
-        <button id="esavSheetStopBtn" class="esav-sheet-ctrl-btn esav-sheet-stop-btn">⏹ Stop</button>
-        <button id="esavSheetCancelRec" class="esav-sheet-ctrl-btn esav-sheet-cancel-btn">✕ Cancel</button>
-      </div>
-    </div>
-    <!-- Playback: review before sending -->
-    <div id="esavSheetPlaybackState" class="esav-sheet-state" style="display:none">
-      <div class="esav-sheet-playback-bar">
-        <button id="esavSheetPlayBtn" class="esav-sheet-play-btn">▶</button>
-        <div class="esav-sheet-waveform">
-          <div id="esavSheetProgressBar" class="esav-sheet-progress-bar"></div>
-        </div>
-        <span id="esavSheetDuration" class="esav-sheet-duration">0:00</span>
-      </div>
-      <div class="esav-sheet-ctrl-row">
-        <button id="esavSheetRerecordBtn" class="esav-sheet-ctrl-btn">🔄 Re-record</button>
-        <button id="esavSheetSendVoiceBtn" class="esav-sheet-ctrl-btn esav-sheet-stop-btn">Send ↑</button>
-      </div>
-      <audio id="esavSheetAudio" style="display:none"></audio>
-    </div>
-    <!-- Thinking -->
-    <div id="esavSheetThinkingState" class="esav-sheet-state" style="display:none">
-      <div class="esav-sheet-dots">
-        <span></span><span></span><span></span>
-      </div>
-      <p class="esav-sheet-hint">Esav is thinking…</p>
-    </div>
-    <!-- Response -->
-    <div id="esavSheetResponseState" class="esav-sheet-state" style="display:none">
-      <p id="esavSheetResponseText" class="esav-sheet-response-text"></p>
-      <button id="esavSheetDoneBtn" class="esav-sheet-ctrl-btn esav-sheet-stop-btn" style="margin-top:12px">Done ✓</button>
-    </div>
-    <!-- Text input — always visible except thinking/response -->
-    <div id="esavSheetTextRow" class="esav-sheet-text-row">
-      <textarea id="esavSheetTextInput" class="esav-sheet-text-input" placeholder="Or type a message…" rows="1"></textarea>
-      <button id="esavSheetSendTextBtn" class="esav-sheet-send-text-btn">↑</button>
-    </div>
-  </div>
-</div>
-<button id="esavFab" class="esav-fab" style="display:flex" title="Esav — your personal assistant">E</button>
 
 <!-- ===== DASHBOARD PAGE ===== -->
 <div id="page-dashboard" class="page active">
@@ -124,7 +65,7 @@
         <button class="dash-pill" id="pillFuture">Future</button>
         <button class="dash-pill" id="pillCheshbon">Cheshbon</button>
         <button class="dash-pill" id="pillHealth">Physical Health</button>
-        <button class="dash-pill" id="pillReminders">Esav<span id="esavBadge" class="esav-badge" style="display:none"></span></button>
+
       </div>
     </div>
     <div class="dash-subnav-right">
@@ -426,96 +367,6 @@
 
   </div>
 
-  <!-- People / Relationship CRM View -->
-  <div id="peopleView" class="view">
-    <div class="list-page-header">
-      <div>
-        <h2 class="list-page-title">People</h2>
-        <p class="list-page-subtitle">Stay in touch — tell Esav to add contacts and log when you see someone</p>
-      </div>
-    </div>
-    <div id="peopleList" class="crm-list"></div>
-  </div>
-
-  <!-- Esav Tab -->
-  <div id="remindersView" class="view esav-view">
-    <div class="list-page-header">
-      <div>
-        <h2 class="list-page-title">Esav</h2>
-        <p class="list-page-subtitle">Your personal assistant</p>
-      </div>
-    </div>
-    <!-- Sub-tab bar -->
-    <div class="esav-subtab-bar">
-      <button class="esav-subtab active" data-tab="goals">Goals</button>
-      <button class="esav-subtab" data-tab="people">People</button>
-      <button class="esav-subtab" data-tab="messages">Messages<span id="esavMsgBadge" class="esav-msg-badge" style="display:none"></span></button>
-      <button class="esav-subtab" data-tab="chat">Chat</button>
-    </div>
-    <!-- Goals panel -->
-    <div id="esavGoalsPanel" class="esav-panel">
-      <div id="esavGoalsList" class="esav-goals-list"></div>
-      <div class="esav-add-row" style="gap:6px">
-        <input id="esavGoalInput" class="esav-add-input" placeholder="Add a goal…" type="text" style="flex:1">
-        <button id="esavGoalAddBtn" class="esav-add-btn">+ Add</button>
-      </div>
-      <div class="esav-add-row esav-goal-meta-row" style="gap:6px;margin-top:4px">
-        <select id="esavGoalTimeframe" class="esav-add-select">
-          <option value="yearly">Yearly</option>
-          <option value="monthly" selected>Monthly</option>
-          <option value="weekly">Weekly</option>
-        </select>
-        <select id="esavGoalPeriod" class="esav-add-input" style="flex:1;min-width:130px"></select>
-        <input id="esavGoalPeriodWeek" class="esav-add-input" type="week" style="flex:1;min-width:130px;display:none">
-        <select id="esavGoalCategory" class="esav-add-select">
-          <option value="">Category</option>
-          <option value="health">Health</option>
-          <option value="spiritual">Spiritual</option>
-          <option value="learning">Learning</option>
-          <option value="relationships">Relationships</option>
-          <option value="work">Work</option>
-          <option value="personal">Personal</option>
-        </select>
-      </div>
-    </div>
-    <!-- People panel -->
-    <div id="esavPeoplePanel" class="esav-panel" style="display:none">
-      <div class="people-cat-strip" id="peopleCatStrip">
-        <button class="people-cat-filter active" data-cat="">All</button>
-        <button class="people-cat-add-btn" id="peopleCatAddBtn">+ Category</button>
-      </div>
-      <div class="people-cat-new-form" id="peopleCatNewForm" style="display:none">
-        <input id="peopleCatNewName" class="esav-add-input" placeholder="Category name…" type="text" style="flex:1">
-        <button id="peopleCatNewSave" class="esav-add-btn">Add</button>
-        <button id="peopleCatNewCancel" class="btn-cancel" style="padding:6px 10px;font-size:13px">Cancel</button>
-      </div>
-      <div id="esavPeopleList" class="esav-people-list"></div>
-      <div class="esav-add-row">
-        <input id="esavPersonName" class="esav-add-input" placeholder="Name" type="text" style="flex:2">
-        <input id="esavPersonFreqNum" class="esav-add-input" type="number" min="1" value="2" style="flex:0.7;min-width:52px;text-align:center">
-        <select id="esavPersonFreqUnit" class="esav-add-select">
-          <option value="weeks" selected>weeks</option>
-          <option value="months">months</option>
-          <option value="days">days</option>
-          <option value="years">years</option>
-        </select>
-        <button id="esavPersonAddBtn" class="esav-add-btn">+ Add</button>
-      </div>
-    </div>
-    <!-- Messages panel -->
-    <div id="esavMessagesPanel" class="esav-panel" style="display:none">
-      <div id="remindersList" class="esav-log-list"></div>
-    </div>
-    <!-- Chat panel -->
-    <div id="esavChatPanel" class="esav-panel esav-chat-panel" style="display:none">
-      <div id="esavTabMessages" class="esav-tab-messages"></div>
-      <div class="esav-tab-reply-bar">
-        <button id="esavTabMicBtn" class="esav-tab-mic-btn" title="Tap to speak">🎤</button>
-        <textarea id="esavTabInput" class="esav-tab-input" placeholder="Message Esav…" rows="1"></textarea>
-        <button id="esavTabSend" class="esav-tab-send-btn" title="Send">↑</button>
-      </div>
-    </div>
-  </div>
 
 </div>
 
@@ -553,6 +404,70 @@
     <div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
   </div>
   <div id="calGrid" class="cal-grid"></div>
+</div>
+
+<!-- ===== GOALS PAGE ===== -->
+<div id="page-goals" class="page">
+  <div class="list-page-header">
+    <div>
+      <h2 class="list-page-title">Goals</h2>
+      <p class="list-page-subtitle">Track your yearly, monthly and weekly goals</p>
+    </div>
+  </div>
+  <div id="esavGoalsList" class="esav-goals-list"></div>
+  <div class="esav-add-row" style="gap:6px">
+    <input id="esavGoalInput" class="esav-add-input" placeholder="Add a goal…" type="text" style="flex:1">
+    <button id="esavGoalAddBtn" class="esav-add-btn">+ Add</button>
+  </div>
+  <div class="esav-add-row esav-goal-meta-row" style="gap:6px;margin-top:4px">
+    <select id="esavGoalTimeframe" class="esav-add-select">
+      <option value="yearly">Yearly</option>
+      <option value="monthly" selected>Monthly</option>
+      <option value="weekly">Weekly</option>
+    </select>
+    <select id="esavGoalPeriod" class="esav-add-input" style="flex:1;min-width:130px"></select>
+    <input id="esavGoalPeriodWeek" class="esav-add-input" type="week" style="flex:1;min-width:130px;display:none">
+    <select id="esavGoalCategory" class="esav-add-select">
+      <option value="">Category</option>
+      <option value="health">Health</option>
+      <option value="spiritual">Spiritual</option>
+      <option value="learning">Learning</option>
+      <option value="relationships">Relationships</option>
+      <option value="work">Work</option>
+      <option value="personal">Personal</option>
+    </select>
+  </div>
+</div>
+
+<!-- ===== PEOPLE PAGE ===== -->
+<div id="page-people" class="page">
+  <div class="list-page-header">
+    <div>
+      <h2 class="list-page-title">People</h2>
+      <p class="list-page-subtitle">Stay in touch — track who you want to connect with and when</p>
+    </div>
+  </div>
+  <div class="people-cat-strip" id="peopleCatStrip">
+    <button class="people-cat-filter active" data-cat="">All</button>
+    <button class="people-cat-add-btn" id="peopleCatAddBtn">+ Category</button>
+  </div>
+  <div class="people-cat-new-form" id="peopleCatNewForm" style="display:none">
+    <input id="peopleCatNewName" class="esav-add-input" placeholder="Category name…" type="text" style="flex:1">
+    <button id="peopleCatNewSave" class="esav-add-btn">Add</button>
+    <button id="peopleCatNewCancel" class="btn-cancel" style="padding:6px 10px;font-size:13px">Cancel</button>
+  </div>
+  <div id="esavPeopleList" class="esav-people-list"></div>
+  <div class="esav-add-row">
+    <input id="esavPersonName" class="esav-add-input" placeholder="Name" type="text" style="flex:2">
+    <input id="esavPersonFreqNum" class="esav-add-input" type="number" min="1" value="2" style="flex:0.7;min-width:52px;text-align:center">
+    <select id="esavPersonFreqUnit" class="esav-add-select">
+      <option value="weeks" selected>weeks</option>
+      <option value="months">months</option>
+      <option value="days">days</option>
+      <option value="years">years</option>
+    </select>
+    <button id="esavPersonAddBtn" class="esav-add-btn">+ Add</button>
+  </div>
 </div>
 
 <!-- ===== NOTES PAGE ===== -->
@@ -1634,6 +1549,12 @@
 
 <!-- More popup (Learning + Financial) -->
 <div id="mobileMoreMenu" class="mob-more-menu" style="display:none">
+  <button class="mob-more-item" onclick="showPage('goals');toggleMobileMore(false)">
+    <span>🎯</span> Goals
+  </button>
+  <button class="mob-more-item" onclick="showPage('people');toggleMobileMore(false)">
+    <span>👥</span> People
+  </button>
   <button class="mob-more-item" onclick="showPage('learning');toggleMobileMore(false)">
     <span>📚</span> Learning
   </button>
@@ -1648,6 +1569,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="app.js?v=215"></script>
+<script src="app.js?v=238"></script>
 </body>
 </html>
