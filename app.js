@@ -673,6 +673,8 @@ document.addEventListener('keydown',function(e){
   else if(k==='k'||k==='K'){showPage('calendar');}                          // K → Calendar
   else if(k==='l'||k==='L'){showPage('learning');}                          // L → Learning
   else if(k==='m'||k==='M'){showPage('financial');}                         // M → Financial (Money)
+  else if(k==='g'||k==='G'){showPage('goals');}                             // G → Goals
+  else if(k==='p'||k==='P'){showPage('people');}                            // P → People
 });
 // Note drag state
 var _draggingNoteId=null;
