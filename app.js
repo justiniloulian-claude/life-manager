@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v239…';
+  b.textContent = 'v240…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v239'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v240'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -2445,6 +2445,10 @@ window.storeJewishMonth = function() {
     _currentAudioBlob = null; _audioChunks = [];
     renderJewishHist();
   };
+  // Last-ditch: if blob wasn't assembled yet but chunks exist, build it now
+  if (!_currentAudioBlob && _audioChunks.length > 0) {
+    _currentAudioBlob = new Blob(_audioChunks, {type: _recordMime || 'audio/webm'});
+  }
   if (_currentAudioBlob) {
     uploadAudioToFirestore(_currentAudioBlob).then(function(key){ doSave(key); }).catch(function(err){
       alert('Audio upload failed: ' + (err.message || err) + '\nYour entry was NOT saved. Please try again.');
