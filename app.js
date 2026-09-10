@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v238…';
+  b.textContent = 'v239…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v238'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v239'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -2380,14 +2380,18 @@ window.pauseRecording = function() {
 };
 
 window.stopRecording = function() {
-  if (_mediaRecorder && _mediaRecorder.state !== 'inactive') _mediaRecorder.stop();
   clearInterval(_recordTimerInt);
+  var timerEl = document.getElementById('recordTimer');
+  if (timerEl) { timerEl.style.display = 'none'; timerEl.style.opacity = '1'; }
+  // Show a brief "Processing…" indicator while waiting for the stop event
+  var ap = document.getElementById('audioPlayback');
+  if (ap && _mediaRecorder && _mediaRecorder.state !== 'inactive') {
+    ap.innerHTML = '<span style="font-size:13px;color:#9ca3af;padding:6px 0;display:block">Processing recording…</span>';
+  }
+  if (_mediaRecorder && _mediaRecorder.state !== 'inactive') _mediaRecorder.stop();
   document.getElementById('btnStartRecord').style.display  = '';
   document.getElementById('btnStopRecord').style.display   = 'none';
   document.getElementById('btnPauseRecord').style.display  = 'none';
-  document.getElementById('recordTimer').style.display     = 'none';
-  var timerEl = document.getElementById('recordTimer');
-  if (timerEl) timerEl.style.opacity = '1';
 };
 
 window.discardRecording = function() {
@@ -2412,6 +2416,21 @@ window.uploadAudioFile = function(input) {
 window.storeJewishMonth = function() {
   var month = (document.getElementById('jewishMonthInput')||{}).value.trim();
   if (!month) { alert('Please enter a Jewish month name.'); return; }
+
+  // Guard: if recorder is still active (user clicked Save too fast after Stop),
+  // wait for the stop event to fire and then retry automatically.
+  if (_mediaRecorder && _mediaRecorder.state !== 'inactive') {
+    var _onStop = function() {
+      _mediaRecorder.removeEventListener('stop', _onStop);
+      window.storeJewishMonth();
+    };
+    _mediaRecorder.addEventListener('stop', _onStop);
+    if (_mediaRecorder.state === 'recording' || _mediaRecorder.state === 'paused') {
+      _mediaRecorder.stop();
+    }
+    return;
+  }
+
   var doSave = function(audioKey) {
     var data = getData();
     data.monthlyJewishHistory.unshift({
@@ -2423,12 +2442,12 @@ window.storeJewishMonth = function() {
     var ji = document.getElementById('jewishMonthInput'); if (ji) ji.value = '';
     var ap = document.getElementById('audioPlayback'); if (ap) ap.innerHTML = '';
     var db = document.getElementById('btnDiscardRecording'); if (db) db.style.display = 'none';
-    _currentAudioBlob = null;
+    _currentAudioBlob = null; _audioChunks = [];
     renderJewishHist();
   };
   if (_currentAudioBlob) {
     uploadAudioToFirestore(_currentAudioBlob).then(function(key){ doSave(key); }).catch(function(err){
-      alert('Save failed: ' + (err.message || err));
+      alert('Audio upload failed: ' + (err.message || err) + '\nYour entry was NOT saved. Please try again.');
     });
   } else {
     doSave('');
