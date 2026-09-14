@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v249…';
+  b.textContent = 'v250…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v249'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v250'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -516,50 +516,54 @@ const state = {
 // ============================================================
 // DATA
 // ============================================================
+// Safe localStorage read — returns dflt if key is missing or JSON is malformed
+function _sg(key, dflt) {
+  try { var v=localStorage.getItem(key); return v!==null ? JSON.parse(v) : dflt; } catch(e){ return dflt; }
+}
 function getData() {
   return {
-    tasks:       JSON.parse(localStorage.getItem('dm_tasks')       || '{}'),
-    routine:     JSON.parse(localStorage.getItem('dm_routine')     || '[]'),
-    calEvents:   JSON.parse(localStorage.getItem('dm_calEvents')   || '[]'),
-    notes:       JSON.parse(localStorage.getItem('dm_notes')       || '[]'),
-    folders:     JSON.parse(localStorage.getItem('dm_folders')     || '[]'),
-    shortterm:   JSON.parse(localStorage.getItem('dm_shortterm')   || '[]'),
-    longterm:    JSON.parse(localStorage.getItem('dm_longterm')    || '[]'),
-    reminders:   JSON.parse(localStorage.getItem('dm_reminders')   || '[]'),
-    learning:    JSON.parse(localStorage.getItem('dm_learning')    || '{}'),
-    finIncome:   JSON.parse(localStorage.getItem('dm_fin_income')   || '[]'),
-    finExpenses: JSON.parse(localStorage.getItem('dm_fin_expenses') || '[]'),
-    finBonuses:  JSON.parse(localStorage.getItem('dm_fin_bonuses')  || '[]'),
-    finWishlist: JSON.parse(localStorage.getItem('dm_fin_wishlist') || '[]'),
+    tasks:       _sg('dm_tasks',       {}),
+    routine:     _sg('dm_routine',     []),
+    calEvents:   _sg('dm_calEvents',   []),
+    notes:       _sg('dm_notes',       []),
+    folders:     _sg('dm_folders',     []),
+    shortterm:   _sg('dm_shortterm',   []),
+    longterm:    _sg('dm_longterm',    []),
+    reminders:   _sg('dm_reminders',   []),
+    learning:    _sg('dm_learning',    {}),
+    finIncome:   _sg('dm_fin_income',  []),
+    finExpenses: _sg('dm_fin_expenses',[]),
+    finBonuses:  _sg('dm_fin_bonuses', []),
+    finWishlist: _sg('dm_fin_wishlist',[]),
     finPoints:   0,
-    finBank:     JSON.parse(localStorage.getItem('dm_fin_bank')     || '0'),
-    moneymaking:      JSON.parse(localStorage.getItem('dm_moneymaking')       || '[]'),
-    routineOverrides:      JSON.parse(localStorage.getItem('dm_routine_overrides'))          || {},
-    gratitude:             JSON.parse(localStorage.getItem('dm_gratitude'))                  || Array(10).fill(''),
-    ayinTov:               JSON.parse(localStorage.getItem('dm_ayin_tov'))                   || Array(5).fill(''),
-    learned:               localStorage.getItem('dm_learned')                                || '',
-    feeling:               localStorage.getItem('dm_feeling')                                || '',
-    reflHistory:           JSON.parse(localStorage.getItem('dm_refl_history'))               || [],
-    cheshbonItems:         JSON.parse(localStorage.getItem('dm_cheshbon_items'))             || [],
-    cheshbonChecks:        JSON.parse(localStorage.getItem('dm_cheshbon_checks'))            || {},
-    cheshbonWeekHistory:   JSON.parse(localStorage.getItem('dm_cheshbon_week_history'))      || [],
-    dietPlan:              JSON.parse(localStorage.getItem('dm_diet_plan'))                  || {},
-    healthWater:           JSON.parse(localStorage.getItem('dm_health_water'))               || {},
-    activityPlan:          JSON.parse(localStorage.getItem('dm_activity_plan'))              || {},
-    activityDone:          JSON.parse(localStorage.getItem('dm_activity_done'))              || {},
-    weeklyItems:           JSON.parse(localStorage.getItem('dm_weekly_items'))               || [],
-    weeklyScores:          JSON.parse(localStorage.getItem('dm_weekly_scores'))              || {},
-    weeklyHistory:         JSON.parse(localStorage.getItem('dm_weekly_history'))             || [],
-    weeklyLastSunday:      localStorage.getItem('dm_weekly_last_sunday')                     || '',
-    freeReflHistory:       JSON.parse(localStorage.getItem('dm_free_refl_history'))          || [],
-    monthlyJewishHistory:  JSON.parse(localStorage.getItem('dm_monthly_jewish_history'))     || [],
-    monthlySecularHistory: JSON.parse(localStorage.getItem('dm_monthly_secular_history'))    || [],
-    monthlyJewishDraft:    JSON.parse(localStorage.getItem('dm_monthly_jewish_draft'))       || {month:''},
-    monthlySecularDraft:   JSON.parse(localStorage.getItem('dm_monthly_secular_draft'))      || {month:'',text:''},
-    weightEntries:    JSON.parse(localStorage.getItem('dm_weight_entries')      || '{}'),
-    weightGoal:       JSON.parse(localStorage.getItem('dm_weight_goal')         || 'null'),
-    weightHistory:    JSON.parse(localStorage.getItem('dm_weight_history')      || '[]'),
-    weightLastSunday: localStorage.getItem('dm_weight_last_sunday')             || '',
+    finBank:     _sg('dm_fin_bank',    0),
+    moneymaking:          _sg('dm_moneymaking',            []),
+    routineOverrides:     _sg('dm_routine_overrides',      {}),
+    gratitude:            _sg('dm_gratitude',              Array(10).fill('')),
+    ayinTov:              _sg('dm_ayin_tov',               Array(5).fill('')),
+    learned:              localStorage.getItem('dm_learned')  || '',
+    feeling:              localStorage.getItem('dm_feeling')  || '',
+    reflHistory:          _sg('dm_refl_history',           []),
+    cheshbonItems:        _sg('dm_cheshbon_items',         []),
+    cheshbonChecks:       _sg('dm_cheshbon_checks',        {}),
+    cheshbonWeekHistory:  _sg('dm_cheshbon_week_history',  []),
+    dietPlan:             _sg('dm_diet_plan',              {}),
+    healthWater:          _sg('dm_health_water',           {}),
+    activityPlan:         _sg('dm_activity_plan',          {}),
+    activityDone:         _sg('dm_activity_done',          {}),
+    weeklyItems:          _sg('dm_weekly_items',           []),
+    weeklyScores:         _sg('dm_weekly_scores',          {}),
+    weeklyHistory:        _sg('dm_weekly_history',         []),
+    weeklyLastSunday:     localStorage.getItem('dm_weekly_last_sunday') || '',
+    freeReflHistory:      _sg('dm_free_refl_history',      []),
+    monthlyJewishHistory: _sg('dm_monthly_jewish_history', []),
+    monthlySecularHistory:_sg('dm_monthly_secular_history',[]),
+    monthlyJewishDraft:   _sg('dm_monthly_jewish_draft',   {month:''}),
+    monthlySecularDraft:  _sg('dm_monthly_secular_draft',  {month:'',text:''}),
+    weightEntries:        _sg('dm_weight_entries',         {}),
+    weightGoal:           _sg('dm_weight_goal',            null),
+    weightHistory:        _sg('dm_weight_history',         []),
+    weightLastSunday:     localStorage.getItem('dm_weight_last_sunday') || '',
   };
 }
 // Every save function calls _syncSave(key, string).
