@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v245…';
+  b.textContent = 'v246…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v245'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v246'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -5022,7 +5022,6 @@ function openEditCalEvent(id, ds) {
   state.pendingEditCalDs=ds||ev.date;
   document.getElementById('calEventModalTitle').textContent='Edit Event';
   populateCalEventUI(Object.assign({},ev,{date:ds||ev.date}));
-  document.getElementById('calEventAddToDashboard').checked=false;
   closeModal('dayDetailModal');
   openModal('calEventModal');
   setTimeout(function(){document.getElementById('calEventTitle').focus();},80);
