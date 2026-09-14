@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v240…';
+  b.textContent = 'v241…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v240'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v241'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -6924,6 +6924,7 @@ window._initGoalsUI = _initGoalsUI;
     inp.value='';
     var f=document.getElementById('peopleCatNewForm'); if(f) f.style.display='none';
     _renderCatStrip(); _renderPeople(_peopleCache);
+    if(window._renderAddTagRow) window._renderAddTagRow();
   };
   window._openCatPicker=function(pid){
     if(_openCatPickerId===pid){ _openCatPickerId=null; _renderPeople(_peopleCache); return; }
@@ -6944,6 +6945,8 @@ window._initGoalsUI = _initGoalsUI;
   function _localNotes(pid){ try{ return JSON.parse(localStorage.getItem('pnotes_'+pid)||'[]'); }catch(e){ return []; } }
   function _saveLocalNote(pid,ts,note){ var arr=_localNotes(pid); arr.unshift({ts:ts,note:note}); try{ localStorage.setItem('pnotes_'+pid,JSON.stringify(arr.slice(0,50))); }catch(e){} }
 
+  var _expandedHistory = {};
+
   function _renderPeople(people){
     var el=document.getElementById('esavPeopleList'); if(!el) return;
     var allCats=_getPeopleCats(); var catMap={}; allCats.forEach(function(c){ catMap[c.id]=c; });
@@ -6958,56 +6961,100 @@ window._initGoalsUI = _initGoalsUI;
     el.innerHTML=sorted.map(function(p){
       var daysOverdue=p.lastContact?Math.floor((now-p.lastContact)/86400000)-p.frequencyDays:999;
       var overdue=daysOverdue>0; var urgent=!p.lastContact||daysOverdue>7;
-      var cls=urgent?'esav-person-urgent':overdue?'esav-person-overdue':'esav-person-ok';
+      var statusCls=urgent?'pc-urgent':overdue?'pc-overdue':'pc-ok';
       var nextDate=_nextContactDate(p.lastContact,p.frequencyDays);
       var statusText=!p.lastContact?'Never contacted':overdue?(daysOverdue+' day'+(daysOverdue>1?'s':'')+' overdue'):(nextDate?'Next: '+nextDate:'On track');
       var last=_daysAgoStr(p.lastContact);
+      var freqLabel = p.frequencyDays >= 365 ? Math.round(p.frequencyDays/365)+'y'
+                    : p.frequencyDays >= 28  ? Math.round(p.frequencyDays/30)+'mo'
+                    : p.frequencyDays >= 7   ? Math.round(p.frequencyDays/7)+'w'
+                    : p.frequencyDays+'d';
+      var initials=(p.name||'?').trim().split(/\s+/).map(function(w){return w[0];}).slice(0,2).join('').toUpperCase();
       var history=_localNotes(p.id).concat((p.contactHistory||[]).filter(function(h){var lts=Math.round(h.ts/1000);return !_localNotes(p.id).some(function(l){return Math.round(l.ts/1000)===lts;});})).sort(function(a,b){return b.ts-a.ts;});
-      var entriesHtml=history.length
-        ? history.map(function(h){
-            var editingNote=_editingNoteKey&&_editingNoteKey.pid===p.id&&_editingNoteKey.ts===h.ts;
-            var noteEl=editingNote
-              ? '<input class="esav-note-edit-input" id="noteEdit_'+p.id+'_'+h.ts+'" value="'+escHtml(h.note||'')+'" onkeydown="if(event.key===\'Enter\')window._esavSaveNoteEdit(\''+p.id+'\','+h.ts+');if(event.key===\'Escape\')window._esavCancelNoteEdit()" />'
-                +'<button class="esav-note-edit-save" onclick="window._esavSaveNoteEdit(\''+p.id+'\','+h.ts+')">✓</button>'
-                +'<button class="esav-note-edit-cancel" onclick="window._esavCancelNoteEdit()">✕</button>'
-              : (h.note?'<span class="esav-contact-entry-note">'+escHtml(h.note)+'</span>':'<span class="esav-contact-entry-note esav-contact-entry-no-note">—</span>')+
-                '<button class="esav-note-edit-btn" onclick="window._esavEditNote(\''+p.id+'\','+h.ts+')" title="Edit">✎</button>'+
-                '<button class="esav-note-edit-btn esav-note-del-btn" onclick="window._esavDeleteNote(\''+p.id+'\','+h.ts+')" title="Delete">🗑</button>';
-            return '<div class="esav-contact-entry'+(editingNote?' editing':'')+'">'+
-              '<span class="esav-contact-entry-date">'+new Date(h.ts).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+'</span>'+
-              noteEl+'</div>';
-          }).join('')
-        : '<div class="esav-contact-entry-no-note" style="padding:2px 0">No conversations logged yet</div>';
       var editing=_editingPersonId===p.id;
-      var pCats=(p.categories||[]).map(function(cid){var c=catMap[cid];if(!c)return '';return '<span class="esav-person-cat-pill" style="background:'+c.color+'22;color:'+c.color+'">'+escHtml(c.name)+'<span class="cat-remove" onclick="event.stopPropagation();window._togglePersonCat(\''+p.id+'\',\''+cid+'\')">×</span></span>';}).join('');
-      var assignBtn='<button class="esav-person-cat-assign-btn" onclick="event.stopPropagation();window._openCatPicker(\''+p.id+'\')">+ tag</button>';
+      var expanded=!!_expandedHistory[p.id];
+
+      // Avatar
+      var avatar='<div class="pc-avatar '+statusCls+'">'+initials+'</div>';
+
+      // Name (editable)
+      var nameEl=editing
+        ? '<input class="pc-name-input" id="esavPersonNameEdit_'+p.id+'" value="'+escHtml(p.name)+'" onkeydown="if(event.key===\'Enter\')window._esavSavePersonEdit(\''+p.id+'\');if(event.key===\'Escape\')window._esavCancelPersonEdit()" />'
+        : '<span class="pc-name">'+escHtml(p.name)+'</span>';
+
+      // Category pills (removable)
+      var catPills=(p.categories||[]).map(function(cid){
+        var c=catMap[cid]; if(!c) return '';
+        return '<span class="pc-cat-pill" style="background:'+c.color+'18;color:'+c.color+';border-color:'+c.color+'44">'+escHtml(c.name)+'<button onclick="event.stopPropagation();window._togglePersonCat(\''+p.id+'\',\''+cid+'\')" style="background:none;border:none;cursor:pointer;color:inherit;font-size:10px;padding:0 0 0 3px;opacity:0.7">×</button></span>';
+      }).join('');
+
+      // Inline tag picker (shown when open)
       var openPicker=_openCatPickerId===p.id;
-      var pickerHtml=openPicker?'<div class="esav-cat-picker">'+allCats.map(function(c){var sel=(p.categories||[]).indexOf(c.id)>=0;return '<button class="esav-cat-pick-btn'+(sel?' selected':'')+'" onclick="window._togglePersonCat(\''+p.id+'\',\''+c.id+'\')" style="background:'+(sel?c.color:'transparent')+';border-color:'+c.color+';color:'+(sel?'#fff':c.color)+'" title="'+escHtml(c.name)+'">'+escHtml(c.name)+'</button>';}).join('')+'</div>':'';
-      var noteInp='<div class="esav-note-input-row"><input class="esav-add-input" id="esavNoteInput_'+p.id+'" placeholder="Add a note…" style="flex:1" onkeydown="if(event.key===\'Enter\')window._esavLogConvo(\''+p.id+'\')"><button class="esav-add-btn" onclick="window._esavLogConvo(\''+p.id+'\')">Log</button></div>';
-      var nameEl=editing?'<input class="esav-goal-edit-input" id="esavPersonNameEdit_'+p.id+'" value="'+escHtml(p.name)+'" style="width:120px;margin-right:6px" onkeydown="if(event.key===\'Enter\')window._esavSavePersonEdit(\''+p.id+'\');if(event.key===\'Escape\')window._esavCancelPersonEdit()" />':'<span class="esav-person-name">'+escHtml(p.name)+'</span>';
-      return '<div class="esav-person-item '+cls+'">'
-        +'<div class="esav-person-header">'
-          +'<div class="esav-person-info">'+nameEl+'<span class="esav-person-status">'+escHtml(statusText)+'</span></div>'
-          +'<div class="esav-person-actions">'
-            +(editing?'<button class="esav-goal-check" onclick="window._esavSavePersonEdit(\''+p.id+'\')">✓</button><button class="btn-icon" onclick="window._esavCancelPersonEdit()">✕</button>':'')
-            +(!editing?'<button class="btn-icon" onclick="window._esavEditPerson(\''+p.id+'\')">✏️</button>':'')
-            +'<button class="btn-icon" onclick="window._deletePerson(\''+p.id+'\')">🗑</button>'
+      var pickerBtnLabel=openPicker?'Done':'+ tag';
+      var pickerHtml=openPicker&&allCats.length
+        ? '<div class="pc-tag-picker">'+allCats.map(function(c){
+            var sel=(p.categories||[]).indexOf(c.id)>=0;
+            return '<button class="pc-tag-pick-btn'+(sel?' sel':'')+'" onclick="window._togglePersonCat(\''+p.id+'\',\''+c.id+'\')" style="border-color:'+c.color+';color:'+(sel?'#fff':c.color)+';background:'+(sel?c.color:'transparent')+'">'+escHtml(c.name)+'</button>';
+          }).join('')+'</div>'
+        : '';
+
+      // Action icons
+      var actionBtns=editing
+        ? '<button class="pc-icon-btn" onclick="window._esavSavePersonEdit(\''+p.id+'\')" title="Save">✓</button><button class="pc-icon-btn" onclick="window._esavCancelPersonEdit()" title="Cancel">✕</button>'
+        : '<button class="pc-icon-btn" onclick="window._esavEditPerson(\''+p.id+'\')" title="Edit name">✏️</button><button class="pc-icon-btn pc-del-btn" onclick="window._deletePerson(\''+p.id+'\')" title="Delete">🗑</button>';
+
+      // History entries
+      var historyHtml='';
+      if(expanded && history.length){
+        historyHtml=history.map(function(h){
+          var editingNote=_editingNoteKey&&_editingNoteKey.pid===p.id&&_editingNoteKey.ts===h.ts;
+          var noteEl=editingNote
+            ? '<input class="esav-note-edit-input" id="noteEdit_'+p.id+'_'+h.ts+'" value="'+escHtml(h.note||'')+'" onkeydown="if(event.key===\'Enter\')window._esavSaveNoteEdit(\''+p.id+'\','+h.ts+');if(event.key===\'Escape\')window._esavCancelNoteEdit()" /><button class="esav-note-edit-save" onclick="window._esavSaveNoteEdit(\''+p.id+'\','+h.ts+')">✓</button><button class="esav-note-edit-cancel" onclick="window._esavCancelNoteEdit()">✕</button>'
+            : '<span class="pc-hist-note">'+(h.note?escHtml(h.note):'<em style="color:#bbb">no note</em>')+'</span>'
+              +'<button class="esav-note-edit-btn" onclick="window._esavEditNote(\''+p.id+'\','+h.ts+')" title="Edit">✎</button>'
+              +'<button class="esav-note-edit-btn" onclick="window._esavDeleteNote(\''+p.id+'\','+h.ts+')" title="Delete" style="color:#ef4444">🗑</button>';
+          return '<div class="pc-hist-row'+(editingNote?' editing':'')+'"><span class="pc-hist-date">'+new Date(h.ts).toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</span>'+noteEl+'</div>';
+        }).join('');
+      }
+
+      var histToggle=history.length
+        ? '<button class="pc-hist-toggle" onclick="window._togglePersonHistory(\''+p.id+'\')">'+(expanded?'▲ Hide':'▼ '+(history.length)+' conversation'+(history.length>1?'s':''))+'</button>'
+        : '<span class="pc-hist-toggle pc-hist-toggle-none">No conversations yet</span>';
+
+      return '<div class="pc-card '+statusCls+'">'
+        // Top row: avatar + info + actions
+        +'<div class="pc-row">'
+          +avatar
+          +'<div class="pc-body">'
+            +'<div class="pc-name-row">'+nameEl+catPills+'<button class="pc-tag-btn" onclick="event.stopPropagation();window._openCatPicker(\''+p.id+'\')">'+pickerBtnLabel+'</button></div>'
+            +'<div class="pc-status-row"><span class="pc-status '+statusCls+'">'+escHtml(statusText)+'</span><span class="pc-meta">Last: '+last+' · every '+freqLabel+'</span></div>'
           +'</div>'
+          +'<div class="pc-actions">'+actionBtns+'</div>'
         +'</div>'
-        +'<div class="esav-person-meta">Last: '+last+' · '+Math.round((p.frequencyDays||30)/7)+' wk frequency</div>'
-        +'<div class="esav-person-cats">'+pCats+assignBtn+'</div>'
         +pickerHtml
-        +'<div class="esav-person-history">'+entriesHtml+'</div>'
-        +noteInp
+        // Log row
+        +'<div class="pc-log-row">'
+          +'<input class="pc-log-input" id="esavNoteInput_'+p.id+'" placeholder="What did you talk about?" onkeydown="if(event.key===\'Enter\')window._esavLogConvo(\''+p.id+'\')">'
+          +'<button class="pc-log-btn" onclick="window._esavLogConvo(\''+p.id+'\')">Log</button>'
+        +'</div>'
+        // History
+        +'<div class="pc-hist-footer">'+histToggle+'</div>'
+        +(expanded?'<div class="pc-hist-list">'+historyHtml+'</div>':'')
       +'</div>';
     }).join('');
   }
   window._renderPeople = _renderPeople;
 
+  window._togglePersonHistory = function(pid) {
+    _expandedHistory[pid] = !_expandedHistory[pid];
+    _renderPeople(_peopleCache);
+  };
+
   window._loadPeople = function(){
     try { _peopleCache = JSON.parse(localStorage.getItem('esav_contacts')||'[]'); } catch(e) { _peopleCache=[]; }
     _peopleCache.forEach(function(p){ if(!p.categories) p.categories=[]; });
     _renderCatStrip(); _renderPeople(_peopleCache);
+    if(window._renderAddTagRow) window._renderAddTagRow();
   };
 
   window._esavLogConvo = function(pid){
@@ -7056,6 +7103,31 @@ window._initGoalsUI = _initGoalsUI;
   };
 
   // ── Person add form ──────────────────────────────────────────
+  var _addFormSelectedCats = [];
+
+  function _renderAddTagRow() {
+    var row = document.getElementById('personAddTagRow'); if (!row) return;
+    var cats = _getPeopleCats();
+    if (!cats.length) { row.innerHTML = ''; return; }
+    row.innerHTML = '<span style="font-size:12px;color:#9ca3af;align-self:center;margin-right:2px">Tag:</span>' +
+      cats.map(function(c) {
+        var sel = _addFormSelectedCats.indexOf(c.id) >= 0;
+        var style = sel
+          ? 'background:'+c.color+';border-color:'+c.color+';color:#fff'
+          : 'background:transparent;border:1px solid '+c.color+';color:'+c.color;
+        return '<button type="button" class="people-cat-filter" data-addcat="'+c.id+'" style="'+style+';padding:3px 10px;font-size:12px;border-radius:99px;cursor:pointer">'+escHtml(c.name)+'</button>';
+      }).join('');
+    row.querySelectorAll('[data-addcat]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var cid = btn.dataset.addcat;
+        var idx = _addFormSelectedCats.indexOf(cid);
+        if (idx >= 0) _addFormSelectedCats.splice(idx, 1); else _addFormSelectedCats.push(cid);
+        _renderAddTagRow();
+      });
+    });
+  }
+  window._renderAddTagRow = _renderAddTagRow;
+
   document.addEventListener('DOMContentLoaded', function(){
     var personAddBtn=document.getElementById('esavPersonAddBtn');
     var personName=document.getElementById('esavPersonName');
@@ -7066,10 +7138,12 @@ window._initGoalsUI = _initGoalsUI;
       function doAdd(){
         var name=personName?personName.value.trim():''; if(!name) return;
         var freq=_freqToDays(personFreqNum?personFreqNum.value:2, personFreqUnit?personFreqUnit.value:'weeks');
-        _peopleCache.push({id:'p_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),name:name,frequencyDays:freq,lastContact:null,contactHistory:[],categories:[]});
+        _peopleCache.push({id:'p_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),name:name,frequencyDays:freq,lastContact:null,contactHistory:[],categories:_addFormSelectedCats.slice()});
         if(personName) personName.value='';
         if(personFreqNum) personFreqNum.value='2';
         if(personFreqUnit) personFreqUnit.value='weeks';
+        _addFormSelectedCats = [];
+        _renderAddTagRow();
         _savePeople(_peopleCache); _renderPeople(_peopleCache);
       }
       personAddBtn.addEventListener('click', doAdd);
