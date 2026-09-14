@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v248…';
+  b.textContent = 'v249…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v248'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v249'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -6785,13 +6785,12 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // Auth state — fires on page load
-  // _authUnsub lets us unsubscribe after first successful init so the callback never fires twice
-  var _authUnsub = _auth.onAuthStateChanged(function(user) {
+  // _appInited is set synchronously before _loadFromFS so double-fires are blocked
+  _auth.onAuthStateChanged(function(user) {
     if(user) {
       _uid = user.uid;
       if(!_appInited) {
-        _appInited = true; // set immediately before any async work
-        if(_authUnsub) _authUnsub(); // stop listening — init runs exactly once
+        _appInited = true;
         document.getElementById('loginLoading').style.display = 'block';
         document.getElementById('loginBtn').style.display = 'none';
         _testWrite(user.uid);
