@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v243…';
+  b.textContent = 'v244…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v243'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v244'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -7158,58 +7158,11 @@ window._initGoalsUI = _initGoalsUI;
   });
 })();
 
-// ============================================================
-// ONE-TIME PEOPLE SEED (v241) — runs once, then never again
-// ============================================================
+// ONE-TIME CLEANUP: remove bad seed from v241
 (function(){
-  if (localStorage.getItem('_peopleSeedDone_v241')) return;
-  var CAT_COLORS = {
-    'College':'#7c3aed','Home':'#2563eb','Yeshiva':'#16a34a',
-    'Rabbi':'#db2777','Kiruv':'#d97706','Family':'#0891b2'
-  };
-  var cats;
-  try { cats = JSON.parse(localStorage.getItem('esav_person_cats')||'[]'); } catch(e){ cats=[]; }
-  function findOrCreate(name) {
-    var c = cats.find(function(x){ return x.name.toLowerCase()===name.toLowerCase(); });
-    if (!c) {
-      c = {id:'cat_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), name:name, color:CAT_COLORS[name]||'#7c3aed'};
-      cats.push(c);
-    }
-    return c;
-  }
-  var catObjs = {};
-  ['College','Home','Yeshiva','Rabbi','Kiruv','Family'].forEach(function(n){ catObjs[n]=findOrCreate(n); });
-  localStorage.setItem('esav_person_cats', JSON.stringify(cats));
-
-  var RABBI_NAMES = ['Rabbi Jacobs','Rabbi Lynn','Rav Yosef','Rabbi Shlomo','Rabbi Friedman','Rabbi E','Rabbi Greenberg'];
-  var PEOPLE = [
-    'Mike Cohan','Arash','Brandon K','Mendy','Ben Chai','Nisim','Fred',
-    'Zach Weiss','Brandon D','Jordan R','Aaron Baron','Noah Ifergan',
-    'Joel Gottleib','Andrew K','Leib','Ben Stern','Jonah Leib','Josh Gindis',
-    'Aaron Souferi','David Rivietz','Aaron Thaler','Adam Dinhofer','Ben Dinhofer',
-    'Jack Rothman','Tim Rea','Biscardi','Peyton','Harris','John','R Kenny',
-    'Kyle Climan','Mike Hall','Sammy Spitzer','David Shumunov',
-    'Rabbi Jacobs','Rabbi Lynn','Rav Yosef','Rabbi Shlomo','Rabbi Friedman','Rabbi E','Rabbi Greenberg',
-    'Cole Axelrod','Evan Goldstein'
-  ];
-
-  var existing;
-  try { existing = JSON.parse(localStorage.getItem('esav_contacts')||'[]'); } catch(e){ existing=[]; }
-  var existingNames = existing.map(function(p){ return (p.name||'').toLowerCase(); });
-
-  PEOPLE.forEach(function(name) {
-    if (existingNames.indexOf(name.toLowerCase()) >= 0) return; // skip duplicates
-    var isRabbi = RABBI_NAMES.indexOf(name) >= 0;
-    existing.push({
-      id: 'p_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
-      name: name,
-      frequencyDays: 30,
-      lastContact: null,
-      contactHistory: [],
-      categories: isRabbi ? [catObjs['Rabbi'].id] : []
-    });
-  });
-
-  localStorage.setItem('esav_contacts', JSON.stringify(existing));
-  localStorage.setItem('_peopleSeedDone_v241', '1');
+  if (!localStorage.getItem('_peopleSeedDone_v241')) return;
+  if (localStorage.getItem('_peopleSeedCleared_v244')) return;
+  localStorage.removeItem('esav_contacts');
+  localStorage.removeItem('_peopleSeedDone_v241');
+  localStorage.setItem('_peopleSeedCleared_v244', '1');
 })();

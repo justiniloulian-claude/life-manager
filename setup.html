@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>People Setup</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+:root {
+  --bg: #f7f5ff; --surface: #fff; --border: #e5e0f5;
+  --accent: #7c3aed; --accent-soft: #ede9fb;
+  --text: #18102e; --text2: #6b5e8a; --text3: #b0a4cc;
+  --alt: #f2eeff;
+  --green: #16a34a; --red: #ef4444;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#0d0a18; --surface:#16112a; --border:#2a2242; --accent:#a78bfa; --accent-soft:#1e1640; --text:#f0eaff; --text2:#9d8fcf; --text3:#5a4e7a; --alt:#130f24; }
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; font-size:14px; }
+
+.header { position:sticky; top:0; z-index:20; background:var(--surface); border-bottom:1px solid var(--border); padding:13px 18px; display:flex; align-items:center; justify-content:space-between; gap:10px; box-shadow:0 1px 6px rgba(100,60,200,.07); }
+.header h1 { font-size:15px; font-weight:700; }
+.header p { font-size:11px; color:var(--text2); margin-top:1px; }
+.header-btns { display:flex; gap:8px; flex-shrink:0; }
+.btn { border:none; border-radius:9px; padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; white-space:nowrap; }
+.btn-save { background:var(--accent); color:#fff; }
+.btn-save:hover { opacity:.88; }
+.btn-clear { background:var(--accent-soft); color:var(--accent); }
+.btn-clear:hover { opacity:.88; }
+
+.col-head { display:grid; grid-template-columns:170px 1fr 150px; gap:8px; padding:7px 18px; font-size:10px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--text3); border-bottom:1px solid var(--border); }
+.row { display:grid; grid-template-columns:170px 1fr 150px; gap:8px; align-items:center; padding:7px 18px; border-bottom:1px solid var(--border); }
+.row:nth-child(odd) { background:var(--alt); }
+.row:hover { background:var(--accent-soft); }
+.pname { font-size:13px; font-weight:600; }
+
+.tags { display:flex; flex-wrap:wrap; gap:3px; }
+.tag { font-size:11px; font-weight:600; padding:2px 8px; border-radius:99px; border:1.5px solid var(--border); background:transparent; color:var(--text2); cursor:pointer; font-family:inherit; transition:all .1s; white-space:nowrap; }
+.tag.on { color:#fff; border-color:transparent; }
+.tag[data-t="College"].on { background:#2563eb; }
+.tag[data-t="Home"].on    { background:#16a34a; }
+.tag[data-t="Yeshiva"].on { background:#7c3aed; }
+.tag[data-t="Rabbi"].on   { background:#d97706; }
+.tag[data-t="Kiruv"].on   { background:#db2777; }
+.tag[data-t="Family"].on  { background:#0891b2; }
+
+.freq { border:1.5px solid var(--border); border-radius:8px; padding:5px 6px; font-size:12px; font-family:inherit; background:var(--surface); color:var(--text); outline:none; cursor:pointer; width:100%; }
+.freq:focus { border-color:var(--accent); }
+
+.toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); background:#1a1033; color:#fff; padding:11px 22px; border-radius:12px; font-size:13px; font-weight:600; opacity:0; transition:all .25s; pointer-events:none; z-index:99; }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>People Setup</h1>
+    <p>Set frequency &amp; tags for each person, then Save All</p>
+  </div>
+  <div class="header-btns">
+    <button class="btn btn-clear" onclick="clearAll()">Clear All &amp; Start Fresh</button>
+    <button class="btn btn-save" onclick="saveAll()">Save All →</button>
+  </div>
+</div>
+
+<div class="col-head">
+  <span>Name</span><span>Tags</span><span>Frequency</span>
+</div>
+<div id="list"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+var TAGS = ['College','Home','Yeshiva','Rabbi','Kiruv','Family'];
+var CAT_COLORS = {College:'#2563eb',Home:'#16a34a',Yeshiva:'#7c3aed',Rabbi:'#d97706',Kiruv:'#db2877',Family:'#0891b2'};
+var FREQS = [
+  {label:'Every week',    days:7},
+  {label:'Every 2 weeks', days:14},
+  {label:'Once a month',  days:30},
+  {label:'Every 2 months',days:60},
+  {label:'Every 3 months',days:90},
+  {label:'Every 6 months',days:180},
+  {label:'Once a year',   days:365},
+];
+var RABBI_NAMES = ['Rabbi Jacobs','Rabbi Lynn','Rav Yosef','Rabbi Shlomo','Rabbi Friedman','Rabbi E','Rabbi Greenberg'];
+var ALL_NAMES = [
+  'Mike Cohan','Arash','Brandon K','Mendy','Ben Chai','Nisim','Fred',
+  'Zach Weiss','Brandon D','Jordan R','Aaron Baron','Noah Ifergan',
+  'Joel Gottleib','Andrew K','Leib','Ben Stern','Jonah Leib','Josh Gindis',
+  'Aaron Souferi','David Rivietz','Aaron Thaler','Adam Dinhofer','Ben Dinhofer',
+  'Jack Rothman','Tim Rea','Biscardi','Peyton','Harris','John','R Kenny',
+  'Kyle Climan','Mike Hall','Sammy Spitzer','David Shumunov',
+  'Rabbi Jacobs','Rabbi Lynn','Rav Yosef','Rabbi Shlomo','Rabbi Friedman','Rabbi E','Rabbi Greenberg',
+  'Cole Axelrod','Evan Goldstein'
+];
+
+// Load or initialize categories
+var cats;
+try { cats = JSON.parse(localStorage.getItem('esav_person_cats')||'[]'); } catch(e) { cats=[]; }
+function findOrCreateCat(name) {
+  var c = cats.find(function(x){return x.name.toLowerCase()===name.toLowerCase();});
+  if (!c) { c={id:'cat_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),name:name,color:CAT_COLORS[name]||'#7c3aed'}; cats.push(c); }
+  return c;
+}
+var catObjs = {};
+TAGS.forEach(function(t){ catObjs[t] = findOrCreateCat(t); });
+localStorage.setItem('esav_person_cats', JSON.stringify(cats));
+
+// State: one entry per person
+var state = ALL_NAMES.map(function(name) {
+  var isRabbi = RABBI_NAMES.indexOf(name) >= 0;
+  return { name:name, freq:30, tags: isRabbi ? ['Rabbi'] : [] };
+});
+
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function render() {
+  var list = document.getElementById('list');
+  list.innerHTML = state.map(function(p, i) {
+    var tagBtns = TAGS.map(function(t) {
+      var on = p.tags.indexOf(t)>=0 ? ' on' : '';
+      return '<button class="tag'+on+'" data-t="'+t+'" onclick="toggleTag('+i+',\''+t+'\')">'+t+'</button>';
+    }).join('');
+    var opts = FREQS.map(function(f){
+      return '<option value="'+f.days+'"'+(p.freq===f.days?' selected':'')+'>'+f.label+'</option>';
+    }).join('');
+    return '<div class="row"><span class="pname">'+escHtml(p.name)+'</span><div class="tags">'+tagBtns+'</div><select class="freq" onchange="setFreq('+i+',+this.value)">'+opts+'</select></div>';
+  }).join('');
+}
+
+function toggleTag(i, t) {
+  var idx = state[i].tags.indexOf(t);
+  if (idx>=0) state[i].tags.splice(idx,1); else state[i].tags.push(t);
+  // just update this row's buttons without full re-render
+  var rows = document.getElementById('list').children;
+  var btns = rows[i].querySelectorAll('.tag');
+  btns.forEach(function(btn){ btn.classList.toggle('on', state[i].tags.indexOf(btn.dataset.t)>=0); });
+}
+
+function setFreq(i, days) { state[i].freq = days; }
+
+function toast(msg) {
+  var el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(function(){ el.classList.remove('show'); }, 2800);
+}
+
+function saveAll() {
+  var people = [];
+  state.forEach(function(p) {
+    people.push({
+      id: 'p_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+      name: p.name,
+      frequencyDays: p.freq,
+      lastContact: null,
+      contactHistory: [],
+      categories: p.tags.map(function(t){ return catObjs[t].id; })
+    });
+  });
+  localStorage.setItem('esav_contacts', JSON.stringify(people));
+  localStorage.setItem('esav_person_cats', JSON.stringify(cats));
+  localStorage.setItem('_peopleSeedCleared_v244','1'); // prevent cleanup from wiping
+  toast('✓ Saved '+people.length+' contacts! Go back to the app and refresh.');
+}
+
+function clearAll() {
+  if (!confirm('Clear all contact data and start fresh?')) return;
+  state.forEach(function(p){ p.freq=30; p.tags=[]; });
+  render();
+}
+
+render();
+</script>
+</body>
+</html>
