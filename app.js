@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v244…';
+  b.textContent = 'v245…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v244'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v245'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -5422,10 +5422,15 @@ function saveCalEventModal() {
     addCalEvent(d);
     if(d.date){var nd2=fromDateStr(d.date);state.calYear=nd2.getFullYear();state.calMonth=nd2.getMonth();}
   }
-  // For non-recurring events: create a standalone dashboard task now.
+  // For non-recurring events: create a standalone dashboard task now (if not already added).
   // For recurring events: addToDashboard is saved on the event; getTasksForDate generates tasks automatically.
   var _isRecur=d.recurring&&d.recurring!=='none';
-  if(d.addToDashboard&&!_isRecur){var _tds=d.date||toDateStr(new Date());addTask(_tds,{title:d.title,time:d.time,color:d.color});}
+  if(d.addToDashboard&&!_isRecur){
+    var _tds=d.date||toDateStr(new Date());
+    var _existingTasks=(getData().tasks[_tds]||[]);
+    var _alreadyAdded=_existingTasks.some(function(t){return !t._rc&&!t._calEv&&t.title===d.title;});
+    if(!_alreadyAdded){addTask(_tds,{title:d.title,time:d.time,color:d.color});}
+  }
   refresh();
   closeModal('calEventModal'); renderCalendar();
 }
@@ -5474,7 +5479,11 @@ window.executeEditCalEvent = function(scope) {
   }
   // For single-occurrence edits with addToDashboard: create a one-time task (the event itself won't recur there).
   // For future/all edits: addToDashboard is already saved on the updated event; virtual tasks handle it.
-  if(state.pendingAddToDash&&ds&&scope==='single'){addTask(ds,{title:d.title,time:d.time||'',color:d.color||''});}
+  if(state.pendingAddToDash&&ds&&scope==='single'){
+    var _ex2=(getData().tasks[ds]||[]);
+    var _dup=_ex2.some(function(t){return !t._rc&&!t._calEv&&t.title===d.title;});
+    if(!_dup){addTask(ds,{title:d.title,time:d.time||'',color:d.color||''});}
+  }
   refresh();
   state.pendingEditCalData=null; state.pendingEditCalDs=null; state.pendingAddToDash=false;
   closeModal('editCalScopeModal'); renderCalendar();
