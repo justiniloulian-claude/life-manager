@@ -1,5 +1,14 @@
 'use strict';
 
+// Global error catcher — shows a red banner on screen for any uncaught JS error
+window.onerror = function(msg, src, line, col, err) {
+  var d = document.createElement('div');
+  d.style.cssText = 'position:fixed;bottom:10px;left:10px;right:10px;background:#fff0f0;border:2px solid #c00;border-radius:10px;padding:14px;font-family:monospace;font-size:12px;color:#900;z-index:99999;white-space:pre-wrap;max-height:220px;overflow:auto';
+  d.textContent = '⚠️ JS Error (screenshot this):\n' + msg + '\nLine ' + line + '\n' + (err && err.stack ? err.stack.slice(0,400) : '');
+  document.body.appendChild(d);
+  setTimeout(function(){if(d.parentNode)d.parentNode.removeChild(d);}, 20000);
+};
+
 // ── Wipe stale Firestore IndexedDB ────────────────────────────────────────────
 // Think of this like clearing a jammed printer queue. Earlier versions stored
 // writes in your browser's built-in database (IndexedDB). Those queued writes
@@ -90,7 +99,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v252…';
+  b.textContent = 'v253…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +107,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v252'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v253'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -4160,41 +4169,45 @@ function setDashView(viewName) {
 // ============================================================
 function isMobile() { return window.innerWidth <= 768; }
 
+function _showErr(msg) {
+  var d=document.createElement('div');
+  d.style.cssText='position:fixed;bottom:10px;left:10px;right:10px;background:#fff0f0;border:2px solid #c00;border-radius:10px;padding:14px;font-family:monospace;font-size:12px;color:#900;z-index:99999;white-space:pre-wrap;max-height:220px;overflow:auto';
+  d.textContent='⚠️ '+msg;
+  document.body.appendChild(d);
+  setTimeout(function(){if(d.parentNode)d.parentNode.removeChild(d);},15000);
+}
 function showPage(pageId) {
+  try {
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
   document.querySelectorAll('.header-nav-tab').forEach(function(t){t.classList.remove('active');});
   document.querySelectorAll('.mob-nav-btn').forEach(function(b){b.classList.remove('active');});
-  // Close More menu and task context menu whenever we navigate
   var moreMenu=document.getElementById('mobileMoreMenu');
   if(moreMenu) moreMenu.style.display='none';
   var ctxMenu=document.getElementById('taskContextMenu');
   if(ctxMenu) ctxMenu.style.display='none';
   _ctxTask=null;
-  document.getElementById('page-'+pageId).classList.add('active');
+  var pageEl=document.getElementById('page-'+pageId);
+  if(!pageEl){ _showErr('No page div for "'+pageId+'" — tell Justin'); return; }
+  pageEl.classList.add('active');
   var activeTab=document.querySelector('.header-nav-tab[data-page="'+pageId+'"]');
   if (activeTab) activeTab.classList.add('active');
   var activeMob=document.querySelector('.mob-nav-btn[data-page="'+pageId+'"]');
   if (activeMob) activeMob.classList.add('active');
-  // Learning & Financial live under the More button
   if (pageId==='learning'||pageId==='financial'||pageId==='goals'||pageId==='people') {
     var moreBtn=document.getElementById('mobMoreBtn');
     if(moreBtn) moreBtn.classList.add('active');
   }
   state.currentPage=pageId;
-  try {
-    if (pageId==='dashboard') { setDashView('seven'); checkMissedTasks(); }
-    if (pageId==='calendar')  renderCalendar();
-    if (pageId==='notes')     renderNotes();
-    if (pageId==='learning')  renderLearning();
-    if (pageId==='financial') renderFinancial();
-    if (pageId==='goals')     { renderGoals(); _initGoalsUI(); }
-    if (pageId==='people')    { if(window._loadPeople) window._loadPeople(); }
+  if (pageId==='dashboard') { setDashView('seven'); checkMissedTasks(); }
+  else if (pageId==='calendar')  renderCalendar();
+  else if (pageId==='notes')     renderNotes();
+  else if (pageId==='learning')  renderLearning();
+  else if (pageId==='financial') renderFinancial();
+  else if (pageId==='goals')     { renderGoals(); _initGoalsUI(); }
+  else if (pageId==='people')    { if(window._loadPeople) window._loadPeople(); }
   } catch(e) {
-    console.error('[showPage:'+pageId+'] render error:', e);
-    var pg=document.getElementById('page-'+pageId);
-    if(pg) pg.innerHTML='<div style="padding:40px;color:#c00;font-family:monospace;font-size:13px;white-space:pre-wrap;background:#fff0f0;border-radius:12px;margin:24px">'+
-      '⚠️ Render error on page "'+pageId+'" — please screenshot this and send it:\n\n'+String(e)+'\n\n'+
-      (e&&e.stack?e.stack.slice(0,600):'')+'</div>';
+    console.error('[showPage:'+pageId+']',e);
+    _showErr('showPage("'+pageId+'") error:\n'+String(e)+'\n'+(e&&e.stack?e.stack.slice(0,400):''));
   }
 }
 
