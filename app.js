@@ -1,6 +1,6 @@
 'use strict';
 
-// v264 — register SW immediately (not inside init/login), auto-reload on SW update
+// v265 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
   // controllerchange fires when a new SW takes over — reload to get fresh HTML
   navigator.serviceWorker.addEventListener('controllerchange', function() {
