@@ -1,7 +1,9 @@
-// v250: postMessage reload — clients.navigate() unreliable on iOS PWA
+// v251: NO fetch interception — browser handles all network requests natively.
+// SW exists only for push notifications. This eliminates stale-cache issues.
 self.addEventListener('install', function() { self.skipWaiting(); });
 
 self.addEventListener('activate', function(e) {
+  // Wipe every cache left over from old SW versions
   e.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(keys.map(function(k) { return caches.delete(k); }));
@@ -10,28 +12,21 @@ self.addEventListener('activate', function(e) {
     }).then(function() {
       return self.clients.matchAll({ type: 'window' });
     }).then(function(clients) {
-      clients.forEach(function(c) {
-        // postMessage is supported everywhere; navigate is not reliable on iOS
-        c.postMessage({ type: 'SW_RELOAD' });
-      });
+      clients.forEach(function(c) { c.postMessage({ type: 'SW_RELOAD' }); });
     })
   );
 });
 
-self.addEventListener('fetch', function(e) {
-  // Always fetch from network — never serve stale cached files
-  e.respondWith(
-    fetch(e.request, { cache: 'no-store' }).catch(function() {
-      return caches.match(e.request);
-    })
-  );
-});
+// ── NO fetch handler ──────────────────────────────────────────────────────────
+// Removing the fetch handler means the browser fetches all resources directly
+// from the network, using its normal HTTP cache. Versioned URLs (?v=258) on
+// app.js and style.css ensure those always bust the cache. This is the fix for
+// the "stuck on old version" problem that plagued v246–v258.
 
 // Push notification handler
 self.addEventListener('push', function(e) {
   var data = {};
   try { data = e.data.json(); } catch(err) { data = { title: 'Esav', body: e.data ? e.data.text() : '' }; }
-  var title = data.title || 'Esav';
   var options = {
     body: data.body || '',
     icon: '/life-manager/icon-192.png',
@@ -39,7 +34,7 @@ self.addEventListener('push', function(e) {
     data: data,
     requireInteraction: false
   };
-  e.waitUntil(self.registration.showNotification(title, options));
+  e.waitUntil(self.registration.showNotification(data.title || 'Esav', options));
 });
 
 self.addEventListener('notificationclick', function(e) {
