@@ -1,17 +1,33 @@
-// v261: intercept only index.html — serve it fresh from network always.
-// All other assets use the browser's normal cache (versioned URLs handle busting).
-self.addEventListener('install', function() { self.skipWaiting(); });
+// v262: precache fresh index.html during install so stale HTTP cache is bypassed
+var CACHE = 'lm-v262';
+
+self.addEventListener('install', function(e) {
+  // Fetch and store the latest HTML right now, bypassing any HTTP cache
+  e.waitUntil(
+    caches.open(CACHE).then(function(cache) {
+      return fetch('/life-manager/', { cache: 'no-store' }).then(function(res) {
+        return cache.put('/life-manager/', res);
+      });
+    }).then(function() {
+      return self.skipWaiting();
+    })
+  );
+});
 
 self.addEventListener('activate', function(e) {
+  // Delete all old caches
   e.waitUntil(
     caches.keys().then(function(keys) {
-      return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+      return Promise.all(
+        keys.filter(function(k) { return k !== CACHE; })
+            .map(function(k) { return caches.delete(k); })
+      );
     }).then(function() {
       return self.clients.claim();
     }).then(function() {
-      // Force all open windows to reload so they pick up fresh index.html
       return self.clients.matchAll({ type: 'window' });
     }).then(function(clients) {
+      // Force all open windows to reload — SW will serve fresh HTML from its cache
       clients.forEach(function(c) {
         try { c.navigate(c.url); } catch(err) {}
       });
@@ -19,16 +35,24 @@ self.addEventListener('activate', function(e) {
   );
 });
 
-// Only intercept the HTML page itself — always fetch it fresh, never from cache
 self.addEventListener('fetch', function(e) {
   var url = e.request.url;
   var isHTML = url.includes('/life-manager/index.html') ||
                url.endsWith('/life-manager/') ||
                url.endsWith('/life-manager');
   if (isHTML) {
-    e.respondWith(fetch(e.request, { cache: 'no-store' }));
+    // Serve the freshly precached HTML — not the stale browser HTTP cache
+    e.respondWith(
+      caches.open(CACHE).then(function(cache) {
+        return cache.match('/life-manager/');
+      }).then(function(cached) {
+        if (cached) return cached;
+        return fetch(e.request, { cache: 'no-store' });
+      })
+    );
+    return;
   }
-  // Everything else: fall through to browser's normal cache handling
+  // All other resources: browser handles normally (versioned URLs bust cache)
 });
 
 // Push notifications
