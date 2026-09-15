@@ -1,5 +1,12 @@
 'use strict';
 
+// v257 — reload when service worker updates
+if (navigator.serviceWorker) {
+  navigator.serviceWorker.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'SW_RELOAD') window.location.reload();
+  });
+}
+
 // Global error catcher — shows a red banner on screen for any uncaught JS error
 window.onerror = function(msg, src, line, col, err) {
   var d = document.createElement('div');

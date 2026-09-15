@@ -1,4 +1,4 @@
-// v248: force reload all clients on SW activation so updates apply immediately
+// v249: postMessage reload — clients.navigate() unreliable on iOS PWA
 self.addEventListener('install', function() { self.skipWaiting(); });
 
 self.addEventListener('activate', function(e) {
@@ -10,13 +10,21 @@ self.addEventListener('activate', function(e) {
     }).then(function() {
       return self.clients.matchAll({ type: 'window' });
     }).then(function(clients) {
-      clients.forEach(function(c) { c.navigate(c.url); });
+      clients.forEach(function(c) {
+        // postMessage is supported everywhere; navigate is not reliable on iOS
+        c.postMessage({ type: 'SW_RELOAD' });
+      });
     })
   );
 });
 
 self.addEventListener('fetch', function(e) {
-  e.respondWith(fetch(e.request, { cache: 'reload' }));
+  // Always fetch from network — never serve stale cached files
+  e.respondWith(
+    fetch(e.request, { cache: 'no-store' }).catch(function() {
+      return caches.match(e.request);
+    })
+  );
 });
 
 // Push notification handler
