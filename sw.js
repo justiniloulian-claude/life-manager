@@ -1,4 +1,4 @@
-// v249: postMessage reload — clients.navigate() unreliable on iOS PWA
+// v250: postMessage reload — clients.navigate() unreliable on iOS PWA
 self.addEventListener('install', function() { self.skipWaiting(); });
 
 self.addEventListener('activate', function(e) {

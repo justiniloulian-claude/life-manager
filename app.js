@@ -1,10 +1,13 @@
 'use strict';
 
-// v257 — reload when service worker updates
+// v258 — force SW update check on every load, reload when SW activates
 if (navigator.serviceWorker) {
   navigator.serviceWorker.addEventListener('message', function(e) {
     if (e.data && e.data.type === 'SW_RELOAD') window.location.reload();
   });
+  navigator.serviceWorker.ready.then(function(reg) {
+    reg.update(); // force browser to re-check sw.js for changes
+  }).catch(function(){});
 }
 
 // Global error catcher — shows a red banner on screen for any uncaught JS error
