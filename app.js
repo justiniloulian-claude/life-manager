@@ -4177,8 +4177,11 @@ function _showErr(msg) {
   setTimeout(function(){if(d.parentNode)d.parentNode.removeChild(d);},15000);
 }
 function showPage(pageId) {
-  try {
-  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+  // Hide all pages via inline style (bypasses any CSS specificity issues)
+  document.querySelectorAll('.page').forEach(function(p){
+    p.classList.remove('active');
+    p.style.display='none';
+  });
   document.querySelectorAll('.header-nav-tab').forEach(function(t){t.classList.remove('active');});
   document.querySelectorAll('.mob-nav-btn').forEach(function(b){b.classList.remove('active');});
   var moreMenu=document.getElementById('mobileMoreMenu');
@@ -4187,8 +4190,10 @@ function showPage(pageId) {
   if(ctxMenu) ctxMenu.style.display='none';
   _ctxTask=null;
   var pageEl=document.getElementById('page-'+pageId);
-  if(!pageEl){ _showErr('No page div for "'+pageId+'" — tell Justin'); return; }
+  if(!pageEl){ console.error('No page div for',pageId); return; }
+  // Force page visible via inline style — overrides all CSS
   pageEl.classList.add('active');
+  pageEl.style.display='block';
   var activeTab=document.querySelector('.header-nav-tab[data-page="'+pageId+'"]');
   if (activeTab) activeTab.classList.add('active');
   var activeMob=document.querySelector('.mob-nav-btn[data-page="'+pageId+'"]');
@@ -4198,32 +4203,15 @@ function showPage(pageId) {
     if(moreBtn) moreBtn.classList.add('active');
   }
   state.currentPage=pageId;
-  // Debug: confirm page is activating and rendering (remove after fix)
-  var _dbg=document.createElement('div');
-  _dbg.id='_dbgBanner';
-  _dbg.style.cssText='position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:6px 16px;border-radius:20px;font-size:12px;font-family:monospace;z-index:99999;pointer-events:none';
-  _dbg.textContent='rendering: '+pageId+' @ v253';
-  document.body.appendChild(_dbg);
-  setTimeout(function(){var e=document.getElementById('_dbgBanner');if(e)e.remove();},3000);
-  if (pageId==='dashboard') { setDashView('seven'); checkMissedTasks(); }
-  else if (pageId==='calendar')  renderCalendar();
-  else if (pageId==='notes') {
-    // Force visible test content — if THIS shows, CSS is fine and render is the bug
-    var _ns=document.getElementById('notesSidebar');
-    var _nm=document.getElementById('notesMain');
-    if(_ns) _ns.innerHTML='<div style="padding:10px;color:red;font-weight:bold">SIDEBAR OK</div>';
-    if(_nm) _nm.innerHTML='<div style="padding:10px;color:blue;font-weight:bold">MAIN OK — '+(_ns?'sidebar found':'sidebar MISSING')+'</div>';
-    if(!_ns||!_nm) _showErr('notes elements missing: sidebar='+!!_ns+' main='+!!_nm);
-    renderNotes();
-  }
-  else if (pageId==='learning')  renderLearning();
-  else if (pageId==='financial') renderFinancial();
-  else if (pageId==='goals')     { renderGoals(); _initGoalsUI(); }
-  else if (pageId==='people')    { if(window._loadPeople) window._loadPeople(); }
-  } catch(e) {
-    console.error('[showPage:'+pageId+']',e);
-    _showErr('showPage("'+pageId+'") error:\n'+String(e)+'\n'+(e&&e.stack?e.stack.slice(0,400):''));
-  }
+  try {
+    if (pageId==='dashboard') { setDashView('seven'); checkMissedTasks(); }
+    else if (pageId==='calendar')  renderCalendar();
+    else if (pageId==='notes')     renderNotes();
+    else if (pageId==='learning')  renderLearning();
+    else if (pageId==='financial') renderFinancial();
+    else if (pageId==='goals')     { renderGoals(); _initGoalsUI(); }
+    else if (pageId==='people')    { if(window._loadPeople) window._loadPeople(); }
+  } catch(e) { console.error('[showPage render]',pageId,e); }
 }
 
 // ============================================================
