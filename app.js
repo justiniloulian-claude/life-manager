@@ -99,7 +99,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v253…';
+  b.textContent = 'v254…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -107,7 +107,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v253'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v254'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -4198,6 +4198,13 @@ function showPage(pageId) {
     if(moreBtn) moreBtn.classList.add('active');
   }
   state.currentPage=pageId;
+  // Debug: confirm page is activating and rendering (remove after fix)
+  var _dbg=document.createElement('div');
+  _dbg.id='_dbgBanner';
+  _dbg.style.cssText='position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:6px 16px;border-radius:20px;font-size:12px;font-family:monospace;z-index:99999;pointer-events:none';
+  _dbg.textContent='rendering: '+pageId+' @ v253';
+  document.body.appendChild(_dbg);
+  setTimeout(function(){var e=document.getElementById('_dbgBanner');if(e)e.remove();},3000);
   if (pageId==='dashboard') { setDashView('seven'); checkMissedTasks(); }
   else if (pageId==='calendar')  renderCalendar();
   else if (pageId==='notes')     renderNotes();
