@@ -1,7 +1,7 @@
-// v263: bootstrap-redirect approach — no clients.navigate(), works on Safari.
+// v264: bootstrap-redirect approach — no clients.navigate(), works on Safari.
 // On any refresh, SW returns a tiny redirect page → browser follows to ?app=1
 // SW then serves fresh precached HTML at ?app=1. No browser action needed beyond a normal refresh.
-var CACHE = 'lm-v263';
+var CACHE = 'lm-v264';
 var APP_URL = 'https://justiniloulian-claude.github.io/life-manager/';
 
 self.addEventListener('install', function(e) {

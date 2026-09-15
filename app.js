@@ -1,13 +1,15 @@
 'use strict';
 
-// v263 — force SW update check + reload page when new SW takes control
+// v264 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
+  // controllerchange fires when a new SW takes over — reload to get fresh HTML
   navigator.serviceWorker.addEventListener('controllerchange', function() {
     window.location.reload();
   });
-  navigator.serviceWorker.ready.then(function(reg) {
-    reg.update();
-  }).catch(function(){});
+  // Register and force-check for updates immediately on page load
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+    .then(function(reg) { reg.update(); })
+    .catch(function() {});
 }
 
 // Global error catcher — shows a red banner on screen for any uncaught JS error
@@ -6793,7 +6795,7 @@ function init() {
   initMobile();
   setDashView('seven');
   checkMissedTasks();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(function(reg){ reg.update(); });
+  // SW registration moved to top of file (runs before login, not here)
   // Dark mode — restore saved preference
   if(localStorage.getItem('dm_darkMode')==='1') document.body.classList.add('dark-mode');
   updateDarkToggleIcon();
