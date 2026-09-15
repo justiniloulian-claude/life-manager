@@ -1,7 +1,10 @@
 'use strict';
 
-// v262 — force SW update check on every load
+// v263 — force SW update check + reload page when new SW takes control
 if (navigator.serviceWorker) {
+  navigator.serviceWorker.addEventListener('controllerchange', function() {
+    window.location.reload();
+  });
   navigator.serviceWorker.ready.then(function(reg) {
     reg.update();
   }).catch(function(){});

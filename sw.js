@@ -1,58 +1,62 @@
-// v262: precache fresh index.html during install so stale HTTP cache is bypassed
-var CACHE = 'lm-v262';
+// v263: bootstrap-redirect approach — no clients.navigate(), works on Safari.
+// On any refresh, SW returns a tiny redirect page → browser follows to ?app=1
+// SW then serves fresh precached HTML at ?app=1. No browser action needed beyond a normal refresh.
+var CACHE = 'lm-v263';
+var APP_URL = 'https://justiniloulian-claude.github.io/life-manager/';
 
 self.addEventListener('install', function(e) {
-  // Fetch and store the latest HTML right now, bypassing any HTTP cache
+  // Fetch and cache the very latest HTML right now, bypassing all HTTP caches
   e.waitUntil(
-    caches.open(CACHE).then(function(cache) {
-      return fetch('/life-manager/', { cache: 'no-store' }).then(function(res) {
-        return cache.put('/life-manager/', res);
-      });
-    }).then(function() {
-      return self.skipWaiting();
-    })
+    fetch(APP_URL, { cache: 'no-store' })
+      .then(function(res) {
+        return caches.open(CACHE).then(function(cache) {
+          return cache.put(APP_URL, res);
+        });
+      })
+      .then(function() { return self.skipWaiting(); })
   );
 });
 
 self.addEventListener('activate', function(e) {
-  // Delete all old caches
   e.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(
         keys.filter(function(k) { return k !== CACHE; })
             .map(function(k) { return caches.delete(k); })
       );
-    }).then(function() {
-      return self.clients.claim();
-    }).then(function() {
-      return self.clients.matchAll({ type: 'window' });
-    }).then(function(clients) {
-      // Force all open windows to reload — SW will serve fresh HTML from its cache
-      clients.forEach(function(c) {
-        try { c.navigate(c.url); } catch(err) {}
-      });
-    })
+    }).then(function() { return self.clients.claim(); })
   );
 });
 
 self.addEventListener('fetch', function(e) {
   var url = e.request.url;
-  var isHTML = url.includes('/life-manager/index.html') ||
-               url.endsWith('/life-manager/') ||
-               url.endsWith('/life-manager');
-  if (isHTML) {
-    // Serve the freshly precached HTML — not the stale browser HTTP cache
+
+  // Only handle navigation requests for the app HTML
+  if (e.request.mode !== 'navigate') return;
+
+  var isApp = url.startsWith(APP_URL) || url === APP_URL.slice(0, -1);
+  if (!isApp) return;
+
+  // If URL already has ?app=1, serve the fresh precached HTML
+  if (url.includes('?app=1')) {
     e.respondWith(
       caches.open(CACHE).then(function(cache) {
-        return cache.match('/life-manager/');
+        return cache.match(APP_URL);
       }).then(function(cached) {
-        if (cached) return cached;
-        return fetch(e.request, { cache: 'no-store' });
+        return cached || fetch(APP_URL, { cache: 'no-store' });
       })
     );
     return;
   }
-  // All other resources: browser handles normally (versioned URLs bust cache)
+
+  // Otherwise: serve a tiny bootstrap page that instantly redirects to ?app=1
+  // This works on Safari without needing clients.navigate()
+  e.respondWith(new Response(
+    '<!DOCTYPE html><html><head><title>Loading…</title>' +
+    '<script>location.replace("' + APP_URL + '?app=1")<\/script>' +
+    '</head><body></body></html>',
+    { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+  ));
 });
 
 // Push notifications
