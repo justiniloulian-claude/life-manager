@@ -1,30 +1,20 @@
-// v252: SW unregisters itself and forces a hard reload.
-// This permanently kills any stuck old SW and lets the browser
-// fetch directly from the network from now on.
-// Push notifications remain handled here after the clean reload.
+// v253: minimal SW — no fetch interception, push notifications only.
+// All network requests go directly through the browser.
 self.addEventListener('install', function() { self.skipWaiting(); });
 
 self.addEventListener('activate', function(e) {
+  // Clear all old caches so nothing stale is served
   e.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(keys.map(function(k) { return caches.delete(k); }));
     }).then(function() {
       return self.clients.claim();
-    }).then(function() {
-      // Unregister this SW so the browser fetches everything directly
-      return self.registration.unregister();
-    }).then(function() {
-      return self.clients.matchAll({ type: 'window' });
-    }).then(function(clients) {
-      clients.forEach(function(c) {
-        // Force a true hard-reload — no cache, no SW
-        c.postMessage({ type: 'SW_HARDRELOAD' });
-      });
     })
   );
 });
 
-// NO fetch handler — after unregister, the browser handles all requests natively
+// NO fetch handler — browser fetches everything directly from the network.
+// Versioned URLs (app.js?v=260, style.css?v=215) bust the HTTP cache.
 
 // Push notification handler
 self.addEventListener('push', function(e) {
