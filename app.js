@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v251…';
+  b.textContent = 'v252…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v251'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v252'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -4189,7 +4189,13 @@ function showPage(pageId) {
     if (pageId==='financial') renderFinancial();
     if (pageId==='goals')     { renderGoals(); _initGoalsUI(); }
     if (pageId==='people')    { if(window._loadPeople) window._loadPeople(); }
-  } catch(e) { console.error('[showPage:'+pageId+'] render error:', e); }
+  } catch(e) {
+    console.error('[showPage:'+pageId+'] render error:', e);
+    var pg=document.getElementById('page-'+pageId);
+    if(pg) pg.innerHTML='<div style="padding:40px;color:#c00;font-family:monospace;font-size:13px;white-space:pre-wrap;background:#fff0f0;border-radius:12px;margin:24px">'+
+      '⚠️ Render error on page "'+pageId+'" — please screenshot this and send it:\n\n'+String(e)+'\n\n'+
+      (e&&e.stack?e.stack.slice(0,600):'')+'</div>';
+  }
 }
 
 // ============================================================
@@ -6803,7 +6809,10 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('loginBtn').style.display = 'none';
         _testWrite(user.uid);
         _loadFromFS(user.uid, function() {
-          try { init(); } catch(e){ console.error('[init] error:', e); }
+          try { init(); } catch(e){
+            console.error('[init] error:', e);
+            document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;bottom:60px;left:16px;right:16px;background:#fff0f0;border:2px solid #c00;border-radius:12px;padding:16px;font-family:monospace;font-size:12px;color:#900;z-index:99999;white-space:pre-wrap">⚠️ Init error — screenshot this:\n'+String(e)+(e&&e.stack?'\n'+e.stack.slice(0,400):'')+'</div>');
+          }
           document.getElementById('loginOverlay').style.display = 'none';
           requestAnimationFrame(function(){
             requestAnimationFrame(function(){
