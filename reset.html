@@ -12,37 +12,30 @@ body{margin:0;display:flex;align-items:center;justify-content:center;min-height:
 </head>
 <body>
 <div>
-  <div class="msg" id="msg">Clearing old cache…</div>
-  <div class="sub" id="sub">One moment</div>
+  <div class="msg">Clearing cache…</div>
+  <div class="sub">Loading fresh app in 2 seconds</div>
 </div>
 <script>
-(async function() {
-  var msg = document.getElementById('msg');
-  var sub = document.getElementById('sub');
+// Redirect ALWAYS fires after 2 seconds regardless of cleanup status
+var dest = 'https://justiniloulian-claude.github.io/life-manager/?reset=' + Date.now();
+setTimeout(function() { window.location.replace(dest); }, 2000);
 
-  // 1. Unregister ALL service workers
-  if ('serviceWorker' in navigator) {
-    var regs = await navigator.serviceWorker.getRegistrations();
-    for (var r of regs) { await r.unregister(); }
+// Best-effort cleanup (fire and forget — don't block the redirect)
+try {
+  if (navigator.serviceWorker) {
+    navigator.serviceWorker.getRegistrations().then(function(regs) {
+      regs.forEach(function(r) { try { r.unregister(); } catch(e) {} });
+    }).catch(function() {});
   }
+} catch(e) {}
 
-  // 2. Clear ALL caches
-  if ('caches' in window) {
-    var keys = await caches.keys();
-    for (var k of keys) { await caches.delete(k); }
+try {
+  if (window.caches) {
+    caches.keys().then(function(keys) {
+      keys.forEach(function(k) { try { caches.delete(k); } catch(e) {} });
+    }).catch(function() {});
   }
-
-  // 3. Clear localStorage app cache keys (keep user data)
-  // (leave esav_* keys intact so data is preserved)
-
-  msg.textContent = 'Done! Loading fresh app…';
-  sub.textContent = 'Redirecting in 1 second…';
-
-  // 4. Redirect to the fresh app (unique URL = Fastly cache miss = guaranteed fresh HTML)
-  setTimeout(function() {
-    window.location.replace('https://justiniloulian-claude.github.io/life-manager/?fresh=' + Date.now());
-  }, 1000);
-})();
+} catch(e) {}
 </script>
 </body>
 </html>
