@@ -1,56 +1,34 @@
-// v266: bulletproof install — skipWaiting always fires, even if precache fails.
-var CACHE = 'lm-v266';
-var APP_URL = 'https://justiniloulian-claude.github.io/life-manager/';
+// v267: back to basics — no caching, always fetch fresh from network.
+// This was the strategy that worked (v247-v248). All requests go to
+// the real network with cache:'no-store', bypassing any CDN edge cache.
+// skipWaiting is called immediately (not in a promise chain) so it ALWAYS fires.
 
-self.addEventListener('install', function(e) {
-  // Precache fresh HTML with cache-busting to bypass any CDN edge cache.
-  // skipWaiting() is called regardless of whether the fetch succeeds,
-  // so the SW always activates even if the network is slow or fails.
-  var freshUrl = APP_URL + '?_sw=' + Date.now();
-  e.waitUntil(
-    fetch(freshUrl, { cache: 'no-store' })
-      .then(function(res) {
-        return caches.open(CACHE).then(function(cache) {
-          return cache.put(APP_URL, res);
-        });
-      })
-      .catch(function() { /* fetch failed — SW still activates, will fetch on demand */ })
-      .then(function() { return self.skipWaiting(); })
-  );
+self.addEventListener('install', function() {
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', function(e) {
   e.waitUntil(
     caches.keys().then(function(keys) {
-      return Promise.all(
-        keys.filter(function(k) { return k !== CACHE; })
-            .map(function(k) { return caches.delete(k); })
-      );
-    })
-    .then(function() { return self.clients.claim(); })
-    .then(function() {
-      // Best-effort: force all open app windows to reload.
-      // Works on iOS 15.4+ and all modern browsers.
-      return self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-        .then(function(list) {
-          return Promise.all(list.map(function(c) {
-            return c.navigate(c.url).catch(function() {});
-          }));
-        });
+      return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+    }).then(function() {
+      return self.clients.claim();
+    }).then(function() {
+      return self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    }).then(function(clients) {
+      return Promise.all(clients.map(function(c) {
+        return c.navigate(c.url).catch(function() {});
+      }));
     })
   );
 });
 
+// Never serve cached content — always fetch from the network fresh.
+// cache:'no-store' bypasses both the browser cache and CDN edge caches.
 self.addEventListener('fetch', function(e) {
-  if (e.request.mode !== 'navigate') return;
-  var url = e.request.url;
-  var isApp = url.startsWith(APP_URL) || url === APP_URL.slice(0, -1);
-  if (!isApp) return;
-
-  // Serve cached HTML if available, otherwise fetch fresh with cache-busting.
   e.respondWith(
-    caches.match(APP_URL).then(function(cached) {
-      return cached || fetch(APP_URL + '?_r=' + Date.now(), { cache: 'no-store' });
+    fetch(e.request, { cache: 'no-store' }).catch(function() {
+      return fetch(e.request);
     })
   );
 });
