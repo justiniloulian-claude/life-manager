@@ -1,7 +1,9 @@
-// v267: back to basics — no caching, always fetch fresh from network.
-// This was the strategy that worked (v247-v248). All requests go to
-// the real network with cache:'no-store', bypassing any CDN edge cache.
-// skipWaiting is called immediately (not in a promise chain) so it ALWAYS fires.
+// v268: CDN cache-bust for HTML navigation requests.
+// cache:'no-store' bypasses the browser cache, but NOT Fastly CDN edge cache.
+// For HTML page loads (navigate mode), we append ?_cb=<minute> to the URL,
+// which makes the CDN treat it as a brand-new URL → cache miss → fresh origin.
+// This guarantees the browser always gets the latest index.html regardless of
+// what Fastly has cached at the user's geographic edge node.
 
 self.addEventListener('install', function() {
   self.skipWaiting();
@@ -23,12 +25,27 @@ self.addEventListener('activate', function(e) {
   );
 });
 
-// Never serve cached content — always fetch from the network fresh.
-// cache:'no-store' bypasses both the browser cache and CDN edge caches.
 self.addEventListener('fetch', function(e) {
+  var req = e.request;
+
+  // For HTML navigation requests on our own origin, bust the CDN edge cache.
+  // Fastly caches by URL — a unique ?_cb= param forces a cache miss → fresh HTML.
+  if (req.mode === 'navigate' && req.url.indexOf(self.location.origin) === 0) {
+    var url = new URL(req.url);
+    // Use seconds-precision timestamp so every page load gets a unique URL.
+    // This guarantees a CDN cache miss every time.
+    url.searchParams.set('_cb', Date.now());
+    e.respondWith(
+      fetch(url.toString(), { cache: 'no-store' })
+        .catch(function() { return fetch(req); })
+    );
+    return;
+  }
+
+  // All other requests: bypass browser cache, let CDN serve normally.
   e.respondWith(
-    fetch(e.request, { cache: 'no-store' }).catch(function() {
-      return fetch(e.request);
+    fetch(req, { cache: 'no-store' }).catch(function() {
+      return fetch(req);
     })
   );
 });
