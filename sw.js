@@ -1,14 +1,12 @@
-// v270: SW caches go.html at install time — CDN is bypassed entirely.
-// go.html is a brand-new path the CDN has never seen → guaranteed fresh fetch
-// from GitHub origin at install time. Every navigation is then served from
-// the SW's own cache, so stale CDN content can NEVER reach the user again.
+// v271: path-independent — works on GitHub Pages (/life-manager/) and
+// Cloudflare Pages (/) without hardcoded origins or paths.
+// APP_URL is derived from self.location so it always points to the right host.
 
-var CACHE = 'lm-v270';
-var APP_URL = 'https://justiniloulian-claude.github.io/life-manager/go.html';
+var CACHE = 'lm-v271';
+var APP_URL = self.location.origin + (self.location.pathname.replace('sw.js', 'go.html'));
 
 self.addEventListener('install', function(e) {
   self.skipWaiting();
-  // Fetch go.html fresh from origin (CDN miss — never been cached) and store it.
   e.waitUntil(
     caches.open(CACHE).then(function(cache) {
       return fetch(APP_URL, { cache: 'no-store' }).then(function(resp) {
@@ -20,7 +18,6 @@ self.addEventListener('install', function(e) {
 
 self.addEventListener('activate', function(e) {
   e.waitUntil(
-    // Delete all old caches except ours
     caches.keys().then(function(keys) {
       return Promise.all(keys.filter(function(k) { return k !== CACHE; })
         .map(function(k) { return caches.delete(k); }));
@@ -38,21 +35,15 @@ self.addEventListener('activate', function(e) {
 
 self.addEventListener('fetch', function(e) {
   var req = e.request;
-
-  // For any HTML page navigation: serve from SW cache (go.html).
-  // This completely bypasses the CDN and browser HTTP cache.
   if (req.mode === 'navigate') {
     e.respondWith(
       caches.match(APP_URL).then(function(cached) {
         if (cached) return cached;
-        // Fallback: fetch fresh if somehow cache is empty
         return fetch(APP_URL, { cache: 'no-store' });
       })
     );
     return;
   }
-
-  // All other requests (JS, CSS, Firebase, etc): always network, no caching.
   e.respondWith(
     fetch(req, { cache: 'no-store' }).catch(function() {
       return fetch(req);
@@ -65,13 +56,13 @@ self.addEventListener('push', function(e) {
   try { data = e.data.json(); } catch(err) { data = { title: 'Esav', body: e.data ? e.data.text() : '' }; }
   e.waitUntil(self.registration.showNotification(data.title || 'Esav', {
     body: data.body || '',
-    icon: '/life-manager/icon-192.png',
-    badge: '/life-manager/icon-192.png',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
     data: data
   }));
 });
 
 self.addEventListener('notificationclick', function(e) {
   e.notification.close();
-  e.waitUntil(clients.openWindow('/life-manager/'));
+  e.waitUntil(clients.openWindow('/'));
 });

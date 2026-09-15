@@ -17,9 +17,7 @@ body{margin:0;display:flex;align-items:center;justify-content:center;min-height:
 </div>
 <script>
 // Redirect ALWAYS fires after 2 seconds regardless of cleanup status
-// CDN ignores query params — use /index.html path which is a separate CDN cache entry
-// and will always be a fresh miss → latest content from origin.
-var dest = 'https://justiniloulian-claude.github.io/life-manager/index.html';
+var dest = window.location.origin + '/index.html';
 setTimeout(function() { window.location.replace(dest); }, 2000);
 
 // Best-effort cleanup (fire and forget — don't block the redirect)
