@@ -1,27 +1,30 @@
-// v251: NO fetch interception — browser handles all network requests natively.
-// SW exists only for push notifications. This eliminates stale-cache issues.
+// v252: SW unregisters itself and forces a hard reload.
+// This permanently kills any stuck old SW and lets the browser
+// fetch directly from the network from now on.
+// Push notifications remain handled here after the clean reload.
 self.addEventListener('install', function() { self.skipWaiting(); });
 
 self.addEventListener('activate', function(e) {
-  // Wipe every cache left over from old SW versions
   e.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(keys.map(function(k) { return caches.delete(k); }));
     }).then(function() {
       return self.clients.claim();
     }).then(function() {
+      // Unregister this SW so the browser fetches everything directly
+      return self.registration.unregister();
+    }).then(function() {
       return self.clients.matchAll({ type: 'window' });
     }).then(function(clients) {
-      clients.forEach(function(c) { c.postMessage({ type: 'SW_RELOAD' }); });
+      clients.forEach(function(c) {
+        // Force a true hard-reload — no cache, no SW
+        c.postMessage({ type: 'SW_HARDRELOAD' });
+      });
     })
   );
 });
 
-// ── NO fetch handler ──────────────────────────────────────────────────────────
-// Removing the fetch handler means the browser fetches all resources directly
-// from the network, using its normal HTTP cache. Versioned URLs (?v=258) on
-// app.js and style.css ensure those always bust the cache. This is the fix for
-// the "stuck on old version" problem that plagued v246–v258.
+// NO fetch handler — after unregister, the browser handles all requests natively
 
 // Push notification handler
 self.addEventListener('push', function(e) {

@@ -1,12 +1,14 @@
 'use strict';
 
-// v258 — force SW update check on every load, reload when SW activates
+// v259 — kill stuck SW, force hard reload when SW unregisters
 if (navigator.serviceWorker) {
   navigator.serviceWorker.addEventListener('message', function(e) {
-    if (e.data && e.data.type === 'SW_RELOAD') window.location.reload();
+    if (e.data && (e.data.type === 'SW_RELOAD' || e.data.type === 'SW_HARDRELOAD')) {
+      window.location.reload(true); // true = bypass cache
+    }
   });
   navigator.serviceWorker.ready.then(function(reg) {
-    reg.update(); // force browser to re-check sw.js for changes
+    reg.update(); // force browser to re-check sw.js on every page load
   }).catch(function(){});
 }
 
