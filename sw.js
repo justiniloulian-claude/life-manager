@@ -1,20 +1,20 @@
-// v265: cache-bust on install + direct serve (no redirect) + force-navigate on activate.
-// This ensures even CDN edge caches are bypassed and pages reload automatically.
-var CACHE = 'lm-v265';
+// v266: bulletproof install — skipWaiting always fires, even if precache fails.
+var CACHE = 'lm-v266';
 var APP_URL = 'https://justiniloulian-claude.github.io/life-manager/';
 
 self.addEventListener('install', function(e) {
-  // Use a unique cache-busting timestamp so CDN edge caches are bypassed.
-  // This guarantees we cache the very latest HTML from the origin server.
+  // Precache fresh HTML with cache-busting to bypass any CDN edge cache.
+  // skipWaiting() is called regardless of whether the fetch succeeds,
+  // so the SW always activates even if the network is slow or fails.
   var freshUrl = APP_URL + '?_sw=' + Date.now();
   e.waitUntil(
     fetch(freshUrl, { cache: 'no-store' })
       .then(function(res) {
         return caches.open(CACHE).then(function(cache) {
-          // Store under the canonical APP_URL so fetch handler can match it.
           return cache.put(APP_URL, res);
         });
       })
+      .catch(function() { /* fetch failed — SW still activates, will fetch on demand */ })
       .then(function() { return self.skipWaiting(); })
   );
 });
@@ -29,11 +29,11 @@ self.addEventListener('activate', function(e) {
     })
     .then(function() { return self.clients.claim(); })
     .then(function() {
-      // Force all open app windows to reload so they get the fresh cached HTML
-      // immediately — no manual refresh needed.
+      // Best-effort: force all open app windows to reload.
+      // Works on iOS 15.4+ and all modern browsers.
       return self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-        .then(function(clients) {
-          return Promise.all(clients.map(function(c) {
+        .then(function(list) {
+          return Promise.all(list.map(function(c) {
             return c.navigate(c.url).catch(function() {});
           }));
         });
@@ -42,32 +42,28 @@ self.addEventListener('activate', function(e) {
 });
 
 self.addEventListener('fetch', function(e) {
-  // Only intercept navigation requests for the app HTML.
   if (e.request.mode !== 'navigate') return;
   var url = e.request.url;
   var isApp = url.startsWith(APP_URL) || url === APP_URL.slice(0, -1);
   if (!isApp) return;
 
-  // Serve the cached fresh HTML directly — no redirect needed.
+  // Serve cached HTML if available, otherwise fetch fresh with cache-busting.
   e.respondWith(
     caches.match(APP_URL).then(function(cached) {
-      return cached || fetch(APP_URL, { cache: 'no-store' });
+      return cached || fetch(APP_URL + '?_r=' + Date.now(), { cache: 'no-store' });
     })
   );
 });
 
-// Push notifications
 self.addEventListener('push', function(e) {
   var data = {};
   try { data = e.data.json(); } catch(err) { data = { title: 'Esav', body: e.data ? e.data.text() : '' }; }
-  var options = {
+  e.waitUntil(self.registration.showNotification(data.title || 'Esav', {
     body: data.body || '',
     icon: '/life-manager/icon-192.png',
     badge: '/life-manager/icon-192.png',
-    data: data,
-    requireInteraction: false
-  };
-  e.waitUntil(self.registration.showNotification(data.title || 'Esav', options));
+    data: data
+  }));
 });
 
 self.addEventListener('notificationclick', function(e) {
