@@ -90,7 +90,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v250…';
+  b.textContent = 'v251…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -98,7 +98,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v250'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v251'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -4181,16 +4181,15 @@ function showPage(pageId) {
     if(moreBtn) moreBtn.classList.add('active');
   }
   state.currentPage=pageId;
-  if (pageId==='dashboard') {
-    setDashView('seven');
-    checkMissedTasks();
-  }
-  if (pageId==='calendar')  renderCalendar();
-  if (pageId==='notes')     renderNotes();
-  if (pageId==='learning')  renderLearning();
-  if (pageId==='financial') renderFinancial();
-  if (pageId==='goals')     { renderGoals(); _initGoalsUI(); }
-  if (pageId==='people')    { if(window._loadPeople) window._loadPeople(); }
+  try {
+    if (pageId==='dashboard') { setDashView('seven'); checkMissedTasks(); }
+    if (pageId==='calendar')  renderCalendar();
+    if (pageId==='notes')     renderNotes();
+    if (pageId==='learning')  renderLearning();
+    if (pageId==='financial') renderFinancial();
+    if (pageId==='goals')     { renderGoals(); _initGoalsUI(); }
+    if (pageId==='people')    { if(window._loadPeople) window._loadPeople(); }
+  } catch(e) { console.error('[showPage:'+pageId+'] render error:', e); }
 }
 
 // ============================================================
@@ -5773,9 +5772,13 @@ window.toggleWtHistWeek=function(wi){
 // ============================================================
 // EVENT LISTENERS
 // ============================================================
+// Null-safe addEventListener helper — silently skips missing elements
+function _on(id, ev, fn) { var el=document.getElementById(id); if(el) el.addEventListener(ev,fn); }
+
 var _initListenersDone = false;
 function initListeners() {
   if (_initListenersDone) return;
+  try {
   // Page navigation
   document.querySelectorAll('.header-nav-tab').forEach(function(tab){ tab.addEventListener('click',function(){showPage(tab.dataset.page);}); });
 
@@ -6513,6 +6516,7 @@ function initListeners() {
   });
 
   initKeyboardShortcuts();
+  } catch(e) { console.error('[initListeners] threw:', e); }
   _initListenersDone = true;
 }
 
