@@ -1,9 +1,11 @@
-// v268: CDN cache-bust for HTML navigation requests.
-// cache:'no-store' bypasses the browser cache, but NOT Fastly CDN edge cache.
-// For HTML page loads (navigate mode), we append ?_cb=<minute> to the URL,
-// which makes the CDN treat it as a brand-new URL → cache miss → fresh origin.
-// This guarantees the browser always gets the latest index.html regardless of
-// what Fastly has cached at the user's geographic edge node.
+// v269: bypass CDN edge cache by fetching /index.html instead of /
+//
+// GitHub Pages' Fastly CDN ignores query parameters in cache keys — they
+// all map to the same cached object. BUT /life-manager/ and
+// /life-manager/index.html are DIFFERENT cache entries. Since traffic
+// has always gone to /life-manager/, the CDN may have that stale.
+// /life-manager/index.html is a fresh cache entry → always a MISS →
+// always fetched from origin → always the latest version.
 
 self.addEventListener('install', function() {
   self.skipWaiting();
@@ -28,21 +30,18 @@ self.addEventListener('activate', function(e) {
 self.addEventListener('fetch', function(e) {
   var req = e.request;
 
-  // For HTML navigation requests on our own origin, bust the CDN edge cache.
-  // Fastly caches by URL — a unique ?_cb= param forces a cache miss → fresh HTML.
+  // For HTML navigation requests on our origin, fetch /index.html explicitly.
+  // CDN caches /life-manager/ and /life-manager/index.html as separate entries.
+  // /index.html path forces a fresh CDN miss → origin fetch → latest HTML.
   if (req.mode === 'navigate' && req.url.indexOf(self.location.origin) === 0) {
-    var url = new URL(req.url);
-    // Use seconds-precision timestamp so every page load gets a unique URL.
-    // This guarantees a CDN cache miss every time.
-    url.searchParams.set('_cb', Date.now());
     e.respondWith(
-      fetch(url.toString(), { cache: 'no-store' })
+      fetch(self.location.origin + '/life-manager/index.html', { cache: 'no-store' })
         .catch(function() { return fetch(req); })
     );
     return;
   }
 
-  // All other requests: bypass browser cache, let CDN serve normally.
+  // All other requests: bypass browser cache.
   e.respondWith(
     fetch(req, { cache: 'no-store' }).catch(function() {
       return fetch(req);
