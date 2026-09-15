@@ -99,7 +99,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v254…';
+  b.textContent = 'v255…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -107,7 +107,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v254'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = 'v255'+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
@@ -4207,7 +4207,15 @@ function showPage(pageId) {
   setTimeout(function(){var e=document.getElementById('_dbgBanner');if(e)e.remove();},3000);
   if (pageId==='dashboard') { setDashView('seven'); checkMissedTasks(); }
   else if (pageId==='calendar')  renderCalendar();
-  else if (pageId==='notes')     renderNotes();
+  else if (pageId==='notes') {
+    // Force visible test content — if THIS shows, CSS is fine and render is the bug
+    var _ns=document.getElementById('notesSidebar');
+    var _nm=document.getElementById('notesMain');
+    if(_ns) _ns.innerHTML='<div style="padding:10px;color:red;font-weight:bold">SIDEBAR OK</div>';
+    if(_nm) _nm.innerHTML='<div style="padding:10px;color:blue;font-weight:bold">MAIN OK — '+(_ns?'sidebar found':'sidebar MISSING')+'</div>';
+    if(!_ns||!_nm) _showErr('notes elements missing: sidebar='+!!_ns+' main='+!!_nm);
+    renderNotes();
+  }
   else if (pageId==='learning')  renderLearning();
   else if (pageId==='financial') renderFinancial();
   else if (pageId==='goals')     { renderGoals(); _initGoalsUI(); }
