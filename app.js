@@ -1,6 +1,6 @@
 'use strict';
 
-// v260 — force SW update check on every load
+// v261 — force SW update check on every load
 if (navigator.serviceWorker) {
   navigator.serviceWorker.ready.then(function(reg) {
     reg.update();

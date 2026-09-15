@@ -1,22 +1,37 @@
-// v253: minimal SW — no fetch interception, push notifications only.
-// All network requests go directly through the browser.
+// v261: intercept only index.html — serve it fresh from network always.
+// All other assets use the browser's normal cache (versioned URLs handle busting).
 self.addEventListener('install', function() { self.skipWaiting(); });
 
 self.addEventListener('activate', function(e) {
-  // Clear all old caches so nothing stale is served
   e.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(keys.map(function(k) { return caches.delete(k); }));
     }).then(function() {
       return self.clients.claim();
+    }).then(function() {
+      // Force all open windows to reload so they pick up fresh index.html
+      return self.clients.matchAll({ type: 'window' });
+    }).then(function(clients) {
+      clients.forEach(function(c) {
+        try { c.navigate(c.url); } catch(err) {}
+      });
     })
   );
 });
 
-// NO fetch handler — browser fetches everything directly from the network.
-// Versioned URLs (app.js?v=260, style.css?v=215) bust the HTTP cache.
+// Only intercept the HTML page itself — always fetch it fresh, never from cache
+self.addEventListener('fetch', function(e) {
+  var url = e.request.url;
+  var isHTML = url.includes('/life-manager/index.html') ||
+               url.endsWith('/life-manager/') ||
+               url.endsWith('/life-manager');
+  if (isHTML) {
+    e.respondWith(fetch(e.request, { cache: 'no-store' }));
+  }
+  // Everything else: fall through to browser's normal cache handling
+});
 
-// Push notification handler
+// Push notifications
 self.addEventListener('push', function(e) {
   var data = {};
   try { data = e.data.json(); } catch(err) { data = { title: 'Esav', body: e.data ? e.data.text() : '' }; }
