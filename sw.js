@@ -1,4 +1,4 @@
-// v272: NO caching. Every navigation and every asset always fetched from network.
+// v273: NO caching. Every navigation and every asset always fetched from network.
 // Prior versions used cache-first for go.html which caused stale content to be
 // served indefinitely. This version deletes every cache on activate and never
 // writes to any cache, so there is no stuck-SW cache layer.

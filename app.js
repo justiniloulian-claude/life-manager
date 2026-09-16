@@ -1,6 +1,8 @@
 'use strict';
 
-// v272 — register SW immediately (not inside init/login), auto-reload on SW update
+var APP_VERSION = 'v273';
+
+// v273 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
   // controllerchange fires when a new SW takes over — reload to get fresh HTML
   navigator.serviceWorker.addEventListener('controllerchange', function() {
@@ -111,7 +113,7 @@ function _initSyncBadge(){
     'background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:4px 8px;'+
     'border-radius:12px;font-family:monospace;pointer-events:none;'+
     'transition:opacity 0.4s;opacity:1;';
-  b.textContent = 'v256…';
+  b.textContent = APP_VERSION+'…';
   document.body.appendChild(b);
   _syncBadge = b;
 }
@@ -119,7 +121,7 @@ function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
-  _syncBadge.textContent = 'v256'+(icons[st]||st)+(detail?' '+detail:'');
+  _syncBadge.textContent = APP_VERSION+(icons[st]||st)+(detail?' '+detail:'');
   _syncBadge.style.opacity = '1';
   _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
                                  st==='ok'  ?'rgba(0,120,0,0.75)':
