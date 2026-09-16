@@ -1,26 +1,17 @@
-// v271: path-independent — works on GitHub Pages (/life-manager/) and
-// Cloudflare Pages (/) without hardcoded origins or paths.
-// APP_URL is derived from self.location so it always points to the right host.
+// v272: NO caching. Every navigation and every asset always fetched from network.
+// Prior versions used cache-first for go.html which caused stale content to be
+// served indefinitely. This version deletes every cache on activate and never
+// writes to any cache, so there is no stuck-SW cache layer.
 
-var CACHE = 'lm-v271';
-var APP_URL = self.location.origin + (self.location.pathname.replace('sw.js', 'go.html'));
-
-self.addEventListener('install', function(e) {
+self.addEventListener('install', function() {
   self.skipWaiting();
-  e.waitUntil(
-    caches.open(CACHE).then(function(cache) {
-      return fetch(APP_URL, { cache: 'no-store' }).then(function(resp) {
-        return cache.put(APP_URL, resp);
-      });
-    }).catch(function() {})
-  );
 });
 
 self.addEventListener('activate', function(e) {
+  // Delete every cache from every previous SW version without exception.
   e.waitUntil(
     caches.keys().then(function(keys) {
-      return Promise.all(keys.filter(function(k) { return k !== CACHE; })
-        .map(function(k) { return caches.delete(k); }));
+      return Promise.all(keys.map(function(k) { return caches.delete(k); }));
     }).then(function() {
       return self.clients.claim();
     }).then(function() {
@@ -33,20 +24,12 @@ self.addEventListener('activate', function(e) {
   );
 });
 
+// Never cache anything. Pass every request straight to the network.
+// cache:'no-store' tells the browser not to store the response in its HTTP cache.
 self.addEventListener('fetch', function(e) {
-  var req = e.request;
-  if (req.mode === 'navigate') {
-    e.respondWith(
-      caches.match(APP_URL).then(function(cached) {
-        if (cached) return cached;
-        return fetch(APP_URL, { cache: 'no-store' });
-      })
-    );
-    return;
-  }
   e.respondWith(
-    fetch(req, { cache: 'no-store' }).catch(function() {
-      return fetch(req);
+    fetch(e.request, { cache: 'no-store' }).catch(function() {
+      return fetch(e.request);
     })
   );
 });
