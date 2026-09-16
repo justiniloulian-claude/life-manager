@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v283';
+var APP_VERSION = 'v284';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -504,6 +504,7 @@ const state = {
   editCheshbonItemId: null,
   healthDate: toDateStr(new Date()),
   physFunRating: 0,
+  editYearlyGoalId: null,
   editHealthFoodId: null,
   editActivityPlanDay: null,
   editActivityPlanId: null,
@@ -597,6 +598,9 @@ function getData() {
     freeReflHistory:      _sg('dm_free_refl_history',      []),
     monthlyJewishHistory: _sg('dm_monthly_jewish_history', []),
     monthlySecularHistory:_sg('dm_monthly_secular_history',[]),
+    yearlyHistory:        _sg('dm_yearly_history',         []),
+    yearlyGoals:          _sg('dm_yearly_goals',           []),
+    yearlyDraft:          _sg('dm_yearly_draft',           {year:''}),
     monthlyJewishDraft:   _sg('dm_monthly_jewish_draft',   {month:''}),
     monthlySecularDraft:  _sg('dm_monthly_secular_draft',  {month:'',text:''}),
     weightEntries:        _sg('dm_weight_entries',         {}),
@@ -642,6 +646,9 @@ function saveWLS(v) { _syncSave('dm_weekly_last_sunday',         v); }
 function saveFRH(v) { _syncSave('dm_free_refl_history',          JSON.stringify(v)); }
 function saveMJH(v) { _syncSave('dm_monthly_jewish_history',     JSON.stringify(v)); }
 function saveMSH(v) { _syncSave('dm_monthly_secular_history',    JSON.stringify(v)); }
+function saveYH(v)  { _syncSave('dm_yearly_history',             JSON.stringify(v)); }
+function saveYG(v)  { _syncSave('dm_yearly_goals',               JSON.stringify(v)); }
+function saveYD(v)  { _syncSave('dm_yearly_draft',               JSON.stringify(v)); }
 function saveMJD(v) { _syncSave('dm_monthly_jewish_draft',       JSON.stringify(v)); }
 function saveMSD(v) { _syncSave('dm_monthly_secular_draft',      JSON.stringify(v)); }
 function saveWtE(v) { _syncSave('dm_weight_entries',             JSON.stringify(v)); }
@@ -2584,17 +2591,29 @@ function _getSupportedMime() {
   return '';
 }
 
+// ── Recorder scoping ─────────────────────────────────────────────────────────
+// One recorder implementation, mounted in both the Monthly and Yearly tabs.
+// Monthly keeps the original unsuffixed element ids; Yearly's are suffixed
+// '-yearly'. _recEl() resolves whichever mount is currently in use, so the
+// recording/playback/storage logic below is shared rather than duplicated.
+var _recScope = 'monthly';
+function _recEl(base, scope) {
+  var s = scope || _recScope;
+  return document.getElementById(s === 'monthly' ? base : base + '-' + s);
+}
+
 function _startRecordTimer() {
   clearInterval(_recordTimerInt);
   _recordTimerInt = setInterval(function() {
     _recordSecs++;
     var m = Math.floor(_recordSecs/60), s = _recordSecs%60;
-    var el = document.getElementById('recordTimer');
+    var el = _recEl('recordTimer');
     if (el) el.textContent = m+':'+(s<10?'0':'')+s;
   }, 1000);
 }
 
-window.startRecording = function() {
+window.startRecording = function(scope) {
+  _recScope = scope || 'monthly';
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     alert('Microphone access is not available in this browser.'); return;
   }
@@ -2612,26 +2631,27 @@ window.startRecording = function() {
       var mime = _recordMime || 'audio/webm';
       _currentAudioBlob = new Blob(_audioChunks, {type: mime});
       var url = URL.createObjectURL(_currentAudioBlob);
-      var ap = document.getElementById('audioPlayback');
+      var ap = _recEl('audioPlayback');
       if (ap) ap.innerHTML = buildAudioPlayerHTML(url, 'preview-player');
-      var db = document.getElementById('btnDiscardRecording');
+      var db = _recEl('btnDiscardRecording');
       if (db) db.style.display = '';
       stream.getTracks().forEach(function(t){t.stop();});
     });
     _mediaRecorder.start(250); // collect chunks every 250ms for reliability
-    document.getElementById('btnStartRecord').style.display  = 'none';
-    document.getElementById('btnStopRecord').style.display   = '';
-    document.getElementById('btnPauseRecord').style.display  = '';
-    document.getElementById('btnPauseRecord').textContent    = '⏸ Pause';
-    document.getElementById('recordTimer').style.display     = '';
+    _recEl('btnStartRecord').style.display  = 'none';
+    _recEl('btnStopRecord').style.display   = '';
+    _recEl('btnPauseRecord').style.display  = '';
+    _recEl('btnPauseRecord').textContent    = '⏸ Pause';
+    _recEl('recordTimer').style.display     = '';
     _startRecordTimer();
   }).catch(function(err) { alert('Could not access microphone: '+err.message); });
 };
 
-window.pauseRecording = function() {
+window.pauseRecording = function(scope) {
+  if (scope) _recScope = scope;
   if (!_mediaRecorder) return;
-  var btn = document.getElementById('btnPauseRecord');
-  var timerEl = document.getElementById('recordTimer');
+  var btn = _recEl('btnPauseRecord');
+  var timerEl = _recEl('recordTimer');
   if (_mediaRecorder.state === 'recording') {
     _mediaRecorder.pause();
     clearInterval(_recordTimerInt);
@@ -2645,37 +2665,40 @@ window.pauseRecording = function() {
   }
 };
 
-window.stopRecording = function() {
+window.stopRecording = function(scope) {
+  if (scope) _recScope = scope;
   clearInterval(_recordTimerInt);
-  var timerEl = document.getElementById('recordTimer');
+  var timerEl = _recEl('recordTimer');
   if (timerEl) { timerEl.style.display = 'none'; timerEl.style.opacity = '1'; }
   // Show a brief "Processing…" indicator while waiting for the stop event
-  var ap = document.getElementById('audioPlayback');
+  var ap = _recEl('audioPlayback');
   if (ap && _mediaRecorder && _mediaRecorder.state !== 'inactive') {
     ap.innerHTML = '<span style="font-size:13px;color:#9ca3af;padding:6px 0;display:block">Processing recording…</span>';
   }
   if (_mediaRecorder && _mediaRecorder.state !== 'inactive') _mediaRecorder.stop();
-  document.getElementById('btnStartRecord').style.display  = '';
-  document.getElementById('btnStopRecord').style.display   = 'none';
-  document.getElementById('btnPauseRecord').style.display  = 'none';
+  _recEl('btnStartRecord').style.display  = '';
+  _recEl('btnStopRecord').style.display   = 'none';
+  _recEl('btnPauseRecord').style.display  = 'none';
 };
 
-window.discardRecording = function() {
+window.discardRecording = function(scope) {
+  if (scope) _recScope = scope;
   _currentAudioBlob = null;
   _audioChunks = [];
-  var ap = document.getElementById('audioPlayback'); if (ap) ap.innerHTML = '';
-  var db = document.getElementById('btnDiscardRecording'); if (db) db.style.display = 'none';
-  var fi = document.getElementById('audioFileInput'); if (fi) fi.value = '';
+  var ap = _recEl('audioPlayback'); if (ap) ap.innerHTML = '';
+  var db = _recEl('btnDiscardRecording'); if (db) db.style.display = 'none';
+  var fi = _recEl('audioFileInput'); if (fi) fi.value = '';
 };
 
-window.uploadAudioFile = function(input) {
+window.uploadAudioFile = function(input, scope) {
+  _recScope = scope || 'monthly';
   var file = input.files && input.files[0];
   if (!file) return;
   _currentAudioBlob = file;
   var url = URL.createObjectURL(file);
-  var ap = document.getElementById('audioPlayback');
+  var ap = _recEl('audioPlayback');
   if (ap) ap.innerHTML = buildAudioPlayerHTML(url, 'preview-player');
-  var db = document.getElementById('btnDiscardRecording');
+  var db = _recEl('btnDiscardRecording');
   if (db) db.style.display = '';
 };
 
@@ -2836,13 +2859,250 @@ window.jewishDrop = function(e, targetId) {
   renderJewishHist();
 };
 
+// A recording transferred to Yearly is shared by reference (same audioKey), so
+// deleting one entry must not destroy audio another entry still points at.
+function _audioKeyStillUsed(audioKey, excludeId) {
+  if (!audioKey) return false;
+  var data = getData();
+  return (data.monthlyJewishHistory || []).concat(data.yearlyHistory || [])
+    .some(function(e){ return e.id !== excludeId && e.audioKey === audioKey; });
+}
+function _releaseAudio(audioKey, excludeId) {
+  if (!audioKey) return;
+  if (_audioKeyStillUsed(audioKey, excludeId)) return;
+  deleteAudioFromFirestore(audioKey);
+  _deleteLocalAudioBlob(audioKey);
+}
+
 window.deleteJewishEntry = function(id, audioKey) {
   if (!confirm('Delete this entry?')) return;
   var data = getData();
   data.monthlyJewishHistory = data.monthlyJewishHistory.filter(function(e){ return e.id !== id; });
   saveMJH(data.monthlyJewishHistory);
-  if (audioKey) { deleteAudioFromFirestore(audioKey); _deleteLocalAudioBlob(audioKey); }
+  _releaseAudio(audioKey, id);
   renderJewishHist();
+};
+
+// ============================================================
+// CHESHBON — YEARLY
+// Mirrors the Monthly tab's structure and storage pattern.
+// ============================================================
+function renderYearlyTab() {
+  var d = getData().yearlyDraft || {year:''};
+  var yi = document.getElementById('yearlyInput');
+  if (yi) yi.value = d.year || '';
+  renderYearlyHist();
+  renderYearlyGoals();
+}
+
+window.saveYearlyDraft = function() {
+  var v = (document.getElementById('yearlyInput')||{}).value || '';
+  saveYD({year: v});
+};
+
+window.storeYearlyEntry = function() {
+  var year = (document.getElementById('yearlyInput')||{}).value.trim();
+  if (!year) { alert('Please enter a year.'); return; }
+
+  // Same guard as Monthly: if the recorder is still finishing, wait for stop.
+  if (_mediaRecorder && _mediaRecorder.state !== 'inactive') {
+    var _onStop = function() {
+      _mediaRecorder.removeEventListener('stop', _onStop);
+      window.storeYearlyEntry();
+    };
+    _mediaRecorder.addEventListener('stop', _onStop);
+    if (_mediaRecorder.state === 'recording' || _mediaRecorder.state === 'paused') _mediaRecorder.stop();
+    return;
+  }
+
+  var doSave = function(audioKey) {
+    var data = getData();
+    data.yearlyHistory.unshift({
+      id: uid(), year: year, audioKey: audioKey || '',
+      storedAt: new Date().toISOString()
+    });
+    saveYH(data.yearlyHistory);
+    saveYD({year: ''});
+    var yi = document.getElementById('yearlyInput'); if (yi) yi.value = '';
+    var ap = document.getElementById('audioPlayback-yearly'); if (ap) ap.innerHTML = '';
+    var db = document.getElementById('btnDiscardRecording-yearly'); if (db) db.style.display = 'none';
+    _currentAudioBlob = null; _audioChunks = [];
+    renderYearlyHist();
+  };
+
+  if (!_currentAudioBlob && _audioChunks.length > 0) {
+    _currentAudioBlob = new Blob(_audioChunks, {type: _recordMime || 'audio/webm'});
+  }
+  if (_currentAudioBlob) {
+    uploadAudioToFirestore(_currentAudioBlob).then(function(key){ doSave(key); }).catch(function(err){
+      alert('Audio upload failed: ' + (err.message || err) + '\nYour entry was NOT saved. Please try again.');
+    });
+  } else {
+    doSave('');
+  }
+};
+
+function renderYearlyHist() {
+  var data = getData();
+  var searchEl = document.getElementById('yearlyHistSearch');
+  var q = (searchEl ? searchEl.value : '').toLowerCase();
+  var list = document.getElementById('yearlyHistList'); if (!list) return;
+  var entries = (data.yearlyHistory || []).filter(function(e) {
+    return !q || (e.year||'').toLowerCase().includes(q) ||
+      new Date(e.storedAt).toLocaleDateString().toLowerCase().includes(q);
+  });
+  if (!entries.length) { list.innerHTML='<div style="color:#aaa;font-size:13px;margin-top:8px">No entries yet.</div>'; return; }
+  list.innerHTML = entries.map(function(e) {
+    var dt = new Date(e.storedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    // .jewish-hist-entry so the shared player logic finds and closes players
+    return '<div class="jewish-hist-entry" id="yhe-'+e.id+'">'+
+      '<div style="display:flex;align-items:center;gap:6px">'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'+
+            '<span class="jewish-hist-month" id="yhm-'+e.id+'">'+escHtml(e.year)+
+              (e.fromMonthly?'<span class="yearly-from-badge" title="Copied from Monthly">from Monthly</span>':'')+'</span>'+
+            '<span style="display:flex;align-items:center;gap:4px;flex-shrink:0">'+
+              '<span class="jewish-hist-date">'+escHtml(dt)+'</span>'+
+              '<button class="btn-icon" title="Rename" onclick="startRenameYearly(\''+e.id+'\')">✏️</button>'+
+              '<button class="btn-icon" style="color:#e53e3e;font-size:14px" title="Delete" onclick="deleteYearlyEntry(\''+e.id+'\',\''+e.audioKey+'\')">🗑</button>'+
+            '</span>'+
+          '</div>'+
+          (e.audioKey ? '<button class="btn-secondary" style="font-size:12px;padding:4px 10px;margin-top:6px" onclick="playJewishAudio(\''+e.audioKey+'\',this)">▶ Play</button>' : '')+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+window.startRenameYearly = function(id) {
+  var span = document.getElementById('yhm-'+id); if (!span) return;
+  var entry = (getData().yearlyHistory||[]).find(function(e){return e.id===id;});
+  var cur = entry ? entry.year : span.textContent;
+  span.innerHTML = '<input class="jewish-rename-input" value="'+escHtml(cur)+'" '+
+    'onblur="commitRenameYearly(\''+id+'\',this)" '+
+    'onkeydown="if(event.key===\'Enter\')this.blur();if(event.key===\'Escape\'){this.dataset.cancel=\'1\';this.blur();}">';
+  var inp = span.querySelector('input'); if (inp){ inp.focus(); inp.select(); }
+};
+
+window.commitRenameYearly = function(id, inp) {
+  if (inp.dataset.cancel) { renderYearlyHist(); return; }
+  var newName = inp.value.trim();
+  if (!newName) { renderYearlyHist(); return; }
+  var data = getData();
+  var entry = data.yearlyHistory.find(function(e){ return e.id===id; });
+  if (entry) { entry.year = newName; saveYH(data.yearlyHistory); }
+  renderYearlyHist();
+};
+
+window.deleteYearlyEntry = function(id, audioKey) {
+  if (!confirm('Delete this entry?')) return;
+  var data = getData();
+  data.yearlyHistory = data.yearlyHistory.filter(function(e){ return e.id !== id; });
+  saveYH(data.yearlyHistory);
+  _releaseAudio(audioKey, id);
+  renderYearlyHist();
+};
+
+// ── Transfer Monthly recordings into Yearly ──────────────────────────────────
+window.openTransferMonthly = function() {
+  var data = getData();
+  var withAudio = (data.monthlyJewishHistory||[]).filter(function(e){ return e.audioKey; });
+  var already = {};
+  (data.yearlyHistory||[]).forEach(function(e){ if(e.audioKey) already[e.audioKey]=true; });
+  var list = document.getElementById('transferMonthlyList');
+  if (!withAudio.length) {
+    list.innerHTML = '<div style="color:#aaa;font-size:13px">No Monthly recordings to transfer yet.</div>';
+  } else {
+    list.innerHTML = withAudio.map(function(e){
+      var dt = new Date(e.storedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      var dup = already[e.audioKey];
+      return '<label class="transfer-row'+(dup?' is-dup':'')+'">'+
+        '<input type="checkbox" class="transfer-chk" value="'+e.id+'"'+(dup?' disabled':'')+'>'+
+        '<span class="transfer-row-body">'+
+          '<span class="transfer-row-title">'+escHtml(e.month)+'</span>'+
+          '<span class="transfer-row-date">'+escHtml(dt)+(dup?' · already in Yearly':'')+'</span>'+
+        '</span></label>';
+    }).join('');
+  }
+  openModal('transferMonthlyModal');
+};
+
+window.confirmTransferMonthly = function() {
+  var ids = [].slice.call(document.querySelectorAll('#transferMonthlyList .transfer-chk:checked'))
+               .map(function(c){ return c.value; });
+  if (!ids.length) { alert('Select at least one recording to transfer.'); return; }
+  var data = getData();
+  // Copy by reference: same audioKey, original month name and date preserved.
+  // The Monthly entry is left untouched.
+  ids.forEach(function(id){
+    var src = data.monthlyJewishHistory.find(function(e){ return e.id===id; });
+    if (!src) return;
+    data.yearlyHistory.unshift({
+      id: uid(), year: src.month, audioKey: src.audioKey || '',
+      storedAt: src.storedAt, fromMonthly: true, sourceId: src.id
+    });
+  });
+  saveYH(data.yearlyHistory);
+  closeModal('transferMonthlyModal');
+  renderYearlyHist();
+};
+
+// ── Yearly goals: title + description, full CRUD ─────────────────────────────
+function renderYearlyGoals() {
+  var el = document.getElementById('yearlyGoalsList'); if (!el) return;
+  var goals = getData().yearlyGoals || [];
+  if (!goals.length) {
+    el.innerHTML = '<div class="stl-empty">No goals yet. Hit + Add Goal to start.</div>';
+    return;
+  }
+  el.innerHTML = goals.map(function(g){
+    return '<div class="ygoal-card">'+
+      '<div class="ygoal-head">'+
+        '<span class="ygoal-title">'+escHtml(g.title)+'</span>'+
+        '<span class="ygoal-actions">'+
+          '<button class="btn-icon" title="Edit" onclick="openYearlyGoalModal(\''+g.id+'\')">✏️</button>'+
+          '<button class="btn-icon" style="color:#e53e3e" title="Delete" onclick="deleteYearlyGoal(\''+g.id+'\')">🗑</button>'+
+        '</span>'+
+      '</div>'+
+      (g.description?'<div class="ygoal-desc">'+escHtml(g.description)+'</div>':'')+
+    '</div>';
+  }).join('');
+}
+
+window.openYearlyGoalModal = function(id) {
+  state.editYearlyGoalId = id || null;
+  var g = id ? (getData().yearlyGoals||[]).find(function(x){return x.id===id;}) : null;
+  document.getElementById('yearlyGoalModalTitle').textContent = g ? 'Edit Goal' : 'Add Goal';
+  document.getElementById('yearlyGoalTitle').value = g ? g.title : '';
+  document.getElementById('yearlyGoalDesc').value  = g ? (g.description||'') : '';
+  openModal('yearlyGoalModal');
+  setTimeout(function(){ document.getElementById('yearlyGoalTitle').focus(); }, 80);
+};
+
+window.saveYearlyGoalModal = function() {
+  var tEl = document.getElementById('yearlyGoalTitle');
+  var title = tEl.value.trim();
+  if (!title) { tEl.classList.add('error'); tEl.focus(); return; }
+  tEl.classList.remove('error');
+  var desc = document.getElementById('yearlyGoalDesc').value.trim();
+  var data = getData();
+  if (state.editYearlyGoalId) {
+    var g = data.yearlyGoals.find(function(x){ return x.id===state.editYearlyGoalId; });
+    if (g) { g.title = title; g.description = desc; }
+  } else {
+    data.yearlyGoals.push({id:uid(), title:title, description:desc, createdAt:new Date().toISOString()});
+  }
+  saveYG(data.yearlyGoals);
+  state.editYearlyGoalId = null;
+  closeModal('yearlyGoalModal');
+  renderYearlyGoals();
+};
+
+window.deleteYearlyGoal = function(id) {
+  if (!confirm('Delete this goal?')) return;
+  var data = getData();
+  saveYG(data.yearlyGoals.filter(function(g){ return g.id!==id; }));
+  renderYearlyGoals();
 };
 
 function renderSecularHist() {
@@ -4318,9 +4578,11 @@ window.setCheshTab = function(tab) {
   document.getElementById('chesh-panel-daily').style.display   = tab==='daily'   ? '' : 'none';
   document.getElementById('chesh-panel-weekly').style.display  = tab==='weekly'  ? '' : 'none';
   document.getElementById('chesh-panel-monthly').style.display = tab==='monthly' ? '' : 'none';
+  document.getElementById('chesh-panel-yearly').style.display  = tab==='yearly'  ? '' : 'none';
   if (tab === 'daily')   { renderCheshbonLeft(); renderCheshbonRight(); renderFreeReflHist(); }
   if (tab === 'weekly')  renderWeeklyTab();
   if (tab === 'monthly') renderMonthlyTab();
+  if (tab === 'yearly')  renderYearlyTab();
 };
 
 // ============================================================
@@ -6267,6 +6529,19 @@ function initListeners() {
   document.getElementById('healthBackTodayBtn').addEventListener('click', function(){
     state.healthDate=toDateStr(new Date()); renderHealth();
   });
+
+  // Yearly goal modal
+  document.getElementById('closeYearlyGoalModal').addEventListener('click', function(){ closeModal('yearlyGoalModal'); });
+  document.getElementById('cancelYearlyGoal').addEventListener('click',     function(){ closeModal('yearlyGoalModal'); });
+  document.getElementById('saveYearlyGoal').addEventListener('click', saveYearlyGoalModal);
+  document.getElementById('yearlyGoalTitle').addEventListener('keydown', function(e){
+    if(e.key==='Enter') document.getElementById('yearlyGoalDesc').focus();
+  });
+
+  // Transfer Monthly -> Yearly modal
+  document.getElementById('closeTransferMonthlyModal').addEventListener('click', function(){ closeModal('transferMonthlyModal'); });
+  document.getElementById('cancelTransferMonthly').addEventListener('click',     function(){ closeModal('transferMonthlyModal'); });
+  document.getElementById('confirmTransferMonthly').addEventListener('click', confirmTransferMonthly);
 
   // Daily 5 checklist — one tap per item
   document.getElementById('physDailyList').addEventListener('click', function(e){

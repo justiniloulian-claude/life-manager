@@ -4059,3 +4059,42 @@ body.dark-mode .phys-star.active { background:#7c3aed; border-color:#7c3aed; col
   .phys-fun-rating { justify-content:space-between; }
   .phys-star { flex:1; }
 }
+
+/* ===== CHESHBON: YEARLY ===== */
+.yearly-from-badge {
+  display:inline-block; margin-left:6px; padding:1px 7px;
+  font-size:10px; font-weight:600; letter-spacing:.02em;
+  background:#ede9fe; color:#6d28d9; border-radius:9px; vertical-align:middle;
+}
+
+.transfer-list { display:flex; flex-direction:column; gap:6px; max-height:340px; overflow-y:auto; }
+.transfer-row {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 12px; border:1px solid #eee; border-radius:10px;
+  background:#fff; cursor:pointer;
+}
+.transfer-row:hover { border-color:#d4d4d4; }
+.transfer-row.is-dup { opacity:.5; cursor:default; }
+.transfer-chk { width:17px; height:17px; flex-shrink:0; accent-color:#7c3aed; }
+.transfer-row-body { display:flex; flex-direction:column; min-width:0; }
+.transfer-row-title { font-size:14px; font-weight:600; color:#1a1a1a; }
+.transfer-row-date  { font-size:12px; color:#999; }
+
+.ygoal-card {
+  border:1px solid #e8e8e8; border-radius:12px; background:#fff;
+  padding:12px 14px; margin-bottom:8px;
+}
+.ygoal-head { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+.ygoal-title { font-size:15px; font-weight:650; color:#1a1a1a; word-break:break-word; }
+.ygoal-actions { display:flex; gap:2px; flex-shrink:0; }
+.ygoal-desc {
+  margin-top:6px; font-size:13.5px; line-height:1.55; color:#666;
+  white-space:pre-wrap; word-break:break-word;
+}
+
+body.dark-mode .transfer-row,
+body.dark-mode .ygoal-card { background:#1c1c1c; border-color:#2e2e2e; }
+body.dark-mode .transfer-row-title,
+body.dark-mode .ygoal-title { color:#e8e8e8; }
+body.dark-mode .ygoal-desc { color:#a8a8a8; }
+body.dark-mode .yearly-from-badge { background:#2e1065; color:#c4b5fd; }

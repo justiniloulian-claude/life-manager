@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Life Manager">
   <title>Dashboard v150</title>
-  <link rel="stylesheet" href="style.css?v=283">
+  <link rel="stylesheet" href="style.css?v=284">
 </head>
 <body>
 
@@ -141,6 +141,7 @@
       <button class="chesh-tab active" onclick="setCheshTab('daily')">Daily</button>
       <button class="chesh-tab" onclick="setCheshTab('weekly')">Weekly</button>
       <button class="chesh-tab" onclick="setCheshTab('monthly')">Monthly</button>
+      <button class="chesh-tab" onclick="setCheshTab('yearly')">Yearly</button>
     </div>
 
     <!-- ===== DAILY PANEL ===== -->
@@ -299,6 +300,51 @@
             </div>
             <div id="secularHistList"></div>
           </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ===== YEARLY PANEL ===== -->
+    <div id="chesh-panel-yearly" style="display:none">
+      <div class="monthly-cols">
+
+        <!-- LEFT: Yearly recordings -->
+        <div class="monthly-col">
+          <div class="monthly-col-title">Year</div>
+          <input type="text" id="yearlyInput" class="field" placeholder="e.g. 5786 / 2026" oninput="saveYearlyDraft()">
+          <div class="record-controls">
+            <button id="btnStartRecord-yearly" class="btn-record" onclick="startRecording('yearly')">⏺ Record</button>
+            <button id="btnPauseRecord-yearly" class="btn-record-pause" onclick="pauseRecording('yearly')" style="display:none">⏸ Pause</button>
+            <button id="btnStopRecord-yearly" class="btn-record-stop" onclick="stopRecording('yearly')" style="display:none">⏹ Stop</button>
+            <span id="recordTimer-yearly" class="record-timer" style="display:none">0:00</span>
+            <label class="btn-upload-audio" title="Upload an audio file from your device">
+              ⬆ Upload
+              <input type="file" id="audioFileInput-yearly" accept="audio/*" style="display:none" onchange="uploadAudioFile(this,'yearly')">
+            </label>
+          </div>
+          <div id="audioPlayback-yearly" style="margin-bottom:6px"></div>
+          <button id="btnDiscardRecording-yearly" class="btn-record-discard" onclick="discardRecording('yearly')" style="display:none">✕ Discard</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn-primary" style="font-size:13px;padding:7px 16px" onclick="storeYearlyEntry()">Store Entry</button>
+            <button class="btn-secondary" style="font-size:13px;padding:7px 16px" onclick="openTransferMonthly()">⇪ Transfer from Monthly</button>
+          </div>
+          <div class="hist-section">
+            <div class="hist-section-hdr">
+              <span>History</span>
+              <input type="text" id="yearlyHistSearch" class="hist-search" placeholder="Search..." oninput="renderYearlyHist()">
+            </div>
+            <div id="yearlyHistList"></div>
+          </div>
+        </div>
+
+        <!-- RIGHT: Yearly goals -->
+        <div class="monthly-col">
+          <div class="monthly-col-title">Goals</div>
+          <div style="text-align:right;margin-bottom:10px">
+            <button class="btn-primary" style="font-size:13px;padding:7px 16px" onclick="openYearlyGoalModal()">+ Add Goal</button>
+          </div>
+          <div id="yearlyGoalsList"></div>
         </div>
 
       </div>
@@ -907,6 +953,44 @@
 </div>
 
 <!-- Simple Item Modal (Short Term / Long Term) -->
+<!-- Yearly Goal Modal -->
+<div id="yearlyGoalModal" class="modal">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-header">
+      <h2 id="yearlyGoalModalTitle">Add Goal</h2>
+      <button class="modal-close" id="closeYearlyGoalModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Title</label>
+      <input type="text" id="yearlyGoalTitle" class="field" placeholder="What's the goal?">
+      <label class="field-label">Description</label>
+      <textarea id="yearlyGoalDesc" class="field" rows="5" placeholder="More detail..."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button id="cancelYearlyGoal" class="btn-cancel">Cancel</button>
+      <button id="saveYearlyGoal" class="btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Transfer Monthly Recordings Modal -->
+<div id="transferMonthlyModal" class="modal">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-header">
+      <h2>Transfer from Monthly</h2>
+      <button class="modal-close" id="closeTransferMonthlyModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-note">Select recordings to copy into Yearly. The original Monthly entry stays where it is.</div>
+      <div id="transferMonthlyList" class="transfer-list"></div>
+    </div>
+    <div class="modal-footer">
+      <button id="cancelTransferMonthly" class="btn-cancel">Cancel</button>
+      <button id="confirmTransferMonthly" class="btn-primary">Copy to Yearly</button>
+    </div>
+  </div>
+</div>
+
 <div id="simpleItemModal" class="modal">
   <div class="modal-box" style="max-width:380px">
     <div class="modal-header">
@@ -1559,8 +1643,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<div id="_ver" style="position:fixed;bottom:4px;right:8px;font-size:10px;color:#aaa;z-index:99990;cursor:pointer" onclick="calDiag()" title="Tap for diagnostics">v283</div>
-<script src="app.js?v=283"></script>
+<div id="_ver" style="position:fixed;bottom:4px;right:8px;font-size:10px;color:#aaa;z-index:99990;cursor:pointer" onclick="calDiag()" title="Tap for diagnostics">v284</div>
+<script src="app.js?v=284"></script>
 </body>
 </html>
 
