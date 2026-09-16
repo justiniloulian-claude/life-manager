@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v277';
+var APP_VERSION = 'v278';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -1377,7 +1377,11 @@ function renderReminderBanner(){
     var key=r.ev.id+'|'+r.label+'|'+r.eventDate;
     return!_isDismissed(key);
   });
-  if(!rems.length)return'';
+  var stRems=getSTRemindersForDate(todayDs).filter(function(r){
+    return!_isDismissed('st|'+r.item.id+'|'+todayDs);
+  });
+  var total=rems.length+stRems.length;
+  if(!total)return'';
   var rows=rems.map(function(r){
     var key=r.ev.id+'|'+r.label+'|'+r.eventDate;
     return'<div class="rem-banner-item">'+
@@ -1388,8 +1392,52 @@ function renderReminderBanner(){
       '<button class="rem-dismiss-btn" onclick="dismissCalReminder(\''+key.replace(/'/g,"\\'")+'\')" >Dismiss</button>'+
     '</div>';
   }).join('');
-  return'<div class="rem-banner"><div class="rem-banner-hdr">🔔 '+rems.length+' upcoming reminder'+(rems.length>1?'s':'')+'</div>'+rows+'</div>';
+  rows+=stRems.map(function(r){
+    var id=r.item.id.replace(/'/g,"\\'");
+    var listLbl=r.list==='shortterm'?'Short term':'Long term';
+    return'<div class="rem-banner-item">'+
+      '<div class="rem-banner-item-info" style="cursor:pointer" onclick="openSTReminderItem(\''+r.list+'\',\''+id+'\')">'+
+        '<span class="rem-banner-title">'+escHtml(r.item.title)+'</span>'+
+        '<span class="rem-banner-when">'+escHtml(listLbl+' · '+r.label)+'</span>'+
+      '</div>'+
+      '<button class="rem-dismiss-btn" onclick="addSTReminderAsTask(\''+r.list+'\',\''+id+'\')">+ Task</button>'+
+      '<button class="rem-dismiss-btn" onclick="dismissSTReminder(\''+id+'\')">Dismiss</button>'+
+    '</div>';
+  }).join('');
+  return'<div class="rem-banner"><div class="rem-banner-hdr">🔔 '+total+' upcoming reminder'+(total>1?'s':'')+'</div>'+rows+'</div>';
 }
+// Tap the reminder text → jump to the item on the Future tab.
+window.openSTReminderItem=function(list,id){
+  showPage('dashboard');
+  setDashView('future');
+  setTimeout(function(){
+    var el=document.querySelector('.stl-item[data-id="'+id+'"][data-list="'+list+'"]');
+    if(el){
+      el.scrollIntoView({behavior:'smooth',block:'center'});
+      el.classList.add('stl-flash');
+      setTimeout(function(){el.classList.remove('stl-flash');},1600);
+    }
+  },60);
+};
+// "+ Task" → drop it on today's dashboard, keeping the original item intact.
+window.addSTReminderAsTask=function(list,id){
+  var data=getData(); var item=(data[list]||[]).find(function(i){return i.id===id;}); if(!item)return;
+  var todayDs=toDateStr(dateFromOffset(0));
+  addTask(todayDs,{title:item.title,notes:item.notes||''});
+  dismissSTReminder(id);
+  refresh();
+};
+window.dismissSTReminder=function(id){
+  var todayDs=toDateStr(dateFromOffset(0));
+  var key='st|'+id+'|'+todayDs;
+  var arr=_getDismissed();
+  if(!arr.some(function(d){return d.key===key;})){
+    arr.push({key:key,ts:Date.now()});
+    localStorage.setItem('dm_dismissed_reminders',JSON.stringify(arr));
+  }
+  var s=document.getElementById('sevenRemBanner'); if(s)s.innerHTML=renderReminderBanner();
+  refresh();
+};
 
 // ============================================================
 // NOTES & FOLDERS
@@ -1449,12 +1497,59 @@ function toggleNotePin(id){ var data=getData(); var n=data.notes.find(function(n
 // ============================================================
 // SHORT TERM / LONG TERM
 // ============================================================
-function addSimpleItem(list,text,notes){ var data=getData(); var arr=data[list]; arr.push({id:uid(),title:text,notes:notes||'',done:false,doneAt:null,createdAt:new Date().toISOString()}); list==='shortterm'?saveST(arr):saveLT(arr); }
-function updateSimpleItem(list,id,text,notes){ var data=getData(); var item=data[list].find(function(i){return i.id===id;}); if(item){item.title=text;item.notes=notes||'';} list==='shortterm'?saveST(data[list]):saveLT(data[list]); }
+function addSimpleItem(list,text,notes,rem){ var data=getData(); var arr=data[list]; arr.push({id:uid(),title:text,notes:notes||'',rem:rem||null,done:false,doneAt:null,createdAt:new Date().toISOString()}); list==='shortterm'?saveST(arr):saveLT(arr); }
+function updateSimpleItem(list,id,text,notes,rem){ var data=getData(); var item=data[list].find(function(i){return i.id===id;}); if(item){item.title=text;item.notes=notes||'';item.rem=rem||null;} list==='shortterm'?saveST(data[list]):saveLT(data[list]); }
 function reorderSimpleList(list,srcId,tgtId){ var data=getData(); var arr=data[list]; var si=arr.findIndex(function(i){return i.id===srcId;}),ti=arr.findIndex(function(i){return i.id===tgtId;}); if(si===-1||ti===-1||si===ti)return; var item=arr.splice(si,1)[0]; arr.splice(ti,0,item); list==='shortterm'?saveST(arr):saveLT(arr); }
 function toggleSimpleItem(list,id){ var data=getData(); var item=data[list].find(function(i){return i.id===id;}); if(item){item.done=!item.done;item.doneAt=item.done?new Date().toISOString():null;} list==='shortterm'?saveST(data[list]):saveLT(data[list]); }
 function deleteSimpleItem(list,id){ var data=getData(); var arr=data[list].filter(function(i){return i.id!==id;}); list==='shortterm'?saveST(arr):saveLT(arr); }
 function moveItemToDay(list,id,ds){ var data=getData(); var item=data[list].find(function(i){return i.id===id;}); if(!item)return; addTask(ds,{title:item.title}); deleteSimpleItem(list,id); }
+
+// ── Short/Long Term reminders ─────────────────────────────────────────────────
+// item.rem = {start:'YYYY-MM-DD', unit:'once'} for a one-time reminder, or
+// {start:'YYYY-MM-DD', n:Number, unit:'days'|'weeks'|'months'|'years'} to repeat.
+// Recurrence counts from `start`, matching how calendar events already work.
+function stRemFiresOn(rem, ds){
+  if(!rem||!rem.start) return false;
+  var start=fromDateStr(rem.start), check=fromDateStr(ds);
+  if(check<start) return false;
+  if(rem.unit==='once') return rem.start===ds;
+  var n=parseInt(rem.n,10)||1;
+  var diffDays=Math.round((check-start)/(1000*60*60*24));
+  if(rem.unit==='days')  return diffDays%n===0;
+  if(rem.unit==='weeks') return diffDays%(n*7)===0;
+  if(rem.unit==='months'){
+    var sd=start.getDate();
+    var totalMonths=(check.getFullYear()-start.getFullYear())*12+(check.getMonth()-start.getMonth());
+    if(totalMonths<0||totalMonths%n!==0) return false;
+    var daysInCM=new Date(check.getFullYear(),check.getMonth()+1,0).getDate();
+    return check.getDate()===Math.min(sd,daysInCM);
+  }
+  if(rem.unit==='years'){
+    var dy=check.getFullYear()-start.getFullYear();
+    if(dy<0||dy%n!==0) return false;
+    return check.getMonth()===start.getMonth()&&check.getDate()===start.getDate();
+  }
+  return false;
+}
+function stRemLabel(rem){
+  if(!rem) return '';
+  if(rem.unit==='once') return 'One time';
+  var n=parseInt(rem.n,10)||1;
+  var unit=rem.unit||'weeks';
+  if(n===1) return 'Every '+unit.replace(/s$/,'');
+  return 'Every '+n+' '+unit;
+}
+// Completed items go quiet — reminders only fire while the item is still open.
+function getSTRemindersForDate(ds){
+  var data=getData(); var out=[];
+  ['shortterm','longterm'].forEach(function(list){
+    (data[list]||[]).forEach(function(item){
+      if(item.done||!item.rem) return;
+      if(stRemFiresOn(item.rem,ds)) out.push({list:list,item:item,label:stRemLabel(item.rem)});
+    });
+  });
+  return out;
+}
 
 // ============================================================
 // REMINDERS
@@ -1868,11 +1963,12 @@ function renderSimpleList(list,containerId) {
   var inc=items.filter(function(i){return !i.done;}); var don=items.filter(function(i){return i.done;});
   el.innerHTML=inc.concat(don).map(function(item){
     var notesHTML=item.notes&&item.notes.trim()?'<div class="stl-item-notes">'+escHtml(item.notes)+'</div>':'';
+    var remHTML=item.rem?'<div class="stl-item-rem">🔔 '+escHtml(stRemLabel(item.rem))+' · from '+escHtml(item.rem.start||'')+'</div>':'';
     return '<div class="stl-item'+(item.done?' is-done':'')+'" draggable="true" data-id="'+item.id+'" data-list="'+list+'" '+
       'ondragstart="stlDragStart(event)" ondragover="stlDragOver(event)" ondrop="stlDrop(event)" ondragleave="stlDragLeave(event)" ondragend="stlDragEnd(event)">' +
       '<div class="stl-drag-handle" title="Drag to reorder">⠿</div>' +
       '<input type="checkbox" class="task-check"'+(item.done?' checked':'')+' onchange="toggleSTItem(\''+list+'\',\''+item.id+'\')">' +
-      '<div class="stl-item-body"><div class="stl-item-title">'+escHtml(item.title)+'</div>'+notesHTML+'</div>' +
+      '<div class="stl-item-body"><div class="stl-item-title">'+escHtml(item.title)+'</div>'+notesHTML+remHTML+'</div>' +
       '<div class="stl-actions">'+
         '<button class="btn-icon" onclick="openEditSTItem(\''+list+'\',\''+item.id+'\')">✏️</button>'+
         (!item.done?'<button class="btn-move" onclick="openMoveToDay(\''+list+'\',\''+item.id+'\')" title="Move to dashboard">→</button>':'')+
@@ -5072,6 +5168,44 @@ function openEditCalEvent(id, ds) {
 window.openEditCalEvent = openEditCalEvent;
 window.removeCalEvent = function(id){ if(confirm('Delete this event?')){ deleteCalEvent(id); closeModal('dayDetailModal'); renderCalendar(); } };
 
+// ── Short/Long Term reminder modal fields ────────────────────────────────────
+// Presets are stored as "<n>-<unit>"; "once" and "custom" are handled separately.
+function _syncSTRemUI(){
+  var v=document.getElementById('simpleItemRemRepeat').value;
+  document.getElementById('simpleItemRemDetail').style.display=v?'':'none';
+  document.getElementById('simpleItemRemCustom').style.display=v==='custom'?'':'none';
+  var startEl=document.getElementById('simpleItemRemStart');
+  if(v&&!startEl.value) startEl.value=toDateStr(new Date());
+}
+function _setSTRemUI(rem){
+  var sel=document.getElementById('simpleItemRemRepeat');
+  var startEl=document.getElementById('simpleItemRemStart');
+  var nEl=document.getElementById('simpleItemRemN');
+  var uEl=document.getElementById('simpleItemRemUnit');
+  if(!rem){ sel.value=''; startEl.value=''; nEl.value=1; uEl.value='days'; _syncSTRemUI(); return; }
+  startEl.value=rem.start||'';
+  if(rem.unit==='once'){ sel.value='once'; }
+  else {
+    var preset=(parseInt(rem.n,10)||1)+'-'+rem.unit;
+    var known=['1-weeks','2-weeks','1-months'];
+    if(known.indexOf(preset)!==-1){ sel.value=preset; }
+    else { sel.value='custom'; nEl.value=parseInt(rem.n,10)||1; uEl.value=rem.unit||'days'; }
+  }
+  _syncSTRemUI();
+}
+function _readSTRemUI(){
+  var v=document.getElementById('simpleItemRemRepeat').value;
+  if(!v) return null;
+  var start=document.getElementById('simpleItemRemStart').value||toDateStr(new Date());
+  if(v==='once') return {start:start,unit:'once'};
+  if(v==='custom'){
+    return {start:start,n:Math.max(1,parseInt(document.getElementById('simpleItemRemN').value,10)||1),
+            unit:document.getElementById('simpleItemRemUnit').value||'days'};
+  }
+  var parts=v.split('-');
+  return {start:start,n:parseInt(parts[0],10)||1,unit:parts[1]};
+}
+
 // Short/Long Term
 window.toggleSTItem  = function(list,id){ toggleSimpleItem(list,id); list==='shortterm'?renderShortTerm():renderLongTerm(); };
 window.deleteSTItem  = function(list,id){ if(confirm('Delete this item?')){ deleteSimpleItem(list,id); list==='shortterm'?renderShortTerm():renderLongTerm(); } };
@@ -5083,6 +5217,7 @@ window.openEditSTItem = function(list,id) {
   document.getElementById('simpleItemLabel').textContent='Task';
   document.getElementById('simpleItemText').value=item.title;
   document.getElementById('simpleItemNotes').value=item.notes||'';
+  _setSTRemUI(item.rem);
   openModal('simpleItemModal');
   setTimeout(function(){document.getElementById('simpleItemText').focus();},80);
 };
@@ -5950,6 +6085,7 @@ function initListeners() {
     document.getElementById('simpleItemLabel').textContent=label||'Task';
     document.getElementById('simpleItemText').value='';
     document.getElementById('simpleItemNotes').value='';
+    _setSTRemUI(null);
     openModal('simpleItemModal');
     setTimeout(function(){document.getElementById('simpleItemText').focus();},80);
   }
@@ -5962,15 +6098,18 @@ function initListeners() {
     var notes=document.getElementById('simpleItemNotes').value.trim();
     if (!text){ document.getElementById('simpleItemText').classList.add('error'); return; }
     document.getElementById('simpleItemText').classList.remove('error');
+    var rem=_readSTRemUI();
     if (state.editSimpleItemId) {
-      updateSimpleItem(state.simpleItemContext,state.editSimpleItemId,text,notes);
+      updateSimpleItem(state.simpleItemContext,state.editSimpleItemId,text,notes,rem);
       state.editSimpleItemId=null;
     } else {
-      addSimpleItem(state.simpleItemContext,text,notes);
+      addSimpleItem(state.simpleItemContext,text,notes,rem);
     }
     closeModal('simpleItemModal');
     state.simpleItemContext==='shortterm'?renderShortTerm():renderLongTerm();
+    refresh();
   });
+  document.getElementById('simpleItemRemRepeat').addEventListener('change', _syncSTRemUI);
   document.getElementById('simpleItemText').addEventListener('keydown', function(e){ if(e.key==='Enter')document.getElementById('saveSimpleItem').click(); });
 
   // Move to Day

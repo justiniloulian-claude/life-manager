@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Life Manager">
   <title>Dashboard v150</title>
-  <link rel="stylesheet" href="style.css?v=215">
+  <link rel="stylesheet" href="style.css?v=278">
 </head>
 <body>
 
@@ -928,6 +928,31 @@
       <input type="text" id="simpleItemText" class="field" placeholder="What is it?">
       <label class="field-label">Notes <span class="optional">optional</span></label>
       <textarea id="simpleItemNotes" class="field" rows="3" placeholder="Any details..."></textarea>
+      <label class="field-label">Reminder <span class="optional">optional</span></label>
+      <select id="simpleItemRemRepeat" class="field">
+        <option value="">No reminder</option>
+        <option value="once">One time</option>
+        <option value="1-weeks">Every week</option>
+        <option value="2-weeks">Every 2 weeks</option>
+        <option value="1-months">Every month</option>
+        <option value="custom">Custom…</option>
+      </select>
+      <div id="simpleItemRemDetail" style="display:none">
+        <label class="field-label">Starting on</label>
+        <input type="date" id="simpleItemRemStart" class="field">
+        <div id="simpleItemRemCustom" style="display:none">
+          <label class="field-label">Repeat every</label>
+          <div style="display:flex;gap:8px">
+            <input type="number" id="simpleItemRemN" class="field" min="1" value="1" style="flex:0.6;text-align:center">
+            <select id="simpleItemRemUnit" class="field" style="flex:1">
+              <option value="days">days</option>
+              <option value="weeks">weeks</option>
+              <option value="months">months</option>
+              <option value="years">years</option>
+            </select>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button id="cancelSimpleItem" class="btn-cancel">Cancel</button>
@@ -1573,8 +1598,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<div id="_ver" style="position:fixed;bottom:4px;right:8px;font-size:10px;color:#aaa;z-index:99990;pointer-events:none">v277</div>
-<script src="app.js?v=277"></script>
+<div id="_ver" style="position:fixed;bottom:4px;right:8px;font-size:10px;color:#aaa;z-index:99990;pointer-events:none">v278</div>
+<script src="app.js?v=278"></script>
 </body>
 </html>
 

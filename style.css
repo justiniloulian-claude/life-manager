@@ -1089,6 +1089,14 @@ body.dark-mode .search-dd-sub { color: #666; }
 .stl-item-body { flex: 1; min-width: 0; }
 .stl-item-title { font-size: 15px; color: #1a1a1a; line-height: 1.4; word-break: break-word; }
 .stl-item-notes { font-size: 13px; color: #888; margin-top: 4px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.stl-item-rem { font-size: 12px; color: #7c3aed; margin-top: 4px; font-weight: 500; }
+.stl-item.is-done .stl-item-rem { opacity: 0.45; }
+.stl-flash { animation: stlFlash 1.6s ease; }
+@keyframes stlFlash {
+  0%, 100% { background: transparent; }
+  20%      { background: #ede9fe; }
+}
+body.dark-mode .stl-item-rem { color: #a78bfa; }
 .stl-item.is-done .stl-item-title { text-decoration: line-through; color: #bbb; }
 .stl-item.is-done .stl-item-notes { color: #ccc; }
 
