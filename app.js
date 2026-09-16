@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v278';
+var APP_VERSION = 'v279';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -158,8 +158,26 @@ function _syncSave(key, str){
 }
 
 // ── Firestore SDK writes (no offline persistence = goes straight to server) ───
+// Firestore hard-caps a document at 1MiB. Oversized writes are rejected by the
+// server, which looks like "saving silently does nothing" — so say so out loud.
+var FS_DOC_LIMIT = 1048576;
 function _fsSaveKey(key, value){
   if(!_uid) return;
+  if(value && value.length > FS_DOC_LIMIT * 0.9){
+    var mb = (value.length/1048576).toFixed(2);
+    _syncStatus('err', key+' too big: '+mb+'MB');
+    if(!document.getElementById('fsSizeWarn')){
+      var w=document.createElement('div');
+      w.id='fsSizeWarn';
+      w.style.cssText='position:fixed;bottom:60px;left:16px;right:16px;background:#fff0f0;'+
+        'border:2px solid #c00;border-radius:12px;padding:14px;font-size:13px;color:#900;z-index:99999';
+      w.textContent='⚠️ "'+key+'" is '+mb+'MB — over Firestore\'s 1MB limit, so it can no longer sync. '+
+        'It is still saved on this device, but will not reach your other devices until it is trimmed.';
+      w.onclick=function(){w.remove();};
+      document.body.appendChild(w);
+    }
+    return;
+  }
   _syncStatus('send');
   var ts = Date.now();
   var ref = _db.collection('users').doc(_uid).collection('appdata');
@@ -716,6 +734,22 @@ var _draggingNoteId=null;
 
 var AUDIO_CHUNK_SIZE = 700000; // ~700KB per chunk, well under Firestore 1MB doc limit
 
+// Long recordings upload as several sequential requests; show progress so the
+// save doesn't look frozen. Call with (0,0) to clear.
+function _audioUploadProgress(done, total) {
+  var el = document.getElementById('audioUploadProgress');
+  if (!total) { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'audioUploadProgress';
+    el.style.cssText = 'position:fixed;bottom:80px;left:16px;right:16px;background:#7c3aed;color:#fff;'+
+      'padding:12px 16px;border-radius:12px;font-size:14px;z-index:99999;text-align:center;'+
+      'box-shadow:0 8px 24px rgba(0,0,0,0.2)';
+    document.body.appendChild(el);
+  }
+  el.textContent = 'Uploading recording… ' + done + ' of ' + total;
+}
+
 function uploadAudioToFirestore(blob) {
   return new Promise(function(resolve, reject) {
     var reader = new FileReader();
@@ -730,19 +764,24 @@ function uploadAudioToFirestore(blob) {
         audioRef.set({ data: dataURI, mime: mime, ts: Date.now(), chunks: 0 })
           .then(function() { resolve(key); }).catch(reject);
       } else {
-        // Split into chunks stored in a subcollection
+        // Split into chunks stored in a subcollection.
+        // Each chunk is written in its own request: a batch commit would put
+        // every chunk in ONE request and blow Firestore's ~10MB request limit,
+        // which defeats the point of chunking (this is what broke long recordings).
         var chunks = [];
         for (var i = 0; i < dataURI.length; i += AUDIO_CHUNK_SIZE) {
           chunks.push(dataURI.slice(i, i + AUDIO_CHUNK_SIZE));
         }
         var chunksRef = audioRef.collection('chunks');
-        var batch = _db.batch();
-        // Store metadata on parent doc
-        batch.set(audioRef, { mime: mime, ts: Date.now(), chunks: chunks.length });
-        for (var j = 0; j < chunks.length; j++) {
-          batch.set(chunksRef.doc(String(j)), { data: chunks[j] });
-        }
-        batch.commit().then(function() { resolve(key); }).catch(reject);
+        var p = audioRef.set({ mime: mime, ts: Date.now(), chunks: chunks.length });
+        chunks.forEach(function(chunk, j) {
+          p = p.then(function() {
+            _audioUploadProgress(j + 1, chunks.length);
+            return chunksRef.doc(String(j)).set({ data: chunk });
+          });
+        });
+        p.then(function() { _audioUploadProgress(0, 0); resolve(key); })
+         .catch(function(e) { _audioUploadProgress(0, 0); reject(e); });
       }
     };
     reader.onerror = reject;
