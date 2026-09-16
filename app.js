@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v282';
+var APP_VERSION = 'v283';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -503,8 +503,8 @@ const state = {
   editReminderId: null,
   editCheshbonItemId: null,
   healthDate: toDateStr(new Date()),
+  physFunRating: 0,
   editHealthFoodId: null,
-  plannerWeekOffset: 0,
   editActivityPlanDay: null,
   editActivityPlanId: null,
   selectedPlanActivityType: '',
@@ -588,10 +588,8 @@ function getData() {
     cheshbonItems:        _sg('dm_cheshbon_items',         []),
     cheshbonChecks:       _sg('dm_cheshbon_checks',        {}),
     cheshbonWeekHistory:  _sg('dm_cheshbon_week_history',  []),
-    dietPlan:             _sg('dm_diet_plan',              {}),
-    healthWater:          _sg('dm_health_water',           {}),
-    activityPlan:         _sg('dm_activity_plan',          {}),
-    activityDone:         _sg('dm_activity_done',          {}),
+    physDaily:            _sg('dm_phys_daily',             {}),
+    physWeekly:           _sg('dm_phys_weekly',            []),
     weeklyItems:          _sg('dm_weekly_items',           []),
     weeklyScores:         _sg('dm_weekly_scores',          {}),
     weeklyHistory:        _sg('dm_weekly_history',         []),
@@ -635,10 +633,8 @@ function saveRHist(v){ _syncSave('dm_refl_history',              JSON.stringify(
 function saveChi(v) { _syncSave('dm_cheshbon_items',             JSON.stringify(v)); }
 function saveChk(v) { _syncSave('dm_cheshbon_checks',            JSON.stringify(v)); }
 function saveChWH(v){ _syncSave('dm_cheshbon_week_history',      JSON.stringify(v)); }
-function saveDietPlan(v){ _syncSave('dm_diet_plan',              JSON.stringify(v)); }
-function saveHW(v)  { _syncSave('dm_health_water',               JSON.stringify(v)); }
-function saveAP(v)  { _syncSave('dm_activity_plan',              JSON.stringify(v)); }
-function saveAD(v)  { _syncSave('dm_activity_done',              JSON.stringify(v)); }
+function savePhysDaily(v) { _syncSave('dm_phys_daily',           JSON.stringify(v)); }
+function savePhysWeekly(v){ _syncSave('dm_phys_weekly',          JSON.stringify(v)); }
 function saveWI(v)  { _syncSave('dm_weekly_items',               JSON.stringify(v)); }
 function saveWS(v)  { _syncSave('dm_weekly_scores',              JSON.stringify(v)); }
 function saveWH(v)  { _syncSave('dm_weekly_history',             JSON.stringify(v)); }
@@ -1461,6 +1457,49 @@ window.dismissCalReminder=function(key){
   var remEl=document.getElementById('sevenRemBanner');
   if(remEl) remEl.innerHTML=renderReminderBanner();
 };
+// Streak + evening nudge, shown near the top of the dashboard so the Physical
+// tab never has to be opened to see where things stand.
+function renderPhysBanner(){
+  var todayDs=toDateStr(new Date());
+  var day=getPhysDay(todayDs);
+  var remaining=PHYS_ITEMS.filter(function(it){ return !day[it.key]; });
+  var done=PHYS_ITEMS.length-remaining.length;
+  var streak=physStreak();
+  var complete=remaining.length===0;
+
+  var evening=new Date().getHours()>=18;
+  var nudge='';
+  if(evening && !complete && !_isDismissed('physnudge|'+todayDs)){
+    nudge='<div class="phys-banner-nudge">'+
+      'Physical tab: water, coffee, stretch, walk, food swap. Two minutes.'+
+      '<button class="phys-banner-x" onclick="event.stopPropagation();dismissPhysNudge()">✕</button>'+
+    '</div>';
+  }
+  var sub = complete
+    ? 'All 5 done today 🎉'
+    : done+'/5 today · still to do: '+remaining.map(function(r){return r.label.toLowerCase();}).join(', ');
+
+  return '<div class="phys-banner'+(complete?' is-complete':'')+'" onclick="goPhysical()">'+
+    '<div class="phys-banner-main">'+
+      '<span class="phys-banner-streak">🔥 '+streak+'</span>'+
+      '<span class="phys-banner-body">'+
+        '<span class="phys-banner-title">day streak</span>'+
+        '<span class="phys-banner-sub">'+escHtml(sub)+'</span>'+
+      '</span>'+
+      '<span class="phys-banner-go">›</span>'+
+    '</div>'+ nudge +'</div>';
+}
+window.goPhysical=function(){ showPage('dashboard'); setDashView('health'); };
+window.dismissPhysNudge=function(){
+  var key='physnudge|'+toDateStr(new Date());
+  var arr=_getDismissed();
+  if(!arr.some(function(d){return d.key===key;})){
+    arr.push({key:key,ts:Date.now()});
+    localStorage.setItem('dm_dismissed_reminders',JSON.stringify(arr));
+  }
+  refresh();
+};
+
 function renderReminderBanner(){
   var todayDs=toDateStr(dateFromOffset(0));
   var rems=getRemindersForDate(todayDs).filter(function(r){
@@ -1697,56 +1736,69 @@ function deleteMoneyIdea(id){ var data=getData(); saveMM(data.moneymaking.filter
 // HEALTH DATA
 // ============================================================
 // Activity plan (weekly repeating template)
-var PLAN_DAYS      = ['mon','tue','wed','thu','fri','sat','sun'];
-var PLAN_DAY_SHORT = {mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat',sun:'Sun'};
-var PLAN_DAY_FULL  = {mon:'Monday',tue:'Tuesday',wed:'Wednesday',thu:'Thursday',fri:'Friday',sat:'Saturday',sun:'Sunday'};
 
-function getPlannerWeekMonday() {
-  var now=new Date(); var dow=now.getDay();
-  var daysToMon=dow===0?-6:1-dow;
-  var mon=new Date(now); mon.setDate(now.getDate()+daysToMon+state.plannerWeekOffset*7); mon.setHours(0,0,0,0);
-  return mon;
-}
-function addActivityPlanItem(day,d){
-  var data=getData(); if(!data.activityPlan[day])data.activityPlan[day]=[];
-  data.activityPlan[day].push({id:uid(),activityType:d.activityType,time:d.time||'',duration:d.duration||''});
-  saveAP(data.activityPlan);
-}
-function updateActivityPlanItem(day,id,d){
-  var data=getData(); var item=(data.activityPlan[day]||[]).find(function(i){return i.id===id;}); if(!item)return;
-  item.activityType=d.activityType; item.time=d.time||''; item.duration=d.duration||'';
-  saveAP(data.activityPlan);
-}
-function deleteActivityPlanItem(day,id){
-  var data=getData(); if(!data.activityPlan[day])return;
-  data.activityPlan[day]=data.activityPlan[day].filter(function(i){return i.id!==id;});
-  saveAP(data.activityPlan);
-}
-function toggleActivityPlanDone(weekKey,itemId){
-  var data=getData(); var key=weekKey+'_'+itemId;
-  data.activityDone[key]=!data.activityDone[key]; saveAD(data.activityDone);
-}
+// ── Physical: daily 5 + streak + weekly fun activity ─────────────────────────
+var PHYS_ITEMS = [
+  {key:'water',   icon:'💧', label:'Water',     hint:'Hit target today'},
+  {key:'coffee',  icon:'☕', label:'Coffee',    hint:'Only when actually needed'},
+  {key:'stretch', icon:'🧘', label:'Stretch',   hint:'Done'},
+  {key:'walk',    icon:'🚶', label:'Walk',      hint:'Done'},
+  {key:'swap',    icon:'🥗', label:'Food swap', hint:"Made today's swap"}
+];
 
-function updateDietPlanDay(day, text) {
-  var data=getData(); data.dietPlan[day]=text; saveDietPlan(data.dietPlan);
+function getPhysDay(ds){ return getData().physDaily[ds] || {}; }
+function togglePhysItem(ds, key){
+  var data=getData();
+  var day=data.physDaily[ds]||{};
+  day[key]=!day[key];
+  data.physDaily[ds]=day;
+  savePhysDaily(data.physDaily);
+  // Update the tapped row in place. Re-rendering the whole list would replace
+  // the node mid-tap, so fast consecutive taps could be dropped.
+  var row=document.querySelector('#physDailyList .phys-item[data-key="'+key+'"]');
+  if(row){
+    row.classList.toggle('is-on', !!day[key]);
+    var chk=row.querySelector('.phys-item-check');
+    if(chk) chk.textContent = day[key] ? '✓' : '';
+  }
+  renderPhysStreakLine();
+  refresh(); // streak banner lives on the dashboard
 }
-function addHealthActivity(ds, d) {
-  var data=getData(); if(!data.healthActivity[ds])data.healthActivity[ds]=[];
-  data.healthActivity[ds].push({id:uid(),activityType:d.activityType,duration:d.duration||'',notes:d.notes||'',createdAt:new Date().toISOString()});
-  saveHA(data.healthActivity);
+function physDayComplete(ds, physDaily){
+  var day=(physDaily||getData().physDaily)[ds];
+  if(!day) return false;
+  return PHYS_ITEMS.every(function(it){ return !!day[it.key]; });
 }
-function updateHealthActivity(ds, id, d) {
-  var data=getData(); var arr=data.healthActivity[ds]||[];
-  var item=arr.find(function(i){return i.id===id;});
-  if(item){item.activityType=d.activityType;item.duration=d.duration||'';item.notes=d.notes||'';} saveHA(data.healthActivity);
+// Streak counts back from today. An unfinished TODAY doesn't break it — the day
+// isn't over yet — so counting starts at yesterday in that case.
+function physStreak(){
+  var physDaily=getData().physDaily;
+  var d=new Date(); d.setHours(0,0,0,0);
+  if(!physDayComplete(toDateStr(d), physDaily)) d.setDate(d.getDate()-1);
+  var n=0;
+  while(physDayComplete(toDateStr(d), physDaily)){ n++; d.setDate(d.getDate()-1); }
+  return n;
 }
-function deleteHealthActivity(ds, id) {
-  var data=getData(); if(!data.healthActivity[ds])return;
-  data.healthActivity[ds]=data.healthActivity[ds].filter(function(i){return i.id!==id;}); saveHA(data.healthActivity);
+function addPhysFunEntry(){
+  var whatEl=document.getElementById('physFunWhat');
+  var what=whatEl.value.trim();
+  if(!what){ whatEl.classList.add('error'); whatEl.focus(); return; }
+  whatEl.classList.remove('error');
+  var rating=state.physFunRating||0;
+  if(!rating){ alert('Pick a fun rating from 1 to 5.'); return; }
+  var data=getData();
+  data.physWeekly.unshift({id:uid(), date:toDateStr(new Date()), what:what, fun:rating});
+  savePhysWeekly(data.physWeekly);
+  whatEl.value=''; state.physFunRating=0;
+  document.querySelectorAll('#physFunRating .phys-star').forEach(function(s){s.classList.remove('active');});
+  renderPhysFun();
 }
-function setHealthWater(ds, level) {
-  var data=getData(); data.healthWater[ds]=level; saveHW(data.healthWater);
-}
+window.deletePhysFunEntry=function(id){
+  if(!confirm('Delete this entry?'))return;
+  var data=getData();
+  savePhysWeekly(data.physWeekly.filter(function(e){return e.id!==id;}));
+  renderPhysFun();
+};
 
 // ============================================================
 // SEED DATA
@@ -1992,9 +2044,10 @@ var _shabbatTimer=null;
 function renderSingle() {
   var date=dateFromOffset(state.dayOffset);
   var ds=toDateStr(date);
+  var physBanner=state.dayOffset===0?renderPhysBanner():'';
   var remBanner=state.dayOffset===0?renderReminderBanner():'';
   var banner=state.dayOffset===0?renderCarryOverBanner():'';
-  document.getElementById('singleDayContainer').innerHTML=remBanner+banner+dayCardHTML(date,false);
+  document.getElementById('singleDayContainer').innerHTML=physBanner+remBanner+banner+dayCardHTML(date,false);
   loadZstrip(ds);
   loadHebrewDate(ds);
   document.getElementById('backToTodayBtn').style.display=state.dayOffset===0?'none':'';
@@ -2018,7 +2071,7 @@ function renderSeven() {
       grid.parentElement.insertBefore(remEl,grid);
     }
   }
-  if(remEl) remEl.innerHTML=renderReminderBanner();
+  if(remEl) remEl.innerHTML=renderPhysBanner()+renderReminderBanner();
   dates.forEach(function(d){ loadHebrewDate(toDateStr(d)); });
   // Shabbat countdown: fetch Thu+Fri zmanim then start ticker
   if(_shabbatTimer){clearInterval(_shabbatTimer);_shabbatTimer=null;}
@@ -3198,146 +3251,74 @@ function renderHealth() {
   if (label) label.textContent = dayName(date) + ', ' + monthDay(date);
   var todayBtn = document.getElementById('healthBackTodayBtn');
   if (todayBtn) todayBtn.style.display = (ds === toDateStr(new Date())) ? 'none' : '';
-  renderHealthWater(ds);
-  renderDietPlan();
-  renderActivityPlanner();
+  renderPhysDaily();
+  renderPhysFun();
   renderWeightTracker();
 }
 
-function renderActivityPlanner() {
-  var grid = document.getElementById('activityPlannerGrid'); if (!grid) return;
-  var data = getData();
-  var monday = getPlannerWeekMonday();
-  var weekKey = toDateStr(monday);
-  var endDate = new Date(monday); endDate.setDate(monday.getDate()+6);
-  // Week label
-  var wLabel = document.getElementById('plannerWeekLabel');
-  if (wLabel) wLabel.textContent = shortMonthDay(monday) + ' – ' + shortMonthDay(endDate);
-  // This week button
-  var twBtn = document.getElementById('plannerThisWeekBtn');
-  if (twBtn) twBtn.style.display = state.plannerWeekOffset === 0 ? 'none' : '';
-  var today = toDateStr(new Date());
-  grid.innerHTML = PLAN_DAYS.map(function(day, idx) {
-    var colDate = new Date(monday); colDate.setDate(monday.getDate()+idx);
-    var colDs = toDateStr(colDate); var isToday = colDs === today;
-    var items = data.activityPlan[day] || [];
-    var itemsHTML = items.map(function(item) {
-      var doneKey = weekKey+'_'+item.id; var isDone = !!data.activityDone[doneKey];
-      var meta = [item.time ? fmt12(item.time) : '', item.duration].filter(Boolean).join(' · ');
-      return '<div class="planner-item'+(isDone?' is-done':'')+'">' +
-        '<input type="checkbox" class="planner-item-check"'+(isDone?' checked':'')+
-        ' onchange="togglePlanDone(\''+weekKey+'\',\''+item.id+'\')">' +
-        '<div class="planner-item-body">' +
-          '<div class="planner-item-type">'+escHtml(item.activityType)+'</div>' +
-          (meta?'<div class="planner-item-meta">'+escHtml(meta)+'</div>':'')+
-        '</div>' +
-        '<div class="planner-item-actions">' +
-          '<button class="btn-icon" style="font-size:11px" onclick="openEditPlanItem(\''+day+'\',\''+item.id+'\')">✏️</button>' +
-          '<button class="btn-icon" style="font-size:11px" onclick="removePlanItem(\''+day+'\',\''+item.id+'\')">🗑</button>' +
-        '</div></div>';
-    }).join('');
-    return '<div class="planner-day-col'+(isToday?' is-today':'')+'">' +
-      '<div class="planner-day-header">'+PLAN_DAY_SHORT[day]+
-        '<div class="planner-day-date">'+shortMonthDay(colDate)+'</div></div>' +
-      '<div class="planner-day-body">'+(itemsHTML||'<div class="planner-day-empty">—</div>')+'</div>' +
-      '<button class="planner-add-row" onclick="openAddPlanItem(\''+day+'\')">+ Add</button>' +
-      '</div>';
+function renderPhysDaily() {
+  var el = document.getElementById('physDailyList'); if (!el) return;
+  var ds = state.healthDate;
+  var day = getPhysDay(ds);
+  el.innerHTML = PHYS_ITEMS.map(function(it){
+    var on = !!day[it.key];
+    return '<div class="phys-item'+(on?' is-on':'')+'" data-key="'+it.key+'" role="button" tabindex="0">'+
+      '<span class="phys-item-check">'+(on?'✓':'')+'</span>'+
+      '<span class="phys-item-icon">'+it.icon+'</span>'+
+      '<span class="phys-item-body">'+
+        '<span class="phys-item-label">'+escHtml(it.label)+'</span>'+
+        '<span class="phys-item-hint">'+escHtml(it.hint)+'</span>'+
+      '</span></div>';
   }).join('');
+  renderPhysStreakLine();
 }
 
-function renderHealthWater(ds) {
-  var data = getData(); var level = data.healthWater[ds] || '';
-  document.querySelectorAll('.water-btn').forEach(function(btn){
-    btn.classList.toggle('active', btn.dataset.level === level);
-  });
+function renderPhysStreakLine() {
+  var line = document.getElementById('physStreakLine'); if (!line) return;
+  var day = getPhysDay(state.healthDate);
+  var done = PHYS_ITEMS.filter(function(it){return !!day[it.key];}).length;
+  var isToday = state.healthDate === toDateStr(new Date());
+  line.innerHTML = '<span class="phys-streak-num">🔥 '+physStreak()+'</span>'+
+    '<span class="phys-streak-txt">day streak</span>'+
+    '<span class="phys-streak-today">'+done+'/5 '+(isToday?'today':'this day')+'</span>';
 }
 
-var DIET_DAYS = ['mon','tue','wed','thu','fri','sat','sun'];
-var DIET_DAY_LABELS = {mon:'Monday',tue:'Tuesday',wed:'Wednesday',thu:'Thursday',fri:'Friday',sat:'Saturday',sun:'Sunday'};
-
-function renderDietPlan() {
-  var data = getData(); var el = document.getElementById('dietPlanGrid'); if(!el)return;
-  el.innerHTML = DIET_DAYS.map(function(day) {
-    var plan = data.dietPlan[day] || '';
-    return '<div class="diet-day-card">'+
-      '<div class="diet-day-label">'+DIET_DAY_LABELS[day]+'</div>'+
-      '<textarea class="diet-day-text" rows="4" placeholder="Plan your meals for '+DIET_DAY_LABELS[day]+'..." onblur="saveDietDay(\''+day+'\',this.value)">'+escHtml(plan)+'</textarea>'+
+function renderPhysFun() {
+  var list = document.getElementById('physFunList'); if (!list) return;
+  var entries = getData().physWeekly || [];
+  var trend = document.getElementById('physFunTrend');
+  if (trend) {
+    if (entries.length < 2) { trend.innerHTML = ''; }
+    else {
+      // oldest -> newest so the line reads left to right
+      var chron = entries.slice().reverse();
+      var recent = chron.slice(-8);
+      var bars = recent.map(function(e){
+        return '<span class="phys-trend-bar" title="'+escHtml(e.what)+' — '+e.fun+'/5" style="height:'+(e.fun*16)+'px"></span>';
+      }).join('');
+      var firstHalf = chron.slice(0, Math.ceil(chron.length/2));
+      var lastHalf  = chron.slice(Math.ceil(chron.length/2));
+      function avg(a){ return a.reduce(function(s,e){return s+e.fun;},0)/a.length; }
+      var delta = avg(lastHalf) - avg(firstHalf);
+      var dir = delta < -0.5 ? '<span class="phys-trend-down">↓ trending down — mix it up?</span>'
+              : delta > 0.5  ? '<span class="phys-trend-up">↑ trending up</span>'
+              : '<span class="phys-trend-flat">→ holding steady</span>';
+      trend.innerHTML = '<div class="phys-trend-bars">'+bars+'</div><div class="phys-trend-note">'+dir+'</div>';
+    }
+  }
+  if (!entries.length) {
+    list.innerHTML = '<div class="stl-empty">No activities logged yet. Add one above.</div>';
+    return;
+  }
+  list.innerHTML = entries.map(function(e){
+    return '<div class="phys-fun-row">'+
+      '<span class="phys-fun-date">'+escHtml(shortMonthDay(fromDateStr(e.date)))+'</span>'+
+      '<span class="phys-fun-what">'+escHtml(e.what)+'</span>'+
+      '<span class="phys-fun-score fun-'+e.fun+'">'+e.fun+'/5</span>'+
+      '<button class="btn-icon" onclick="deletePhysFunEntry(\''+e.id+'\')">🗑</button>'+
     '</div>';
   }).join('');
 }
-
-function renderHealthActivity(ds) {
-  var data = getData(); var items = (data.healthActivity[ds] || []);
-  var el = document.getElementById('healthActivityList'); if(!el)return;
-  if (!items.length) { el.innerHTML='<div class="health-activity-empty">No activities logged yet.</div>'; return; }
-  el.innerHTML = items.map(function(item){
-    return '<div class="health-activity-item">'+
-      '<div class="health-activity-body">'+
-        '<span class="health-activity-type">'+escHtml(item.activityType)+'</span>'+
-        (item.duration?'<span class="health-activity-duration">'+escHtml(item.duration)+'</span>':'')+
-        (item.notes?'<div class="health-activity-notes">'+escHtml(item.notes)+'</div>':'')+
-      '</div>'+
-      '<div class="health-activity-actions">'+
-        '<button class="btn-icon" onclick="openEditHealthActivity(\''+ds+'\',\''+item.id+'\')">✏️</button>'+
-        '<button class="btn-icon" onclick="removeHealthActivity(\''+ds+'\',\''+item.id+'\')">🗑</button>'+
-      '</div></div>';
-  }).join('');
-}
-
-// Activity planner window callbacks
-window.togglePlanDone = function(weekKey, itemId) {
-  toggleActivityPlanDone(weekKey, itemId); renderActivityPlanner();
-};
-window.openAddPlanItem = function(day) {
-  state.editActivityPlanDay=day; state.editActivityPlanId=null; state.selectedPlanActivityType='';
-  document.getElementById('activityPlanModalTitle').textContent='Add — '+PLAN_DAY_FULL[day];
-  document.getElementById('planActivitySave').textContent='Add';
-  document.querySelectorAll('.plan-activity-type-btn').forEach(function(b){b.classList.remove('active');});
-  document.getElementById('planActivityCustom').value='';
-  document.getElementById('planActivityTime').value='';
-  document.getElementById('planActivityDuration').value='';
-  openModal('activityPlanModal');
-};
-window.openEditPlanItem = function(day, id) {
-  var data=getData(); var item=(data.activityPlan[day]||[]).find(function(i){return i.id===id;}); if(!item)return;
-  state.editActivityPlanDay=day; state.editActivityPlanId=id; state.selectedPlanActivityType=item.activityType;
-  document.getElementById('activityPlanModalTitle').textContent='Edit Activity';
-  document.getElementById('planActivitySave').textContent='Save';
-  var isPreset=['Cardio','PT','Stretching','Basketball','Biking','Ab Workouts'].indexOf(item.activityType)!==-1;
-  document.querySelectorAll('.plan-activity-type-btn').forEach(function(b){
-    b.classList.toggle('active', b.dataset.type===item.activityType);
-  });
-  document.getElementById('planActivityCustom').value=isPreset?'':item.activityType;
-  document.getElementById('planActivityTime').value=item.time||'';
-  document.getElementById('planActivityDuration').value=item.duration||'';
-  openModal('activityPlanModal');
-};
-window.removePlanItem = function(day, id) {
-  if(!confirm('Remove this activity?'))return;
-  deleteActivityPlanItem(day,id); renderActivityPlanner();
-};
-
-// Health window callbacks
-window.saveDietDay = function(day, val) { updateDietPlanDay(day, val.trim()); };
-window.openEditHealthActivity = function(ds, id) {
-  var data=getData(); var item=(data.healthActivity[ds]||[]).find(function(i){return i.id===id;}); if(!item)return;
-  state.editHealthActivityId=id;
-  document.getElementById('healthActivityModalTitle').textContent='Edit Activity';
-  // Set type buttons
-  state.selectedActivityType=item.activityType;
-  document.querySelectorAll('.activity-type-btn').forEach(function(btn){
-    btn.classList.toggle('active', btn.dataset.type===item.activityType);
-  });
-  var isPreset=['Cardio','PT','Stretching','Basketball','Biking','Ab Workouts'].indexOf(item.activityType)!==-1;
-  document.getElementById('healthActivityCustom').value=isPreset?'':item.activityType;
-  document.getElementById('healthActivityDuration').value=item.duration||'';
-  document.getElementById('healthActivityNotes').value=item.notes||'';
-  openModal('healthActivityModal');
-};
-window.removeHealthActivity = function(ds, id){
-  if(!confirm('Delete this activity?'))return;
-  deleteHealthActivity(ds,id); renderHealthActivity(ds);
-};
 
 // ============================================================
 // ============================================================
@@ -6287,44 +6268,24 @@ function initListeners() {
     state.healthDate=toDateStr(new Date()); renderHealth();
   });
 
-  // Water picker
-  document.getElementById('waterPicker').addEventListener('click', function(e){
-    var btn=e.target.closest('.water-btn'); if(!btn)return;
-    var level=btn.dataset.level; var ds=state.healthDate;
-    var data=getData(); var current=data.healthWater[ds]||'';
-    setHealthWater(ds, current===level?'':level); renderHealthWater(ds);
+  // Daily 5 checklist — one tap per item
+  document.getElementById('physDailyList').addEventListener('click', function(e){
+    var row=e.target.closest('.phys-item'); if(!row)return;
+    togglePhysItem(state.healthDate, row.dataset.key);
   });
 
-
-  // Activity Plan modal
-  document.getElementById('planActivityTypePicker').addEventListener('click', function(e){
-    var btn=e.target.closest('.plan-activity-type-btn'); if(!btn)return;
-    document.querySelectorAll('.plan-activity-type-btn').forEach(function(b){b.classList.remove('active');});
-    btn.classList.add('active'); state.selectedPlanActivityType=btn.dataset.type;
-    document.getElementById('planActivityCustom').value='';
+  // Weekly fun activity
+  document.getElementById('physFunRating').addEventListener('click', function(e){
+    var b=e.target.closest('.phys-star'); if(!b)return;
+    state.physFunRating=parseInt(b.dataset.val,10);
+    document.querySelectorAll('#physFunRating .phys-star').forEach(function(s){
+      s.classList.toggle('active', parseInt(s.dataset.val,10)<=state.physFunRating);
+    });
   });
-  document.getElementById('planActivityCustom').addEventListener('input', function(){
-    if(this.value.trim()){
-      document.querySelectorAll('.plan-activity-type-btn').forEach(function(b){b.classList.remove('active');});
-      state.selectedPlanActivityType='';
-    }
+  document.getElementById('physFunAddBtn').addEventListener('click', addPhysFunEntry);
+  document.getElementById('physFunWhat').addEventListener('keydown', function(e){
+    if(e.key==='Enter') addPhysFunEntry();
   });
-  document.getElementById('closeActivityPlanModal').addEventListener('click', function(){ closeModal('activityPlanModal'); });
-  document.getElementById('cancelActivityPlan').addEventListener('click',     function(){ closeModal('activityPlanModal'); });
-  document.getElementById('planActivitySave').addEventListener('click', function(){
-    var custom=document.getElementById('planActivityCustom').value.trim();
-    var actType=custom||state.selectedPlanActivityType;
-    if(!actType){alert('Please select or type an activity.');return;}
-    var d={activityType:actType,time:document.getElementById('planActivityTime').value,duration:document.getElementById('planActivityDuration').value.trim()};
-    var day=state.editActivityPlanDay;
-    state.editActivityPlanId?updateActivityPlanItem(day,state.editActivityPlanId,d):addActivityPlanItem(day,d);
-    state.editActivityPlanId=null; state.selectedPlanActivityType='';
-    closeModal('activityPlanModal'); renderActivityPlanner();
-  });
-  // Planner week nav
-  document.getElementById('plannerPrevWeekBtn').addEventListener('click', function(){ state.plannerWeekOffset--; renderActivityPlanner(); });
-  document.getElementById('plannerNextWeekBtn').addEventListener('click', function(){ state.plannerWeekOffset++; renderActivityPlanner(); });
-  document.getElementById('plannerThisWeekBtn').addEventListener('click', function(){ state.plannerWeekOffset=0; renderActivityPlanner(); });
 
   // Reminders
   if(document.getElementById('closeWeightGoalModal'))

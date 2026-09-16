@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Life Manager">
   <title>Dashboard v150</title>
-  <link rel="stylesheet" href="style.css?v=278">
+  <link rel="stylesheet" href="style.css?v=283">
 </head>
 <body>
 
@@ -309,10 +309,10 @@
   <!-- Physical Health View -->
   <div id="healthView" class="view">
 
-    <!-- Water Section (day-navigated) -->
+    <!-- Daily 5 checklist (day-navigated) -->
     <div class="health-section-block">
       <div class="health-section-topbar">
-        <h2 class="health-section-heading">💧 Water</h2>
+        <h2 class="health-section-heading">✅ Daily 5</h2>
         <div class="health-date-nav">
           <button id="healthPrevDayBtn" class="btn-nav">&#8592; Prev</button>
           <button id="healthBackTodayBtn" class="btn-today" style="display:none">Today</button>
@@ -320,40 +320,30 @@
           <button id="healthNextDayBtn" class="btn-nav">Next &#8594;</button>
         </div>
       </div>
-      <div class="health-panel">
-        <div class="health-water-section">
-          <div class="health-section-label">Water Intake</div>
-          <div class="water-picker" id="waterPicker">
-            <button class="water-btn" data-level="not_enough">Not enough</button>
-            <button class="water-btn" data-level="little_more">A little more</button>
-            <button class="water-btn" data-level="fine">Fine</button>
-            <button class="water-btn" data-level="great">Great amount</button>
-          </div>
-        </div>
-      </div>
+      <div id="physStreakLine" class="phys-streak-line"></div>
+      <div id="physDailyList" class="phys-daily-list"></div>
     </div>
 
-    <!-- Weekly Diet Plan -->
+    <!-- Weekly fun activity -->
     <div class="health-section-block" style="margin-top:28px">
       <div class="health-section-topbar">
-        <h2 class="health-section-heading">🥗 Weekly Diet Plan</h2>
-        <span style="font-size:13px;color:#aaa">Fixed weekly template — edit any day below</span>
+        <h2 class="health-section-heading">🎉 Weekly Fun Activity</h2>
+        <span style="font-size:13px;color:#aaa">One hour-long activity a week — keep it fun</span>
       </div>
-      <div id="dietPlanGrid" class="diet-plan-grid"></div>
-    </div>
-
-    <!-- Activity Planner Section (weekly grid) -->
-    <div class="health-section-block" style="margin-top:28px">
-      <div class="health-section-topbar">
-        <h2 class="health-section-heading">🏃 Activity Planner</h2>
-        <div class="planner-week-nav">
-          <button id="plannerPrevWeekBtn" class="btn-nav">&#8592; Prev Week</button>
-          <span id="plannerWeekLabel" class="planner-week-label"></span>
-          <button id="plannerThisWeekBtn" class="btn-today" style="display:none">This Week</button>
-          <button id="plannerNextWeekBtn" class="btn-nav">Next Week &#8594;</button>
+      <div class="phys-fun-add">
+        <input type="text" id="physFunWhat" class="phys-fun-input" placeholder="What did you do?">
+        <div class="phys-fun-rating" id="physFunRating">
+          <span class="phys-fun-rating-label">Fun</span>
+          <button type="button" class="phys-star" data-val="1">1</button>
+          <button type="button" class="phys-star" data-val="2">2</button>
+          <button type="button" class="phys-star" data-val="3">3</button>
+          <button type="button" class="phys-star" data-val="4">4</button>
+          <button type="button" class="phys-star" data-val="5">5</button>
         </div>
+        <button id="physFunAddBtn" class="btn-primary">Add</button>
       </div>
-      <div class="activity-planner-grid" id="activityPlannerGrid"></div>
+      <div id="physFunTrend" class="phys-fun-trend"></div>
+      <div id="physFunList" class="phys-fun-list"></div>
     </div>
 
     <!-- Weight Tracker Section -->
@@ -1517,35 +1507,6 @@
 
 <!-- Health Activity Modal -->
 <!-- Activity Plan Modal -->
-<div id="activityPlanModal" class="modal">
-  <div class="modal-box" style="max-width:420px">
-    <div class="modal-header">
-      <h2 id="activityPlanModalTitle">Add Activity</h2>
-      <button class="modal-close" id="closeActivityPlanModal">&times;</button>
-    </div>
-    <div class="modal-body">
-      <label class="field-label">Activity Type</label>
-      <div class="activity-type-picker" id="planActivityTypePicker">
-        <button type="button" class="plan-activity-type-btn activity-type-btn" data-type="Cardio">Cardio</button>
-        <button type="button" class="plan-activity-type-btn activity-type-btn" data-type="PT">PT</button>
-        <button type="button" class="plan-activity-type-btn activity-type-btn" data-type="Stretching">Stretching</button>
-        <button type="button" class="plan-activity-type-btn activity-type-btn" data-type="Basketball">Basketball</button>
-        <button type="button" class="plan-activity-type-btn activity-type-btn" data-type="Biking">Biking</button>
-        <button type="button" class="plan-activity-type-btn activity-type-btn" data-type="Ab Workouts">Ab Workouts</button>
-      </div>
-      <label class="field-label">Custom activity <span class="optional">optional</span></label>
-      <input type="text" id="planActivityCustom" class="field" placeholder="e.g. Swimming, Yoga...">
-      <label class="field-label">Time <span class="optional">optional</span></label>
-      <input type="time" id="planActivityTime" class="field">
-      <label class="field-label">Duration <span class="optional">optional</span></label>
-      <input type="text" id="planActivityDuration" class="field" placeholder="e.g. 30 min, 1 hour">
-    </div>
-    <div class="modal-footer">
-      <button id="cancelActivityPlan" class="btn-cancel">Cancel</button>
-      <button id="planActivitySave" class="btn-primary">Add</button>
-    </div>
-  </div>
-</div>
 
 <!-- Task right-click context menu -->
 <div id="taskContextMenu" style="display:none;position:fixed;z-index:9999;background:#fff;border:1px solid #e8e8e8;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.13);padding:4px 0;min-width:170px">
@@ -1598,8 +1559,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<div id="_ver" style="position:fixed;bottom:4px;right:8px;font-size:10px;color:#aaa;z-index:99990;cursor:pointer" onclick="calDiag()" title="Tap for diagnostics">v282</div>
-<script src="app.js?v=282"></script>
+<div id="_ver" style="position:fixed;bottom:4px;right:8px;font-size:10px;color:#aaa;z-index:99990;cursor:pointer" onclick="calDiag()" title="Tap for diagnostics">v283</div>
+<script src="app.js?v=283"></script>
 </body>
 </html>
 
