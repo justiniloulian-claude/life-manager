@@ -1,8 +1,8 @@
 'use strict';
 
-var APP_VERSION = 'v273';
+var APP_VERSION = 'v274';
 
-// v273 — register SW immediately (not inside init/login), auto-reload on SW update
+// v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
   // controllerchange fires when a new SW takes over — reload to get fresh HTML
   navigator.serviceWorker.addEventListener('controllerchange', function() {
@@ -6552,7 +6552,12 @@ function initListeners() {
   });
 
   initKeyboardShortcuts();
-  } catch(e) { console.error('[initListeners] threw:', e); }
+  } catch(e) {
+    console.error('[initListeners] threw:', e);
+    document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;bottom:60px;left:16px;right:16px;background:#fff0f0;border:2px solid #c00;border-radius:12px;padding:16px;font-family:monospace;font-size:12px;color:#900;z-index:99999;white-space:pre-wrap">⚠️ Button wiring error — screenshot this:\n'+String(e)+(e&&e.stack?'\n'+e.stack.slice(0,400):'')+'</div>');
+    _initListenersDone = false;
+    return;
+  }
   _initListenersDone = true;
 }
 
