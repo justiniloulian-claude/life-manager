@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v281';
+var APP_VERSION = 'v282';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -1592,7 +1592,7 @@ function updateSimpleItem(list,id,text,notes,rem){ var data=getData(); var item=
 function reorderSimpleList(list,srcId,tgtId){ var data=getData(); var arr=data[list]; var si=arr.findIndex(function(i){return i.id===srcId;}),ti=arr.findIndex(function(i){return i.id===tgtId;}); if(si===-1||ti===-1||si===ti)return; var item=arr.splice(si,1)[0]; arr.splice(ti,0,item); list==='shortterm'?saveST(arr):saveLT(arr); }
 function toggleSimpleItem(list,id){ var data=getData(); var item=data[list].find(function(i){return i.id===id;}); if(item){item.done=!item.done;item.doneAt=item.done?new Date().toISOString():null;} list==='shortterm'?saveST(data[list]):saveLT(data[list]); }
 function deleteSimpleItem(list,id){ var data=getData(); var arr=data[list].filter(function(i){return i.id!==id;}); list==='shortterm'?saveST(arr):saveLT(arr); }
-function moveItemToDay(list,id,ds){ var data=getData(); var item=data[list].find(function(i){return i.id===id;}); if(!item)return; addTask(ds,{title:item.title}); deleteSimpleItem(list,id); }
+function moveItemToDay(list,id,ds){ var data=getData(); var item=data[list].find(function(i){return i.id===id;}); if(!item)return; addTask(ds,{title:item.title,notes:item.notes||''}); deleteSimpleItem(list,id); }
 
 // ── Short/Long Term reminders ─────────────────────────────────────────────────
 // item.rem = {start:'YYYY-MM-DD', unit:'once'} for a one-time reminder, or
@@ -4539,7 +4539,7 @@ window.executeMoveTask = function(fromDs, id, isR, toDs) {
     var key=fromDs+'_'+id;
     data.routineOverrides[key]=data.routineOverrides[key]||{};
     data.routineOverrides[key].skipped=true; saveRO(data.routineOverrides);
-    addTask(toDs,{title:r.title,time:r.time||'',location:r.location||''});
+    addTask(toDs,{title:r.title,time:r.time||'',endTime:r.endTime||'',location:r.location||'',notes:r.notes||'',priority:r.priority||'standard'});
   } else {
     var t=(data.tasks[fromDs]||[]).find(function(t){return t.id===id;}); if(!t)return;
     addTask(toDs,{title:t.title,time:t.time,location:t.location,notes:t.notes,color:t.color,priority:t.priority,linkedNoteIds:t.linkedNoteIds||[]});
@@ -5700,7 +5700,7 @@ function saveCalEventModal() {
     var _tds=d.date||toDateStr(new Date());
     var _existingTasks=(getData().tasks[_tds]||[]);
     var _alreadyAdded=_existingTasks.some(function(t){return !t._rc&&!t._calEv&&t.title===d.title;});
-    if(!_alreadyAdded){addTask(_tds,{title:d.title,time:d.time,color:d.color});}
+    if(!_alreadyAdded){addTask(_tds,{title:d.title,time:d.time,endTime:d.endTime||'',location:d.location||'',notes:d.notes||'',color:d.color});}
   }
   refresh();
   closeModal('calEventModal'); renderCalendar();
@@ -5753,7 +5753,7 @@ window.executeEditCalEvent = function(scope) {
   if(state.pendingAddToDash&&ds&&scope==='single'){
     var _ex2=(getData().tasks[ds]||[]);
     var _dup=_ex2.some(function(t){return !t._rc&&!t._calEv&&t.title===d.title;});
-    if(!_dup){addTask(ds,{title:d.title,time:d.time||'',color:d.color||''});}
+    if(!_dup){addTask(ds,{title:d.title,time:d.time||'',endTime:d.endTime||'',location:d.location||'',notes:d.notes||'',color:d.color||''});}
   }
   refresh();
   state.pendingEditCalData=null; state.pendingEditCalDs=null; state.pendingAddToDash=false;
