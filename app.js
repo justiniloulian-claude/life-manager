@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v280';
+var APP_VERSION = 'v281';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -1010,11 +1010,20 @@ async function _initTodayHeb(){
 }
 // ── Hebrew month-end dates (for "end of Hebrew month" recurrence) ──────────────
 var _hebMonthEndDates = null; // Set<'YYYY-MM-DD'>, null until loaded
+// Loads asynchronously, so re-draw anything already on screen once it lands —
+// otherwise "end of Hebrew month" events stay invisible until the next render.
+function _onHebMonthEndsLoaded() {
+  try {
+    if (state.currentPage === 'calendar') renderCalendar();
+    refresh();
+  } catch(e) {}
+}
 async function _initHebMonthEnds() {
   try {
     var cached = JSON.parse(localStorage.getItem('_hebMonthEndsCache2') || 'null');
     if (cached && cached.ts && Date.now() - cached.ts < 30 * 24 * 60 * 60 * 1000) {
       _hebMonthEndDates = new Set(cached.dates);
+      _onHebMonthEndsLoaded();
       return;
     }
   } catch(e) {}
@@ -1028,7 +1037,11 @@ async function _initHebMonthEnds() {
       (json.items || []).forEach(function(item) {
         var ds = (item.date || '').slice(0, 10); if (!ds) return;
         var isRC = item.category === 'roshchodesh';
-        var isRH = item.category === 'holiday' && (item.title || '').indexOf('Rosh Hashana') !== -1;
+        // "Erev Rosh Hashana" also contains "Rosh Hashana"; counting it made the
+        // earliest date one day early, so the Tishrei month-end landed on 28 Elul
+        // instead of 29 Elul. Match only the day of Rosh Hashana itself.
+        var isRH = item.category === 'holiday' && (item.title || '').indexOf('Rosh Hashana') !== -1
+                   && (item.title || '').indexOf('Erev') === -1;
         if (!isRC && !isRH) return;
         var key = (isRH ? 'RoshHashana' : item.title) + '_' + y;
         if (!rcByKey[key] || ds < rcByKey[key]) rcByKey[key] = ds;
@@ -1042,6 +1055,7 @@ async function _initHebMonthEnds() {
   });
   _hebMonthEndDates = new Set(dates);
   try { localStorage.setItem('_hebMonthEndsCache2', JSON.stringify({ts: Date.now(), dates: dates})); } catch(e) {}
+  _onHebMonthEndsLoaded();
 }
 function _curHebPeriod(){ return _todayHebMonth?(_todayHebMonth.year+'-'+_todayHebMonth.month):''; }
 function _curHebYear(){ return _todayHebMonth?String(_todayHebMonth.year):''; }
@@ -7019,6 +7033,7 @@ function init() {
   seedFinancialIfEmpty();
   updateHeaderDate();
   loadHeaderHebrewDate();
+  _initHebMonthEnds(); // populates the "end of Hebrew month" recurrence dates
   setInterval(updateHeaderDate,60000);
   initListeners();
   initSwipe();
