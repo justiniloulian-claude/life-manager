@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v276';
+var APP_VERSION = 'v277';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
