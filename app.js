@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v274';
+var APP_VERSION = 'v275';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -4225,7 +4225,10 @@ function showPage(pageId) {
     else if (pageId==='financial') renderFinancial();
     else if (pageId==='goals')     { renderGoals(); _initGoalsUI(); }
     else if (pageId==='people')    { if(window._loadPeople) window._loadPeople(); }
-  } catch(e) { console.error('[showPage render]',pageId,e); }
+  } catch(e) {
+    console.error('[showPage render]',pageId,e);
+    document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;bottom:60px;left:16px;right:16px;background:#fff0f0;border:2px solid #c00;border-radius:12px;padding:16px;font-family:monospace;font-size:12px;color:#900;z-index:99999;white-space:pre-wrap">⚠️ Page render error ('+pageId+') — screenshot this:\n'+String(e)+(e&&e.stack?'\n'+e.stack.slice(0,400):'')+'</div>');
+  }
 }
 
 // ============================================================
