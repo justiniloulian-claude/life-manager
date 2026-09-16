@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v279';
+var APP_VERSION = 'v280';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -1230,6 +1230,43 @@ function isRecurringOccurrence(ev, ds) {
   }
   return false;
 }
+// Tap the version badge. Reports anything in calEvents that would stop an
+// event from rendering, since "it saved but never shows" is otherwise invisible.
+window.calDiag = function(){
+  var out=[];
+  try{
+    var raw=localStorage.getItem('dm_calEvents');
+    out.push('dm_calEvents raw size: '+(raw?raw.length:0)+' chars');
+    var data=getData();
+    var evs=data.calEvents;
+    out.push('Array.isArray(calEvents): '+Array.isArray(evs));
+    out.push('event count: '+(evs&&evs.length));
+    var bad=[];
+    (evs||[]).forEach(function(e,i){
+      var problems=[];
+      if(!e.date) problems.push('NO DATE');
+      else if(!/^\d{4}-\d{2}-\d{2}$/.test(e.date)) problems.push('BAD DATE FORMAT "'+e.date+'"');
+      var rec=e.recurring||'none';
+      var known=['none','custom','weekly','biweekly','monthly','hebrew-monthly'];
+      if(known.indexOf(rec)===-1) problems.push('UNKNOWN recurring "'+rec+'"');
+      if(rec==='custom'&&(!e.recurringN||!e.recurringUnit)) problems.push('custom missing N/unit');
+      if(rec==='hebrew-monthly'&&!_hebMonthEndDates) problems.push('hebrew-monthly but date table not loaded');
+      if(e.recurringUntil&&/^\d{4}-\d{2}-\d{2}$/.test(e.recurringUntil)&&fromDateStr(e.recurringUntil)<new Date()) problems.push('recurringUntil is in the PAST');
+      if(problems.length) bad.push('#'+i+' "'+(e.title||'(untitled)')+'": '+problems.join(', '));
+    });
+    out.push('problem events: '+bad.length);
+    if(bad.length) out.push(bad.slice(0,15).join('\n'));
+    var today=toDateStr(new Date());
+    out.push('showing month: '+(state.calMonth+1)+'/'+state.calYear);
+    out.push('getEventsForDate(today '+today+'): '+getEventsForDate(today).length);
+    out.push('hebrew date table loaded: '+(!!_hebMonthEndDates));
+    out.push('screen width: '+window.innerWidth+' (mobile mode: '+isMobile()+')');
+  }catch(e){ out.push('DIAGNOSTIC THREW: '+e); }
+  var txt=out.join('\n');
+  try{ navigator.clipboard.writeText(txt); }catch(e){}
+  alert(txt+'\n\n(copied to clipboard)');
+};
+
 function getEventsForDate(ds){
   var data=getData(); var result=[];
   data.calEvents.forEach(function(ev){
