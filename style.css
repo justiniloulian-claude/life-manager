@@ -4061,11 +4061,6 @@ body.dark-mode .phys-star.active { background:#7c3aed; border-color:#7c3aed; col
 }
 
 /* ===== CHESHBON: YEARLY ===== */
-.yearly-from-badge {
-  display:inline-block; margin-left:6px; padding:1px 7px;
-  font-size:10px; font-weight:600; letter-spacing:.02em;
-  background:#ede9fe; color:#6d28d9; border-radius:9px; vertical-align:middle;
-}
 
 .transfer-list { display:flex; flex-direction:column; gap:6px; max-height:340px; overflow-y:auto; }
 .transfer-row {
@@ -4097,4 +4092,3 @@ body.dark-mode .ygoal-card { background:#1c1c1c; border-color:#2e2e2e; }
 body.dark-mode .transfer-row-title,
 body.dark-mode .ygoal-title { color:#e8e8e8; }
 body.dark-mode .ygoal-desc { color:#a8a8a8; }
-body.dark-mode .yearly-from-badge { background:#2e1065; color:#c4b5fd; }

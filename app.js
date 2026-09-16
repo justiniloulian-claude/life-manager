@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v284';
+var APP_VERSION = 'v285';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -2959,8 +2959,7 @@ function renderYearlyHist() {
       '<div style="display:flex;align-items:center;gap:6px">'+
         '<div style="flex:1;min-width:0">'+
           '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'+
-            '<span class="jewish-hist-month" id="yhm-'+e.id+'">'+escHtml(e.year)+
-              (e.fromMonthly?'<span class="yearly-from-badge" title="Copied from Monthly">from Monthly</span>':'')+'</span>'+
+            '<span class="jewish-hist-month" id="yhm-'+e.id+'">'+escHtml(e.year)+'</span>'+
             '<span style="display:flex;align-items:center;gap:4px;flex-shrink:0">'+
               '<span class="jewish-hist-date">'+escHtml(dt)+'</span>'+
               '<button class="btn-icon" title="Rename" onclick="startRenameYearly(\''+e.id+'\')">✏️</button>'+
