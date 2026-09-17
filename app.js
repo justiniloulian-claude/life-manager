@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v287';
+var APP_VERSION = 'v288';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -505,6 +505,7 @@ const state = {
   healthDate: toDateStr(new Date()),
   physFunRating: 0,
   editYearlyGoalId: null,
+  yearlyGoalYear: null,
   editHealthFoodId: null,
   editActivityPlanDay: null,
   editActivityPlanId: null,
@@ -1009,6 +1010,8 @@ async function _initTodayHeb(){
     _todayHebMonth={month:_HMONTH_NAMES[json.hm]||json.hm,year:json.hy};
     _syncPeriodPicker();
     if(typeof _goalsCache!=='undefined'&&_goalsCache&&_goalsCache.length) _renderGoals(_goalsCache);
+    // Yearly goal folders key off the current Hebrew year, which only exists now
+    try{ if(document.getElementById('yearlyGoalYearBar')) renderYearlyGoals(); }catch(e){}
   }catch(e){}
 }
 // ── Hebrew month-end dates (for "end of Hebrew month" recurrence) ──────────────
@@ -3046,12 +3049,59 @@ window.confirmTransferMonthly = function() {
   renderYearlyHist();
 };
 
-// ── Yearly goals: title + description, full CRUD ─────────────────────────────
+// ── Yearly goals: foldered by Hebrew year ────────────────────────────────────
+// Each goal carries a .year. Goals saved before foldering have none and are
+// treated as belonging to the current Hebrew year.
+// Must not depend on which years already have goals: a year planned ahead of
+// time would otherwise become "the current year" and swallow untagged goals.
+function _defaultGoalYear() {
+  var cur = _curHebYear();
+  if (cur) return cur;
+  // Hebrew date not loaded yet — approximate (Tishrei falls in Sep/Oct).
+  var now = new Date();
+  return String(now.getFullYear() + 3760 + (now.getMonth() >= 8 ? 1 : 0));
+}
+function _goalYearOf(g) { return g.year || _defaultGoalYear(); }
+function _yearlyGoalYears() {
+  var years = {};
+  (getData().yearlyGoals || []).forEach(function(g){ years[_goalYearOf(g)] = true; });
+  years[_defaultGoalYear()] = true;
+  if (state.yearlyGoalYear) years[state.yearlyGoalYear] = true;
+  return Object.keys(years).sort();
+}
+function _activeGoalYear() {
+  var years = _yearlyGoalYears();
+  if (state.yearlyGoalYear && years.indexOf(state.yearlyGoalYear) !== -1) return state.yearlyGoalYear;
+  var def = _defaultGoalYear();
+  return years.indexOf(def) !== -1 ? def : years[years.length-1];
+}
+window.setYearlyGoalYear = function(y) {
+  state.yearlyGoalYear = y;
+  renderYearlyGoalYears();
+  renderYearlyGoals();
+};
+window.addYearlyGoalYear = function() {
+  var y = (prompt('Add a year (e.g. 5788)') || '').trim();
+  if (!y) return;
+  if (!/^\d{4}$/.test(y)) { alert('Enter a 4-digit year, e.g. 5788.'); return; }
+  setYearlyGoalYear(y);
+};
+function renderYearlyGoalYears() {
+  var bar = document.getElementById('yearlyGoalYearBar'); if (!bar) return;
+  var active = _activeGoalYear();
+  bar.innerHTML = _yearlyGoalYears().map(function(y){
+    return '<button class="ygoal-year-pill'+(y===active?' active':'')+'" onclick="setYearlyGoalYear(\''+y+'\')">'+escHtml(y)+'</button>';
+  }).join('') +
+  '<button class="ygoal-year-pill ygoal-year-add" title="Add a year" onclick="addYearlyGoalYear()">+</button>';
+}
+
 function renderYearlyGoals() {
   var el = document.getElementById('yearlyGoalsList'); if (!el) return;
-  var goals = getData().yearlyGoals || [];
+  renderYearlyGoalYears();
+  var year = _activeGoalYear();
+  var goals = (getData().yearlyGoals || []).filter(function(g){ return _goalYearOf(g) === year; });
   if (!goals.length) {
-    el.innerHTML = '<div class="stl-empty">No goals yet. Hit + Add Goal to start.</div>';
+    el.innerHTML = '<div class="stl-empty">No goals for '+escHtml(year)+' yet. Hit + Add Goal to start.</div>';
     return;
   }
   el.innerHTML = goals.map(function(g){
@@ -3094,9 +3144,10 @@ window.saveYearlyGoalModal = function() {
   var data = getData();
   if (state.editYearlyGoalId) {
     var g = data.yearlyGoals.find(function(x){ return x.id===state.editYearlyGoalId; });
-    if (g) { g.title = title; g.goal = goal; g.practice = practice; delete g.description; }
+    if (g) { g.title = title; g.goal = goal; g.practice = practice; g.year = g.year || _activeGoalYear(); delete g.description; }
   } else {
-    data.yearlyGoals.push({id:uid(), title:title, goal:goal, practice:practice, createdAt:new Date().toISOString()});
+    data.yearlyGoals.push({id:uid(), title:title, goal:goal, practice:practice,
+                           year:_activeGoalYear(), createdAt:new Date().toISOString()});
   }
   saveYG(data.yearlyGoals);
   state.editYearlyGoalId = null;

@@ -4098,3 +4098,18 @@ body.dark-mode .transfer-row-title,
 body.dark-mode .ygoal-title { color:#e8e8e8; }
 body.dark-mode .ygoal-field-text { color:#a8a8a8; }
 body.dark-mode .ygoal-field-label { color:#6f6f6f; }
+
+/* Yearly goal year folders */
+.ygoal-year-bar { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+.ygoal-year-pill {
+  padding:5px 13px; border-radius:20px; border:1.5px solid #e4e4e4;
+  background:#fff; color:#777; font-size:13px; font-weight:600;
+  font-variant-numeric:tabular-nums; cursor:pointer;
+  transition:background .12s, border-color .12s, color .12s;
+}
+.ygoal-year-pill:hover { border-color:#c9c9c9; }
+.ygoal-year-pill.active { background:#1a1a1a; border-color:#1a1a1a; color:#fff; }
+.ygoal-year-add { color:#a0a0a0; font-weight:700; padding:5px 11px; }
+
+body.dark-mode .ygoal-year-pill { background:#1c1c1c; border-color:#2e2e2e; color:#999; }
+body.dark-mode .ygoal-year-pill.active { background:#f0f0f0; border-color:#f0f0f0; color:#1a1a1a; }
