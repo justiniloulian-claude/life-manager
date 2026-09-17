@@ -4082,8 +4082,13 @@ body.dark-mode .phys-star.active { background:#7c3aed; border-color:#7c3aed; col
 .ygoal-head { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
 .ygoal-title { font-size:15px; font-weight:650; color:#1a1a1a; word-break:break-word; }
 .ygoal-actions { display:flex; gap:2px; flex-shrink:0; }
-.ygoal-desc {
-  margin-top:6px; font-size:13.5px; line-height:1.55; color:#666;
+.ygoal-field { margin-top:8px; display:flex; flex-direction:column; gap:1px; }
+.ygoal-field-label {
+  font-size:10.5px; font-weight:700; letter-spacing:.06em;
+  text-transform:uppercase; color:#a5a5a5;
+}
+.ygoal-field-text {
+  font-size:13.5px; line-height:1.55; color:#666;
   white-space:pre-wrap; word-break:break-word;
 }
 
@@ -4091,4 +4096,5 @@ body.dark-mode .transfer-row,
 body.dark-mode .ygoal-card { background:#1c1c1c; border-color:#2e2e2e; }
 body.dark-mode .transfer-row-title,
 body.dark-mode .ygoal-title { color:#e8e8e8; }
-body.dark-mode .ygoal-desc { color:#a8a8a8; }
+body.dark-mode .ygoal-field-text { color:#a8a8a8; }
+body.dark-mode .ygoal-field-label { color:#6f6f6f; }

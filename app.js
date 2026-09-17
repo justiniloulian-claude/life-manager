@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v285';
+var APP_VERSION = 'v286';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -3055,6 +3055,8 @@ function renderYearlyGoals() {
     return;
   }
   el.innerHTML = goals.map(function(g){
+    // goals saved before the Goal/Practice split kept their text in .description
+    var practice = g.practice || g.description || '';
     return '<div class="ygoal-card">'+
       '<div class="ygoal-head">'+
         '<span class="ygoal-title">'+escHtml(g.title)+'</span>'+
@@ -3063,7 +3065,10 @@ function renderYearlyGoals() {
           '<button class="btn-icon" style="color:#e53e3e" title="Delete" onclick="deleteYearlyGoal(\''+g.id+'\')">🗑</button>'+
         '</span>'+
       '</div>'+
-      (g.description?'<div class="ygoal-desc">'+escHtml(g.description)+'</div>':'')+
+      (g.goal?'<div class="ygoal-field"><span class="ygoal-field-label">Goal</span>'+
+              '<span class="ygoal-field-text">'+escHtml(g.goal)+'</span></div>':'')+
+      (practice?'<div class="ygoal-field"><span class="ygoal-field-label">Practice</span>'+
+                '<span class="ygoal-field-text">'+escHtml(practice)+'</span></div>':'')+
     '</div>';
   }).join('');
 }
@@ -3072,8 +3077,9 @@ window.openYearlyGoalModal = function(id) {
   state.editYearlyGoalId = id || null;
   var g = id ? (getData().yearlyGoals||[]).find(function(x){return x.id===id;}) : null;
   document.getElementById('yearlyGoalModalTitle').textContent = g ? 'Edit Goal' : 'Add Goal';
-  document.getElementById('yearlyGoalTitle').value = g ? g.title : '';
-  document.getElementById('yearlyGoalDesc').value  = g ? (g.description||'') : '';
+  document.getElementById('yearlyGoalTitle').value    = g ? g.title : '';
+  document.getElementById('yearlyGoalGoal').value     = g ? (g.goal||'') : '';
+  document.getElementById('yearlyGoalPractice').value = g ? (g.practice||g.description||'') : '';
   openModal('yearlyGoalModal');
   setTimeout(function(){ document.getElementById('yearlyGoalTitle').focus(); }, 80);
 };
@@ -3083,13 +3089,14 @@ window.saveYearlyGoalModal = function() {
   var title = tEl.value.trim();
   if (!title) { tEl.classList.add('error'); tEl.focus(); return; }
   tEl.classList.remove('error');
-  var desc = document.getElementById('yearlyGoalDesc').value.trim();
+  var goal     = document.getElementById('yearlyGoalGoal').value.trim();
+  var practice = document.getElementById('yearlyGoalPractice').value.trim();
   var data = getData();
   if (state.editYearlyGoalId) {
     var g = data.yearlyGoals.find(function(x){ return x.id===state.editYearlyGoalId; });
-    if (g) { g.title = title; g.description = desc; }
+    if (g) { g.title = title; g.goal = goal; g.practice = practice; delete g.description; }
   } else {
-    data.yearlyGoals.push({id:uid(), title:title, description:desc, createdAt:new Date().toISOString()});
+    data.yearlyGoals.push({id:uid(), title:title, goal:goal, practice:practice, createdAt:new Date().toISOString()});
   }
   saveYG(data.yearlyGoals);
   state.editYearlyGoalId = null;
@@ -6534,7 +6541,7 @@ function initListeners() {
   document.getElementById('cancelYearlyGoal').addEventListener('click',     function(){ closeModal('yearlyGoalModal'); });
   document.getElementById('saveYearlyGoal').addEventListener('click', saveYearlyGoalModal);
   document.getElementById('yearlyGoalTitle').addEventListener('keydown', function(e){
-    if(e.key==='Enter') document.getElementById('yearlyGoalDesc').focus();
+    if(e.key==='Enter') document.getElementById('yearlyGoalGoal').focus();
   });
 
   // Transfer Monthly -> Yearly modal
