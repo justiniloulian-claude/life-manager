@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v286';
+var APP_VERSION = 'v287';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -4643,7 +4643,6 @@ function showPage(pageId) {
   // Force page visible via inline style — overrides all CSS
   pageEl.classList.add('active');
   pageEl.style.display='block';
-  void pageEl.offsetHeight; // force synchronous reflow — some browsers defer paint on display toggles without it
   var activeTab=document.querySelector('.header-nav-tab[data-page="'+pageId+'"]');
   if (activeTab) activeTab.classList.add('active');
   var activeMob=document.querySelector('.mob-nav-btn[data-page="'+pageId+'"]');
@@ -5838,11 +5837,7 @@ window.openEditMoneyIdea = function(id) {
 // ============================================================
 // MODALS
 // ============================================================
-function openModal(id)  {
-  var el=document.getElementById(id);
-  el.classList.add('open');
-  void el.offsetHeight; // force synchronous reflow — some browsers defer paint on display toggles without it
-}
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
 function saveTaskModal() {
