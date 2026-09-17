@@ -4100,16 +4100,36 @@ body.dark-mode .ygoal-field-text { color:#a8a8a8; }
 body.dark-mode .ygoal-field-label { color:#6f6f6f; }
 
 /* Yearly goal year folders */
-.ygoal-year-bar { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
-.ygoal-year-pill {
+.goal-period-bar { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+.goal-period-pill {
   padding:5px 13px; border-radius:20px; border:1.5px solid #e4e4e4;
   background:#fff; color:#777; font-size:13px; font-weight:600;
   font-variant-numeric:tabular-nums; cursor:pointer;
   transition:background .12s, border-color .12s, color .12s;
 }
-.ygoal-year-pill:hover { border-color:#c9c9c9; }
-.ygoal-year-pill.active { background:#1a1a1a; border-color:#1a1a1a; color:#fff; }
-.ygoal-year-add { color:#a0a0a0; font-weight:700; padding:5px 11px; }
+.goal-period-pill:hover { border-color:#c9c9c9; }
+.goal-period-pill.active { background:#1a1a1a; border-color:#1a1a1a; color:#fff; }
+.goal-period-add { color:#a0a0a0; font-weight:700; padding:5px 11px; }
 
-body.dark-mode .ygoal-year-pill { background:#1c1c1c; border-color:#2e2e2e; color:#999; }
-body.dark-mode .ygoal-year-pill.active { background:#f0f0f0; border-color:#f0f0f0; color:#1a1a1a; }
+body.dark-mode .goal-period-pill { background:#1c1c1c; border-color:#2e2e2e; color:#999; }
+body.dark-mode .goal-period-pill.active { background:#f0f0f0; border-color:#f0f0f0; color:#1a1a1a; }
+
+/* Goals tab — period bars, reorder, cards */
+.goal-period-bar + .goal-period-bar { margin-top:-4px; }
+.goal-month-pill { font-size:12.5px; padding:4px 11px; }
+.goal-pill-count {
+  display:inline-block; margin-left:5px; padding:0 5px;
+  border-radius:8px; background:#00000014; font-size:10.5px; font-weight:700;
+}
+.goal-period-pill.active .goal-pill-count { background:#ffffff2e; }
+
+.goal-drag-handle { color:#ccc; cursor:grab; font-size:13px; flex-shrink:0; user-select:none; }
+.goal-drag-handle:active { cursor:grabbing; }
+.ygoal-card.goal-dragging { opacity:.45; }
+.ygoal-card.goal-drag-over { border-color:#7c3aed; box-shadow:0 0 0 2px #7c3aed22; }
+.ygoal-head .btn-icon[disabled] { opacity:.25; cursor:default; }
+.ygoal-head { align-items:center; gap:7px; }
+.ygoal-head .ygoal-title { flex:1; min-width:0; }
+
+body.dark-mode .goal-pill-count { background:#ffffff1a; }
+body.dark-mode .goal-drag-handle { color:#555; }

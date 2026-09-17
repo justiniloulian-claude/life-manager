@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v288';
+var APP_VERSION = 'v289';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -504,8 +504,10 @@ const state = {
   editCheshbonItemId: null,
   healthDate: toDateStr(new Date()),
   physFunRating: 0,
-  editYearlyGoalId: null,
-  yearlyGoalYear: null,
+  editGoalId: null,
+  goalScope: 'monthly',
+  goalYear: null,
+  goalMonth: null,
   editHealthFoodId: null,
   editActivityPlanDay: null,
   editActivityPlanId: null,
@@ -600,6 +602,7 @@ function getData() {
     monthlyJewishHistory: _sg('dm_monthly_jewish_history', []),
     monthlySecularHistory:_sg('dm_monthly_secular_history',[]),
     yearlyHistory:        _sg('dm_yearly_history',         []),
+    goals:                _sg('dm_goals',                  []),
     yearlyGoals:          _sg('dm_yearly_goals',           []),
     yearlyDraft:          _sg('dm_yearly_draft',           {year:''}),
     monthlyJewishDraft:   _sg('dm_monthly_jewish_draft',   {month:''}),
@@ -648,6 +651,7 @@ function saveFRH(v) { _syncSave('dm_free_refl_history',          JSON.stringify(
 function saveMJH(v) { _syncSave('dm_monthly_jewish_history',     JSON.stringify(v)); }
 function saveMSH(v) { _syncSave('dm_monthly_secular_history',    JSON.stringify(v)); }
 function saveYH(v)  { _syncSave('dm_yearly_history',             JSON.stringify(v)); }
+function saveGoals(v){ _syncSave('dm_goals',                      JSON.stringify(v)); }
 function saveYG(v)  { _syncSave('dm_yearly_goals',               JSON.stringify(v)); }
 function saveYD(v)  { _syncSave('dm_yearly_draft',               JSON.stringify(v)); }
 function saveMJD(v) { _syncSave('dm_monthly_jewish_draft',       JSON.stringify(v)); }
@@ -1008,10 +1012,8 @@ async function _initTodayHeb(){
     var res=await fetch('https://www.hebcal.com/converter?cfg=json&gy='+pts[0]+'&gm='+Number(pts[1])+'&gd='+Number(pts[2])+'&g2h=1');
     var json=await res.json();
     _todayHebMonth={month:_HMONTH_NAMES[json.hm]||json.hm,year:json.hy};
-    _syncPeriodPicker();
-    if(typeof _goalsCache!=='undefined'&&_goalsCache&&_goalsCache.length) _renderGoals(_goalsCache);
-    // Yearly goal folders key off the current Hebrew year, which only exists now
-    try{ if(document.getElementById('yearlyGoalYearBar')) renderYearlyGoals(); }catch(e){}
+    // Goal folders key off the current Hebrew month/year, which only exist now
+    try{ if(state.currentPage==='goals') renderGoals(); }catch(e){}
   }catch(e){}
 }
 // ── Hebrew month-end dates (for "end of Hebrew month" recurrence) ──────────────
@@ -2895,7 +2897,6 @@ function renderYearlyTab() {
   var yi = document.getElementById('yearlyInput');
   if (yi) yi.value = d.year || '';
   renderYearlyHist();
-  renderYearlyGoals();
 }
 
 window.saveYearlyDraft = function() {
@@ -3049,70 +3050,160 @@ window.confirmTransferMonthly = function() {
   renderYearlyHist();
 };
 
-// ── Yearly goals: foldered by Hebrew year ────────────────────────────────────
-// Each goal carries a .year. Goals saved before foldering have none and are
-// treated as belonging to the current Hebrew year.
-// Must not depend on which years already have goals: a year planned ahead of
-// time would otherwise become "the current year" and swallow untagged goals.
-function _defaultGoalYear() {
+// ============================================================
+// GOALS — Monthly + Yearly, foldered by Hebrew month / year
+// Unified store: dm_goals, one record shape for both scopes.
+//   scope 'yearly'  -> period is a Hebrew year, e.g. '5787'
+//   scope 'monthly' -> period is '<year>-<month>', e.g. '5787-Tishrei'
+// ============================================================
+var GOAL_CATS = {
+  health:'#16a34a', spiritual:'#7c3aed', learning:'#2563eb',
+  relationships:'#db2777', work:'#d97706', personal:'#6366f1'
+};
+
+// Computed from the date only, never from which periods already have goals —
+// a period planned ahead must not become "current" and swallow untagged goals.
+function _curHebYearSafe() {
   var cur = _curHebYear();
   if (cur) return cur;
-  // Hebrew date not loaded yet — approximate (Tishrei falls in Sep/Oct).
   var now = new Date();
   return String(now.getFullYear() + 3760 + (now.getMonth() >= 8 ? 1 : 0));
 }
-function _goalYearOf(g) { return g.year || _defaultGoalYear(); }
-function _yearlyGoalYears() {
+function _curHebMonthSafe() {
+  return (_todayHebMonth && _todayHebMonth.month) || 'Tishrei';
+}
+function _defaultGoalPeriod(scope) {
+  return scope === 'yearly' ? _curHebYearSafe()
+                            : _curHebYearSafe() + '-' + _curHebMonthSafe();
+}
+
+// One-time move of the old Cheshbon yearly goals into the unified store.
+// dm_yearly_goals is deliberately left in place as a backup.
+function _migrateYearlyGoals() {
+  var data = getData();
+  var legacy = data.yearlyGoals || [];
+  if (!legacy.length) return;
+  var existing = data.goals || [];
+  var seen = {};
+  existing.forEach(function(g){ seen[g.id] = true; });
+  var added = legacy.filter(function(g){ return !seen[g.id]; }).map(function(g, i){
+    return {
+      id: g.id, scope: 'yearly',
+      period: g.year || _curHebYearSafe(),
+      title: g.title || '', goal: g.goal || '',
+      practice: g.practice || g.description || '',
+      category: g.category || '',
+      order: existing.length + i,
+      createdAt: g.createdAt || new Date().toISOString()
+    };
+  });
+  if (!added.length) return;
+  saveGoals(existing.concat(added));
+}
+
+function _allGoals() { return getData().goals || []; }
+function _goalsFor(scope, period) {
+  return _allGoals().filter(function(g){ return g.scope === scope && g.period === period; })
+                    .sort(function(a,b){ return (a.order||0) - (b.order||0); });
+}
+function _goalYears() {
   var years = {};
-  (getData().yearlyGoals || []).forEach(function(g){ years[_goalYearOf(g)] = true; });
-  years[_defaultGoalYear()] = true;
-  if (state.yearlyGoalYear) years[state.yearlyGoalYear] = true;
+  _allGoals().forEach(function(g){
+    years[g.scope === 'yearly' ? g.period : String(g.period).split('-')[0]] = true;
+  });
+  years[_curHebYearSafe()] = true;
+  if (state.goalYear) years[state.goalYear] = true;
   return Object.keys(years).sort();
 }
 function _activeGoalYear() {
-  var years = _yearlyGoalYears();
-  if (state.yearlyGoalYear && years.indexOf(state.yearlyGoalYear) !== -1) return state.yearlyGoalYear;
-  var def = _defaultGoalYear();
+  var years = _goalYears();
+  if (state.goalYear && years.indexOf(state.goalYear) !== -1) return state.goalYear;
+  var def = _curHebYearSafe();
   return years.indexOf(def) !== -1 ? def : years[years.length-1];
 }
-window.setYearlyGoalYear = function(y) {
-  state.yearlyGoalYear = y;
-  renderYearlyGoalYears();
-  renderYearlyGoals();
+function _activeGoalMonth() {
+  var months = _goalMonths();
+  if (state.goalMonth && months.indexOf(state.goalMonth) !== -1) return state.goalMonth;
+  var def = _curHebMonthSafe();
+  return months.indexOf(def) !== -1 ? def : months[0];
+}
+// The 12 standard months, plus Adar I/II if this year's data uses them.
+function _goalMonths() {
+  var base = _HEB_MONTHS_ORDERED.slice();
+  var yr = _activeGoalYear();
+  _allGoals().forEach(function(g){
+    if (g.scope !== 'monthly') return;
+    var parts = String(g.period).split('-');
+    if (parts[0] === yr && parts[1] && base.indexOf(parts[1]) === -1) base.push(parts[1]);
+  });
+  return base;
+}
+function _activeGoalPeriod() {
+  return state.goalScope === 'yearly' ? _activeGoalYear()
+                                      : _activeGoalYear() + '-' + _activeGoalMonth();
+}
+
+window.setGoalScope = function(scope) {
+  state.goalScope = scope;
+  document.querySelectorAll('#goalScopeNav .chesh-tab').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('onclick') === "setGoalScope('"+scope+"')");
+  });
+  renderGoals();
 };
-window.addYearlyGoalYear = function() {
+window.setGoalYear  = function(y){ state.goalYear = y;  renderGoals(); };
+window.setGoalMonth = function(m){ state.goalMonth = m; renderGoals(); };
+window.addGoalYear  = function(){
   var y = (prompt('Add a year (e.g. 5788)') || '').trim();
   if (!y) return;
   if (!/^\d{4}$/.test(y)) { alert('Enter a 4-digit year, e.g. 5788.'); return; }
-  setYearlyGoalYear(y);
+  setGoalYear(y);
 };
-function renderYearlyGoalYears() {
-  var bar = document.getElementById('yearlyGoalYearBar'); if (!bar) return;
-  var active = _activeGoalYear();
-  bar.innerHTML = _yearlyGoalYears().map(function(y){
-    return '<button class="ygoal-year-pill'+(y===active?' active':'')+'" onclick="setYearlyGoalYear(\''+y+'\')">'+escHtml(y)+'</button>';
-  }).join('') +
-  '<button class="ygoal-year-pill ygoal-year-add" title="Add a year" onclick="addYearlyGoalYear()">+</button>';
+
+function renderGoalPeriodBars() {
+  var yearBar = document.getElementById('goalYearBar');
+  var monthBar = document.getElementById('goalMonthBar');
+  if (!yearBar || !monthBar) return;
+  var activeYear = _activeGoalYear();
+  yearBar.innerHTML = _goalYears().map(function(y){
+    return '<button class="goal-period-pill'+(y===activeYear?' active':'')+'" onclick="setGoalYear(\''+y+'\')">'+escHtml(y)+'</button>';
+  }).join('') + '<button class="goal-period-pill goal-period-add" title="Add a year" onclick="addGoalYear()">+</button>';
+
+  if (state.goalScope === 'yearly') { monthBar.style.display = 'none'; monthBar.innerHTML = ''; return; }
+  monthBar.style.display = '';
+  var activeMonth = _activeGoalMonth();
+  monthBar.innerHTML = _goalMonths().map(function(m){
+    var n = _goalsFor('monthly', activeYear+'-'+m).length;
+    return '<button class="goal-period-pill goal-month-pill'+(m===activeMonth?' active':'')+'" onclick="setGoalMonth(\''+m+'\')">'+
+      escHtml(m)+(n?'<span class="goal-pill-count">'+n+'</span>':'')+'</button>';
+  }).join('');
 }
 
-function renderYearlyGoals() {
-  var el = document.getElementById('yearlyGoalsList'); if (!el) return;
-  renderYearlyGoalYears();
-  var year = _activeGoalYear();
-  var goals = (getData().yearlyGoals || []).filter(function(g){ return _goalYearOf(g) === year; });
+function renderGoals() {
+  var el = document.getElementById('goalsList'); if (!el) return;
+  renderGoalPeriodBars();
+  var scope = state.goalScope, period = _activeGoalPeriod();
+  var goals = _goalsFor(scope, period);
+  var label = scope === 'yearly' ? period : _activeGoalMonth()+' '+_activeGoalYear();
   if (!goals.length) {
-    el.innerHTML = '<div class="stl-empty">No goals for '+escHtml(year)+' yet. Hit + Add Goal to start.</div>';
+    el.innerHTML = '<div class="stl-empty">No goals for '+escHtml(label)+' yet. Hit + Add Goal to start.</div>';
     return;
   }
-  el.innerHTML = goals.map(function(g){
-    // goals saved before the Goal/Practice split kept their text in .description
+  el.innerHTML = goals.map(function(g, i){
+    var cc = GOAL_CATS[g.category] || '';
+    var cat = g.category ? '<span class="esav-goal-cat" style="background:'+cc+'22;color:'+cc+'">'+escHtml(g.category)+'</span>' : '';
+    // goals written before the Goal/Practice split kept their text in .description
     var practice = g.practice || g.description || '';
-    return '<div class="ygoal-card">'+
+    return '<div class="ygoal-card" draggable="true" data-gid="'+g.id+'" '+
+        'ondragstart="goalDragStart(event,\''+g.id+'\')" ondragover="goalDragOver(event,\''+g.id+'\')" '+
+        'ondrop="goalDrop(event,\''+g.id+'\')" ondragleave="goalDragLeave(event)" ondragend="goalDragEnd(event)">'+
       '<div class="ygoal-head">'+
-        '<span class="ygoal-title">'+escHtml(g.title)+'</span>'+
+        '<span class="goal-drag-handle" title="Drag to reorder">⠿</span>'+
+        '<span class="ygoal-title">'+escHtml(g.title||'')+'</span>'+cat+
         '<span class="ygoal-actions">'+
-          '<button class="btn-icon" title="Edit" onclick="openYearlyGoalModal(\''+g.id+'\')">✏️</button>'+
-          '<button class="btn-icon" style="color:#e53e3e" title="Delete" onclick="deleteYearlyGoal(\''+g.id+'\')">🗑</button>'+
+          '<button class="btn-icon" title="Move up" onclick="moveGoal(\''+g.id+'\',-1)"'+(i===0?' disabled':'')+'>↑</button>'+
+          '<button class="btn-icon" title="Move down" onclick="moveGoal(\''+g.id+'\',1)"'+(i===goals.length-1?' disabled':'')+'>↓</button>'+
+          '<button class="btn-icon" title="Edit" onclick="openGoalModal(\''+g.id+'\')">✏️</button>'+
+          '<button class="btn-icon" style="color:#e53e3e" title="Delete" onclick="deleteGoal(\''+g.id+'\')">🗑</button>'+
         '</span>'+
       '</div>'+
       (g.goal?'<div class="ygoal-field"><span class="ygoal-field-label">Goal</span>'+
@@ -3123,43 +3214,88 @@ function renderYearlyGoals() {
   }).join('');
 }
 
-window.openYearlyGoalModal = function(id) {
-  state.editYearlyGoalId = id || null;
-  var g = id ? (getData().yearlyGoals||[]).find(function(x){return x.id===id;}) : null;
-  document.getElementById('yearlyGoalModalTitle').textContent = g ? 'Edit Goal' : 'Add Goal';
-  document.getElementById('yearlyGoalTitle').value    = g ? g.title : '';
-  document.getElementById('yearlyGoalGoal').value     = g ? (g.goal||'') : '';
-  document.getElementById('yearlyGoalPractice').value = g ? (g.practice||g.description||'') : '';
-  openModal('yearlyGoalModal');
-  setTimeout(function(){ document.getElementById('yearlyGoalTitle').focus(); }, 80);
+// ── Reorder: drag handle on desktop, arrows everywhere ───────────────────────
+function _reorderGoal(srcId, targetId) {
+  var data = getData();
+  var scope = state.goalScope, period = _activeGoalPeriod();
+  var group = _goalsFor(scope, period);
+  var from = group.findIndex(function(g){ return g.id===srcId; });
+  var to   = group.findIndex(function(g){ return g.id===targetId; });
+  if (from === -1 || to === -1 || from === to) return;
+  var moved = group.splice(from,1)[0];
+  group.splice(to,0,moved);
+  group.forEach(function(g,i){
+    var rec = data.goals.find(function(x){ return x.id===g.id; });
+    if (rec) rec.order = i;
+  });
+  saveGoals(data.goals);
+  renderGoals();
+}
+window.moveGoal = function(id, delta) {
+  var group = _goalsFor(state.goalScope, _activeGoalPeriod());
+  var i = group.findIndex(function(g){ return g.id===id; });
+  var j = i + delta;
+  if (i === -1 || j < 0 || j >= group.length) return;
+  _reorderGoal(id, group[j].id);
+};
+var _goalDragId = null;
+window.goalDragStart = function(e,id){ _goalDragId=id; e.dataTransfer.effectAllowed='move';
+  setTimeout(function(){ var el=document.querySelector('.ygoal-card[data-gid="'+id+'"]'); if(el)el.classList.add('goal-dragging'); },0); };
+window.goalDragOver = function(e,id){ e.preventDefault(); e.dataTransfer.dropEffect='move';
+  if(id===_goalDragId)return;
+  document.querySelectorAll('.ygoal-card').forEach(function(el){ el.classList.remove('goal-drag-over'); });
+  var el=document.querySelector('.ygoal-card[data-gid="'+id+'"]'); if(el)el.classList.add('goal-drag-over'); };
+window.goalDragLeave = function(e){ if(e.currentTarget) e.currentTarget.classList.remove('goal-drag-over'); };
+window.goalDragEnd = function(){ _goalDragId=null;
+  document.querySelectorAll('.ygoal-card').forEach(function(el){ el.classList.remove('goal-dragging','goal-drag-over'); }); };
+window.goalDrop = function(e,targetId){ e.preventDefault();
+  var src=_goalDragId; _goalDragId=null;
+  document.querySelectorAll('.ygoal-card').forEach(function(el){ el.classList.remove('goal-dragging','goal-drag-over'); });
+  if(src && src!==targetId) _reorderGoal(src,targetId); };
+
+// ── Goal CRUD ────────────────────────────────────────────────────────────────
+window.openGoalModal = function(id) {
+  state.editGoalId = id || null;
+  var g = id ? _allGoals().find(function(x){ return x.id===id; }) : null;
+  document.getElementById('goalModalTitle').textContent = g ? 'Edit Goal' : 'Add Goal';
+  document.getElementById('goalTitleInput').value    = g ? (g.title||'') : '';
+  document.getElementById('goalGoalInput').value     = g ? (g.goal||'') : '';
+  document.getElementById('goalPracticeInput').value = g ? (g.practice||g.description||'') : '';
+  document.getElementById('goalCategoryInput').value = g ? (g.category||'') : '';
+  openModal('goalModal');
+  setTimeout(function(){ document.getElementById('goalTitleInput').focus(); }, 80);
 };
 
-window.saveYearlyGoalModal = function() {
-  var tEl = document.getElementById('yearlyGoalTitle');
+window.saveGoalModal = function() {
+  var tEl = document.getElementById('goalTitleInput');
   var title = tEl.value.trim();
   if (!title) { tEl.classList.add('error'); tEl.focus(); return; }
   tEl.classList.remove('error');
-  var goal     = document.getElementById('yearlyGoalGoal').value.trim();
-  var practice = document.getElementById('yearlyGoalPractice').value.trim();
+  var goal     = document.getElementById('goalGoalInput').value.trim();
+  var practice = document.getElementById('goalPracticeInput').value.trim();
+  var category = document.getElementById('goalCategoryInput').value;
   var data = getData();
-  if (state.editYearlyGoalId) {
-    var g = data.yearlyGoals.find(function(x){ return x.id===state.editYearlyGoalId; });
-    if (g) { g.title = title; g.goal = goal; g.practice = practice; g.year = g.year || _activeGoalYear(); delete g.description; }
+  if (state.editGoalId) {
+    var g = data.goals.find(function(x){ return x.id===state.editGoalId; });
+    if (g) { g.title=title; g.goal=goal; g.practice=practice; g.category=category; delete g.description; }
   } else {
-    data.yearlyGoals.push({id:uid(), title:title, goal:goal, practice:practice,
-                           year:_activeGoalYear(), createdAt:new Date().toISOString()});
+    var period = _activeGoalPeriod();
+    var maxOrder = _goalsFor(state.goalScope, period).reduce(function(m,x){ return Math.max(m, x.order||0); }, -1);
+    data.goals.push({id:uid(), scope:state.goalScope, period:period, title:title, goal:goal,
+                     practice:practice, category:category, order:maxOrder+1,
+                     createdAt:new Date().toISOString()});
   }
-  saveYG(data.yearlyGoals);
-  state.editYearlyGoalId = null;
-  closeModal('yearlyGoalModal');
-  renderYearlyGoals();
+  saveGoals(data.goals);
+  state.editGoalId = null;
+  closeModal('goalModal');
+  renderGoals();
 };
 
-window.deleteYearlyGoal = function(id) {
+window.deleteGoal = function(id) {
   if (!confirm('Delete this goal?')) return;
   var data = getData();
-  saveYG(data.yearlyGoals.filter(function(g){ return g.id!==id; }));
-  renderYearlyGoals();
+  saveGoals(data.goals.filter(function(g){ return g.id!==id; }));
+  renderGoals();
 };
 
 function renderSecularHist() {
@@ -3637,51 +3773,6 @@ function renderPhysFun() {
   }).join('');
 }
 
-// ============================================================
-// ============================================================
-// GOALS — localStorage-based rendering
-// ============================================================
-function renderGoals() {
-  var el = document.getElementById('esavGoalsList'); if (!el) return;
-  var goals;
-  try { goals = JSON.parse(localStorage.getItem('esav_goals') || '[]'); } catch(e) { goals = []; }
-  if (!goals.length) { el.innerHTML = '<div class="stl-empty">No goals yet. Add one below.</div>'; return; }
-  function goalHtml(g) {
-    var catColors = {health:'#16a34a',spiritual:'#7c3aed',learning:'#2563eb',relationships:'#db2777',work:'#d97706',personal:'#6366f1'};
-    var cc = catColors[g.category] || '#888';
-    var cat = g.category ? '<span class="esav-goal-cat" style="background:'+cc+'22;color:'+cc+'">'+escHtml(g.category)+'</span>' : '';
-    var tf = g.timeframe ? '<span style="font-size:11px;color:#9ca3af;margin-left:4px">'+escHtml(g.timeframe)+'</span>' : '';
-    return '<div class="esav-goal-item'+(g.done?' done':'')+'">'+
-      '<button class="esav-goal-check" onclick="window._toggleGoal(\''+g.id+'\','+(!g.done)+')">'+
-        (g.done?'✓':'○')+
-      '</button>'+
-      '<div class="esav-goal-body">'+
-        '<div class="esav-goal-title-row">'+
-          '<span class="esav-goal-title">'+escHtml(g.text||g.title||'')+'</span>'+cat+tf+
-        '</div>'+
-      '</div>'+
-      '<button class="btn-icon" style="flex-shrink:0" onclick="window._deleteGoal(\''+g.id+'\')">🗑</button>'+
-    '</div>';
-  }
-  var active = goals.filter(function(g){return !g.done;});
-  var done   = goals.filter(function(g){return g.done;});
-  var html = active.map(goalHtml).join('');
-  if (done.length) html += '<div class="esav-goals-done-label">Completed</div>' + done.map(goalHtml).join('');
-  el.innerHTML = html;
-}
-window.renderGoals = renderGoals;
-
-window._toggleGoal = function(id, done) {
-  var goals; try { goals = JSON.parse(localStorage.getItem('esav_goals')||'[]'); } catch(e){ goals=[]; }
-  var g = goals.find(function(x){return x.id===id;});
-  if (g) { g.done = done; localStorage.setItem('esav_goals', JSON.stringify(goals)); renderGoals(); }
-};
-window._deleteGoal = function(id) {
-  var goals; try { goals = JSON.parse(localStorage.getItem('esav_goals')||'[]'); } catch(e){ goals=[]; }
-  if (!confirm('Delete this goal?')) return;
-  goals = goals.filter(function(g){return g.id!==id;});
-  localStorage.setItem('esav_goals', JSON.stringify(goals)); renderGoals();
-};
 
 // ============================================================
 // RENDER — PEOPLE / RELATIONSHIP CRM
@@ -4709,7 +4800,7 @@ function showPage(pageId) {
     else if (pageId==='notes')     renderNotes();
     else if (pageId==='learning')  renderLearning();
     else if (pageId==='financial') renderFinancial();
-    else if (pageId==='goals')     { renderGoals(); _initGoalsUI(); }
+    else if (pageId==='goals')     { _migrateYearlyGoals(); renderGoals(); }
     else if (pageId==='people')    { if(window._loadPeople) window._loadPeople(); }
   } catch(e) {
     console.error('[showPage render]',pageId,e);
@@ -6582,12 +6673,12 @@ function initListeners() {
     state.healthDate=toDateStr(new Date()); renderHealth();
   });
 
-  // Yearly goal modal
-  document.getElementById('closeYearlyGoalModal').addEventListener('click', function(){ closeModal('yearlyGoalModal'); });
-  document.getElementById('cancelYearlyGoal').addEventListener('click',     function(){ closeModal('yearlyGoalModal'); });
-  document.getElementById('saveYearlyGoal').addEventListener('click', saveYearlyGoalModal);
-  document.getElementById('yearlyGoalTitle').addEventListener('keydown', function(e){
-    if(e.key==='Enter') document.getElementById('yearlyGoalGoal').focus();
+  // Goal modal
+  document.getElementById('closeGoalModal').addEventListener('click', function(){ closeModal('goalModal'); });
+  document.getElementById('cancelGoal').addEventListener('click',     function(){ closeModal('goalModal'); });
+  document.getElementById('saveGoal').addEventListener('click', saveGoalModal);
+  document.getElementById('goalTitleInput').addEventListener('keydown', function(e){
+    if(e.key==='Enter') document.getElementById('goalGoalInput').focus();
   });
 
   // Transfer Monthly -> Yearly modal
@@ -7411,61 +7502,6 @@ function _doLogin() {
 }
 
 
-// ============================================================
-// GOALS UI — init add button
-// ============================================================
-function _initGoalsUI() {
-  var goalInput    = document.getElementById('esavGoalInput');
-  var goalAddBtn   = document.getElementById('esavGoalAddBtn');
-  var goalTimeframe= document.getElementById('esavGoalTimeframe');
-  var goalPeriod   = document.getElementById('esavGoalPeriod');
-  var goalPeriodWeek= document.getElementById('esavGoalPeriodWeek');
-  var goalCat      = document.getElementById('esavGoalCategory');
-  if (!goalAddBtn || goalAddBtn._initDone) return;
-  goalAddBtn._initDone = true;
-
-  function _syncPeriodPicker() {
-    var tf = goalTimeframe ? goalTimeframe.value : 'monthly';
-    if (tf === 'yearly') {
-      if (goalPeriod) goalPeriod.style.display = 'none';
-      if (goalPeriodWeek) goalPeriodWeek.style.display = 'none';
-    } else if (tf === 'monthly') {
-      if (goalPeriod) goalPeriod.style.display = '';
-      if (goalPeriodWeek) goalPeriodWeek.style.display = 'none';
-      if (goalPeriod && !goalPeriod.options.length) {
-        var now = new Date();
-        var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-        for (var i = 0; i < 12; i++) {
-          var opt = document.createElement('option');
-          opt.value = (now.getFullYear())+'-'+(i+1);
-          opt.textContent = months[i]+' '+now.getFullYear();
-          if (i === now.getMonth()) opt.selected = true;
-          goalPeriod.appendChild(opt);
-        }
-      }
-    } else {
-      if (goalPeriod) goalPeriod.style.display = 'none';
-      if (goalPeriodWeek) { goalPeriodWeek.style.display = ''; if (!goalPeriodWeek.value) goalPeriodWeek.value = new Date().toISOString().slice(0,10); }
-    }
-  }
-  if (goalTimeframe) { goalTimeframe.addEventListener('change', _syncPeriodPicker); _syncPeriodPicker(); }
-
-  goalAddBtn.addEventListener('click', function() {
-    var text = goalInput ? goalInput.value.trim() : '';
-    if (!text) return;
-    var tf = goalTimeframe ? goalTimeframe.value : 'monthly';
-    var period = tf === 'monthly' ? (goalPeriod && goalPeriod.value ? goalPeriod.value : '') :
-                 tf === 'weekly'  ? (goalPeriodWeek && goalPeriodWeek.value ? goalPeriodWeek.value : '') : '';
-    var cat = goalCat ? goalCat.value : '';
-    var goals; try { goals = JSON.parse(localStorage.getItem('esav_goals')||'[]'); } catch(e) { goals=[]; }
-    goals.push({id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), text:text, timeframe:tf, period:period, category:cat, done:false, createdAt:Date.now()});
-    localStorage.setItem('esav_goals', JSON.stringify(goals));
-    if (goalInput) goalInput.value = '';
-    renderGoals();
-  });
-  if (goalInput) goalInput.addEventListener('keydown', function(e){ if(e.key==='Enter') goalAddBtn.click(); });
-}
-window._initGoalsUI = _initGoalsUI;
 
 // ============================================================
 // PEOPLE CRM — localStorage-based

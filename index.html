@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Life Manager">
   <title>Dashboard v150</title>
-  <link rel="stylesheet" href="style.css?v=288">
+  <link rel="stylesheet" href="style.css?v=289">
 </head>
 <body>
 
@@ -338,16 +338,6 @@
           </div>
         </div>
 
-        <!-- RIGHT: Yearly goals -->
-        <div class="monthly-col">
-          <div class="monthly-col-title">Goals</div>
-          <div class="ygoal-year-bar" id="yearlyGoalYearBar"></div>
-          <div style="text-align:right;margin-bottom:10px">
-            <button class="btn-primary" style="font-size:13px;padding:7px 16px" onclick="openYearlyGoalModal()">+ Add Goal</button>
-          </div>
-          <div id="yearlyGoalsList"></div>
-        </div>
-
       </div>
     </div>
 
@@ -451,32 +441,19 @@
   <div class="list-page-header">
     <div>
       <h2 class="list-page-title">Goals</h2>
-      <p class="list-page-subtitle">Track your yearly, monthly and weekly goals</p>
+      <p class="list-page-subtitle">Monthly and yearly goals, by Jewish month and year</p>
     </div>
   </div>
-  <div class="esav-add-row" style="gap:6px">
-    <input id="esavGoalInput" class="esav-add-input" placeholder="Add a goal…" type="text" style="flex:1">
-    <button id="esavGoalAddBtn" class="esav-add-btn">+ Add</button>
+  <div class="chesh-subnav" id="goalScopeNav">
+    <button class="chesh-tab active" onclick="setGoalScope('monthly')">Monthly</button>
+    <button class="chesh-tab" onclick="setGoalScope('yearly')">Yearly</button>
   </div>
-  <div class="esav-add-row esav-goal-meta-row" style="gap:6px;margin-top:4px">
-    <select id="esavGoalTimeframe" class="esav-add-select">
-      <option value="yearly">Yearly</option>
-      <option value="monthly" selected>Monthly</option>
-      <option value="weekly">Weekly</option>
-    </select>
-    <select id="esavGoalPeriod" class="esav-add-input" style="flex:1;min-width:130px"></select>
-    <input id="esavGoalPeriodWeek" class="esav-add-input" type="week" style="flex:1;min-width:130px;display:none">
-    <select id="esavGoalCategory" class="esav-add-select">
-      <option value="">Category</option>
-      <option value="health">Health</option>
-      <option value="spiritual">Spiritual</option>
-      <option value="learning">Learning</option>
-      <option value="relationships">Relationships</option>
-      <option value="work">Work</option>
-      <option value="personal">Personal</option>
-    </select>
+  <div class="goal-period-bar" id="goalYearBar"></div>
+  <div class="goal-period-bar" id="goalMonthBar"></div>
+  <div style="text-align:right;margin:10px 0">
+    <button class="btn-primary" style="font-size:13px;padding:7px 16px" onclick="openGoalModal()">+ Add Goal</button>
   </div>
-  <div id="esavGoalsList" class="esav-goals-list"></div>
+  <div id="goalsList" class="esav-goals-list"></div>
 </div>
 
 <!-- ===== PEOPLE PAGE ===== -->
@@ -954,24 +931,34 @@
 </div>
 
 <!-- Simple Item Modal (Short Term / Long Term) -->
-<!-- Yearly Goal Modal -->
-<div id="yearlyGoalModal" class="modal">
-  <div class="modal-box" style="max-width:420px">
+<!-- Goal Modal (Monthly + Yearly) -->
+<div id="goalModal" class="modal">
+  <div class="modal-box" style="max-width:440px">
     <div class="modal-header">
-      <h2 id="yearlyGoalModalTitle">Add Goal</h2>
-      <button class="modal-close" id="closeYearlyGoalModal">&times;</button>
+      <h2 id="goalModalTitle">Add Goal</h2>
+      <button class="modal-close" id="closeGoalModal">&times;</button>
     </div>
     <div class="modal-body">
       <label class="field-label">Title</label>
-      <input type="text" id="yearlyGoalTitle" class="field" placeholder="Short name for this">
+      <input type="text" id="goalTitleInput" class="field" placeholder="Short name for this">
       <label class="field-label">Goal</label>
-      <textarea id="yearlyGoalGoal" class="field" rows="3" placeholder="What are you aiming for?"></textarea>
+      <textarea id="goalGoalInput" class="field" rows="3" placeholder="What are you aiming for?"></textarea>
       <label class="field-label">Practice</label>
-      <textarea id="yearlyGoalPractice" class="field" rows="4" placeholder="What will you actually do?"></textarea>
+      <textarea id="goalPracticeInput" class="field" rows="4" placeholder="What will you actually do?"></textarea>
+      <label class="field-label">Category <span class="optional">optional</span></label>
+      <select id="goalCategoryInput" class="field">
+        <option value="">No category</option>
+        <option value="health">Health</option>
+        <option value="spiritual">Spiritual</option>
+        <option value="learning">Learning</option>
+        <option value="relationships">Relationships</option>
+        <option value="work">Work</option>
+        <option value="personal">Personal</option>
+      </select>
     </div>
     <div class="modal-footer">
-      <button id="cancelYearlyGoal" class="btn-cancel">Cancel</button>
-      <button id="saveYearlyGoal" class="btn-primary">Save</button>
+      <button id="cancelGoal" class="btn-cancel">Cancel</button>
+      <button id="saveGoal" class="btn-primary">Save</button>
     </div>
   </div>
 </div>
@@ -1646,8 +1633,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<div id="_ver" style="position:fixed;bottom:4px;right:8px;font-size:10px;color:#aaa;z-index:99990;cursor:pointer" onclick="calDiag()" title="Tap for diagnostics">v288</div>
-<script src="app.js?v=288"></script>
+<div id="_ver" style="position:fixed;bottom:4px;right:8px;font-size:10px;color:#aaa;z-index:99990;cursor:pointer" onclick="calDiag()" title="Tap for diagnostics">v289</div>
+<script src="app.js?v=289"></script>
 </body>
 </html>
 
