@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v289';
+var APP_VERSION = 'v290';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -580,7 +580,6 @@ function getData() {
     finExpenses: _sg('dm_fin_expenses',[]),
     finBonuses:  _sg('dm_fin_bonuses', []),
     finWishlist: _sg('dm_fin_wishlist',[]),
-    finPoints:   0,
     finBank:     _sg('dm_fin_bank',    0),
     moneymaking:          _sg('dm_moneymaking',            []),
     routineOverrides:     _sg('dm_routine_overrides',      {}),
@@ -629,7 +628,6 @@ function saveFinInc(v)  { _syncSave('dm_fin_income',             JSON.stringify(
 function saveFinExp(v)  { _syncSave('dm_fin_expenses',           JSON.stringify(v)); }
 function saveFinBon(v)  { _syncSave('dm_fin_bonuses',            JSON.stringify(v)); }
 function saveFinWish(v) { _syncSave('dm_fin_wishlist',           JSON.stringify(v)); }
-function saveFinPts(v)  { _syncSave('dm_fin_points',             JSON.stringify(v)); }
 function saveFinBank(v) { _syncSave('dm_fin_bank',               JSON.stringify(v)); }
 function saveMM(v)  { _syncSave('dm_moneymaking',                JSON.stringify(v)); }
 function saveRO(v)  { _syncSave('dm_routine_overrides',          JSON.stringify(v)); }
@@ -5805,11 +5803,6 @@ window.wishMoveDown = function(id) {
   var tier=data.finWishlist.filter(function(w){return w.tier===item.tier;}).sort(function(a,b){return a.order-b.order;});
   var idx=tier.findIndex(function(w){return w.id===id;}); if(idx>=tier.length-1)return;
   tier[idx].order=idx+1; tier[idx+1].order=idx; saveFinWish(data.finWishlist); renderFinancial();
-};
-
-window.saveFinPointsBalance = function() {
-  var v=parseInt(document.getElementById('finPointsInput').value)||0;
-  saveFinPts(v); renderFinancial();
 };
 
 // Expense modal open
