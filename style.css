@@ -4133,3 +4133,16 @@ body.dark-mode .goal-period-pill.active { background:#f0f0f0; border-color:#f0f0
 
 body.dark-mode .goal-pill-count { background:#ffffff1a; }
 body.dark-mode .goal-drag-handle { color:#555; }
+
+/* People — inline frequency editing */
+.pc-freq-edit { display:inline-flex; align-items:center; gap:4px; font-size:12px; color:#888; }
+.pc-freq-num {
+  width:52px; padding:3px 6px; text-align:center;
+  border:1px solid #ddd; border-radius:7px; font-size:12px; font-family:inherit; outline:none;
+}
+.pc-freq-unit {
+  padding:3px 6px; border:1px solid #ddd; border-radius:7px;
+  font-size:12px; font-family:inherit; background:#fff; outline:none;
+}
+.pc-freq-num:focus, .pc-freq-unit:focus { border-color:#7c3aed; }
+body.dark-mode .pc-freq-num, body.dark-mode .pc-freq-unit { background:#1c1c1c; border-color:#3a3a3a; color:#e8e8e8; }

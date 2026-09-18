@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v290';
+var APP_VERSION = 'v291';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -504,6 +504,7 @@ const state = {
   editCheshbonItemId: null,
   healthDate: toDateStr(new Date()),
   physFunRating: 0,
+  editPhysFunId: null,
   editGoalId: null,
   goalScope: 'monthly',
   goalYear: null,
@@ -1797,14 +1798,38 @@ function addPhysFunEntry(){
   var rating=state.physFunRating||0;
   if(!rating){ alert('Pick a fun rating from 1 to 5.'); return; }
   var data=getData();
-  data.physWeekly.unshift({id:uid(), date:toDateStr(new Date()), what:what, fun:rating});
+  if(state.editPhysFunId){
+    var e=data.physWeekly.find(function(x){return x.id===state.editPhysFunId;});
+    if(e){ e.what=what; e.fun=rating; }
+    state.editPhysFunId=null;
+    document.getElementById('physFunAddBtn').textContent='Add';
+  } else {
+    data.physWeekly.unshift({id:uid(), date:toDateStr(new Date()), what:what, fun:rating});
+  }
   savePhysWeekly(data.physWeekly);
   whatEl.value=''; state.physFunRating=0;
   document.querySelectorAll('#physFunRating .phys-star').forEach(function(s){s.classList.remove('active');});
   renderPhysFun();
 }
+// Edit reuses the add row rather than a separate modal — one field set to maintain.
+window.editPhysFunEntry=function(id){
+  var e=(getData().physWeekly||[]).find(function(x){return x.id===id;}); if(!e)return;
+  state.editPhysFunId=id;
+  state.physFunRating=e.fun;
+  document.getElementById('physFunWhat').value=e.what;
+  document.querySelectorAll('#physFunRating .phys-star').forEach(function(s){
+    s.classList.toggle('active', parseInt(s.dataset.val,10)<=e.fun);
+  });
+  document.getElementById('physFunAddBtn').textContent='Save';
+  document.getElementById('physFunWhat').focus();
+};
 window.deletePhysFunEntry=function(id){
   if(!confirm('Delete this entry?'))return;
+  if(state.editPhysFunId===id){
+    state.editPhysFunId=null;
+    document.getElementById('physFunWhat').value='';
+    document.getElementById('physFunAddBtn').textContent='Add';
+  }
   var data=getData();
   savePhysWeekly(data.physWeekly.filter(function(e){return e.id!==id;}));
   renderPhysFun();
@@ -3766,7 +3791,8 @@ function renderPhysFun() {
       '<span class="phys-fun-date">'+escHtml(shortMonthDay(fromDateStr(e.date)))+'</span>'+
       '<span class="phys-fun-what">'+escHtml(e.what)+'</span>'+
       '<span class="phys-fun-score fun-'+e.fun+'">'+e.fun+'/5</span>'+
-      '<button class="btn-icon" onclick="deletePhysFunEntry(\''+e.id+'\')">🗑</button>'+
+      '<button class="btn-icon" title="Edit" onclick="editPhysFunEntry(\''+e.id+'\')">✏️</button>'+
+      '<button class="btn-icon" title="Delete" onclick="deletePhysFunEntry(\''+e.id+'\')">🗑</button>'+
     '</div>';
   }).join('');
 }
@@ -7558,6 +7584,15 @@ function _doLogin() {
   };
 
   function _freqToDays(n,unit){ n=parseInt(n)||1; return unit==='days'?n:unit==='weeks'?n*7:unit==='months'?n*30:n*365; }
+  // Inverse of _freqToDays, for prefilling the edit form. Picks the largest
+  // unit that divides evenly so "every 30 days" reads back as "1 months".
+  function _daysToFreq(days){
+    days=parseInt(days)||1;
+    if(days%365===0) return {n:days/365, unit:'years'};
+    if(days%30===0)  return {n:days/30,  unit:'months'};
+    if(days%7===0)   return {n:days/7,   unit:'weeks'};
+    return {n:days, unit:'days'};
+  }
   function _nextContactDate(lastMs, days){ if(!lastMs||!days) return null; var d=new Date(lastMs+days*86400000); return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
   function _daysAgoStr(ts){ if(!ts) return 'never'; var d=Math.floor((Date.now()-ts)/86400000); return d===0?'today':d===1?'yesterday':d+' days ago'; }
 
@@ -7646,7 +7681,17 @@ function _doLogin() {
           +avatar
           +'<div class="pc-body">'
             +'<div class="pc-name-row">'+nameEl+catPills+'<button class="pc-tag-btn" onclick="event.stopPropagation();window._openCatPicker(\''+p.id+'\')">'+pickerBtnLabel+'</button></div>'
-            +'<div class="pc-status-row"><span class="pc-status '+statusCls+'">'+escHtml(statusText)+'</span><span class="pc-meta">Last: '+last+' · every '+freqLabel+'</span></div>'
+            +'<div class="pc-status-row"><span class="pc-status '+statusCls+'">'+escHtml(statusText)+'</span>'
+              +(editing
+                ? '<span class="pc-freq-edit">every '
+                    +'<input type="number" min="1" class="pc-freq-num" id="esavPersonFreqNumEdit_'+p.id+'" value="'+_daysToFreq(p.frequencyDays).n+'">'
+                    +'<select class="pc-freq-unit" id="esavPersonFreqUnitEdit_'+p.id+'">'
+                      +['days','weeks','months','years'].map(function(u){
+                          return '<option value="'+u+'"'+(_daysToFreq(p.frequencyDays).unit===u?' selected':'')+'>'+u+'</option>';
+                        }).join('')
+                    +'</select></span>'
+                : '<span class="pc-meta">Last: '+last+' · every '+freqLabel+'</span>')
+            +'</div>'
           +'</div>'
           +'<div class="pc-actions">'+actionBtns+'</div>'
         +'</div>'
@@ -7699,7 +7744,14 @@ function _doLogin() {
     var inp=document.getElementById('esavPersonNameEdit_'+id); if(!inp) return;
     var name=inp.value.trim(); if(!name) return;
     var p=_peopleCache.find(function(x){return x.id===id;}); if(!p) return;
-    p.name=name; _editingPersonId=null; _savePeople(_peopleCache); _renderPeople(_peopleCache);
+    p.name=name;
+    var nEl=document.getElementById('esavPersonFreqNumEdit_'+id);
+    var uEl=document.getElementById('esavPersonFreqUnitEdit_'+id);
+    if(nEl&&uEl){
+      var days=_freqToDays(nEl.value, uEl.value);
+      if(days>0) p.frequencyDays=days;
+    }
+    _editingPersonId=null; _savePeople(_peopleCache); _renderPeople(_peopleCache);
   };
 
   window._esavEditNote=function(pid,ts){ _editingNoteKey={pid:pid,ts:ts}; _renderPeople(_peopleCache); setTimeout(function(){var inp=document.getElementById('noteEdit_'+pid+'_'+ts);if(inp){inp.focus();inp.select();}},30); };
