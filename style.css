@@ -4146,3 +4146,42 @@ body.dark-mode .goal-drag-handle { color:#555; }
 }
 .pc-freq-num:focus, .pc-freq-unit:focus { border-color:#7c3aed; }
 body.dark-mode .pc-freq-num, body.dark-mode .pc-freq-unit { background:#1c1c1c; border-color:#3a3a3a; color:#e8e8e8; }
+
+/* People — category rename */
+.people-cat-rename {
+  padding:4px 11px; border:1.5px solid #ddd; border-radius:20px;
+  font-size:12.5px; font-weight:600; font-family:inherit; outline:none;
+  background:#fff; max-width:150px;
+}
+.people-cat-strip-edit {
+  background:none; border:none; cursor:pointer; font-size:10px;
+  padding:0 2px; opacity:.55;
+}
+.people-cat-strip-edit:hover { opacity:1; }
+
+/* Physical — editable checklist items */
+#physEditItemsBtn { font-size:13px; margin-left:6px; vertical-align:middle; opacity:.5; }
+#physEditItemsBtn:hover { opacity:1; }
+.phys-item-edit {
+  display:flex; align-items:center; gap:8px;
+  padding:9px 12px; border:1px solid #e8e8e8; border-radius:12px;
+  background:#fff; margin-bottom:8px;
+}
+.phys-item-edit-label, .phys-item-edit-hint {
+  padding:7px 11px; border:1px solid #e0e0e0; border-radius:9px;
+  font-size:14px; font-family:inherit; outline:none; min-width:0;
+}
+.phys-item-edit-label { flex:1; font-weight:600; }
+.phys-item-edit-hint  { flex:1.3; font-size:13px; color:#777; }
+.phys-item-edit-label:focus, .phys-item-edit-hint:focus { border-color:#7c3aed; }
+.phys-item-add {
+  width:100%; padding:11px; border:1.5px dashed #d8d8d8; border-radius:12px;
+  background:none; color:#888; font-size:14px; font-weight:600; cursor:pointer;
+}
+.phys-item-add:hover { border-color:#7c3aed; color:#7c3aed; }
+.phys-item-edit-note { font-size:12px; color:#aaa; margin-top:8px; line-height:1.5; }
+
+body.dark-mode .people-cat-rename,
+body.dark-mode .phys-item-edit,
+body.dark-mode .phys-item-edit-label,
+body.dark-mode .phys-item-edit-hint { background:#1c1c1c; border-color:#2e2e2e; color:#e8e8e8; }

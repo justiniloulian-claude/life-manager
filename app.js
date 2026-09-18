@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v291';
+var APP_VERSION = 'v292';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -505,6 +505,7 @@ const state = {
   healthDate: toDateStr(new Date()),
   physFunRating: 0,
   editPhysFunId: null,
+  physItemsEditing: false,
   editGoalId: null,
   goalScope: 'monthly',
   goalYear: null,
@@ -593,6 +594,7 @@ function getData() {
     cheshbonChecks:       _sg('dm_cheshbon_checks',        {}),
     cheshbonWeekHistory:  _sg('dm_cheshbon_week_history',  []),
     physDaily:            _sg('dm_phys_daily',             {}),
+    physItems:            _sg('dm_phys_items',             []),
     physWeekly:           _sg('dm_phys_weekly',            []),
     weeklyItems:          _sg('dm_weekly_items',           []),
     weeklyScores:         _sg('dm_weekly_scores',          {}),
@@ -641,6 +643,7 @@ function saveChi(v) { _syncSave('dm_cheshbon_items',             JSON.stringify(
 function saveChk(v) { _syncSave('dm_cheshbon_checks',            JSON.stringify(v)); }
 function saveChWH(v){ _syncSave('dm_cheshbon_week_history',      JSON.stringify(v)); }
 function savePhysDaily(v) { _syncSave('dm_phys_daily',           JSON.stringify(v)); }
+function savePhysItems(v) { _syncSave('dm_phys_items',           JSON.stringify(v)); }
 function savePhysWeekly(v){ _syncSave('dm_phys_weekly',          JSON.stringify(v)); }
 function saveWI(v)  { _syncSave('dm_weekly_items',               JSON.stringify(v)); }
 function saveWS(v)  { _syncSave('dm_weekly_scores',              JSON.stringify(v)); }
@@ -1473,8 +1476,9 @@ window.dismissCalReminder=function(key){
 function renderPhysBanner(){
   var todayDs=toDateStr(new Date());
   var day=getPhysDay(todayDs);
-  var remaining=PHYS_ITEMS.filter(function(it){ return !day[it.key]; });
-  var done=PHYS_ITEMS.length-remaining.length;
+  var items=physItemsForDay(todayDs);
+  var remaining=items.filter(function(it){ return !day[it.key]; });
+  var done=items.length-remaining.length;
   var streak=physStreak();
   var complete=remaining.length===0;
 
@@ -1487,8 +1491,8 @@ function renderPhysBanner(){
     '</div>';
   }
   var sub = complete
-    ? 'All 5 done today 🎉'
-    : done+'/5 today · still to do: '+remaining.map(function(r){return r.label.toLowerCase();}).join(', ');
+    ? 'All '+items.length+' done today 🎉'
+    : done+'/'+items.length+' today · still to do: '+remaining.map(function(r){return r.label.toLowerCase();}).join(', ');
 
   return '<div class="phys-banner'+(complete?' is-complete':'')+'" onclick="goPhysical()">'+
     '<div class="phys-banner-main">'+
@@ -1749,13 +1753,24 @@ function deleteMoneyIdea(id){ var data=getData(); saveMM(data.moneymaking.filter
 // Activity plan (weekly repeating template)
 
 // ── Physical: daily 5 + streak + weekly fun activity ─────────────────────────
-var PHYS_ITEMS = [
-  {key:'water',   icon:'💧', label:'Water',     hint:'Hit target today'},
-  {key:'coffee',  icon:'☕', label:'Coffee',    hint:'Only when actually needed'},
-  {key:'stretch', icon:'🧘', label:'Stretch',   hint:'Done'},
-  {key:'walk',    icon:'🚶', label:'Walk',      hint:'Done'},
-  {key:'swap',    icon:'🥗', label:'Food swap', hint:"Made today's swap"}
+// Defaults seed the list on first use. createdAt is deliberately ancient so the
+// originals count for every day of history.
+var PHYS_ITEMS_DEFAULT = [
+  {key:'water',   icon:'💧', label:'Water',     hint:'Hit target today',        createdAt:'2000-01-01'},
+  {key:'coffee',  icon:'☕', label:'Coffee',    hint:'Only when actually needed',createdAt:'2000-01-01'},
+  {key:'stretch', icon:'🧘', label:'Stretch',   hint:'Done',                    createdAt:'2000-01-01'},
+  {key:'walk',    icon:'🚶', label:'Walk',      hint:'Done',                    createdAt:'2000-01-01'},
+  {key:'swap',    icon:'🥗', label:'Food swap', hint:"Made today's swap",       createdAt:'2000-01-01'}
 ];
+function getPhysItems(){
+  var stored = getData().physItems;
+  return (stored && stored.length) ? stored : PHYS_ITEMS_DEFAULT;
+}
+// A day only has to satisfy the items that already existed on that day —
+// otherwise adding an item today would retroactively void the whole streak.
+function physItemsForDay(ds){
+  return getPhysItems().filter(function(it){ return !it.createdAt || it.createdAt <= ds; });
+}
 
 function getPhysDay(ds){ return getData().physDaily[ds] || {}; }
 function togglePhysItem(ds, key){
@@ -1778,7 +1793,9 @@ function togglePhysItem(ds, key){
 function physDayComplete(ds, physDaily){
   var day=(physDaily||getData().physDaily)[ds];
   if(!day) return false;
-  return PHYS_ITEMS.every(function(it){ return !!day[it.key]; });
+  var items=physItemsForDay(ds);
+  if(!items.length) return false;
+  return items.every(function(it){ return !!day[it.key]; });
 }
 // Streak counts back from today. An unfinished TODAY doesn't break it — the day
 // isn't over yet — so counting starts at yesterday in that case.
@@ -3732,11 +3749,63 @@ function renderHealth() {
   renderWeightTracker();
 }
 
+window.togglePhysItemsEdit = function(){
+  state.physItemsEditing = !state.physItemsEditing;
+  renderPhysDaily();
+};
+window.savePhysItemLabel = function(key, field, val){
+  var items = getPhysItems().map(function(it){ return Object.assign({}, it); });
+  var it = items.find(function(x){ return x.key===key; });
+  if(!it) return;
+  val = (val||'').trim();
+  if(field==='label' && !val) { renderPhysDaily(); return; }
+  it[field] = val;
+  savePhysItems(items);
+};
+window.addPhysItem = function(){
+  var name = (prompt('New checklist item (e.g. Vitamins)') || '').trim();
+  if(!name) return;
+  var items = getPhysItems().map(function(it){ return Object.assign({}, it); });
+  // createdAt = today, so past days aren't retroactively marked incomplete
+  items.push({key:'it_'+Date.now().toString(36), icon:'•', label:name, hint:'',
+              createdAt:toDateStr(new Date())});
+  savePhysItems(items);
+  renderPhysDaily(); refresh();
+};
+window.deletePhysItem = function(key){
+  var items = getPhysItems();
+  if(items.length<=1){ alert('Keep at least one item.'); return; }
+  var it = items.find(function(x){ return x.key===key; });
+  if(!confirm('Remove "'+((it&&it.label)||'this item')+'" from the checklist?')) return;
+  savePhysItems(items.filter(function(x){ return x.key!==key; }));
+  renderPhysDaily(); refresh();
+};
+
 function renderPhysDaily() {
   var el = document.getElementById('physDailyList'); if (!el) return;
   var ds = state.healthDate;
   var day = getPhysDay(ds);
-  el.innerHTML = PHYS_ITEMS.map(function(it){
+  var items = physItemsForDay(ds);
+  var heading = document.getElementById('physDailyHeading');
+  if (heading) heading.textContent = 'Daily ' + items.length;
+
+  if (state.physItemsEditing) {
+    el.innerHTML = getPhysItems().map(function(it){
+      return '<div class="phys-item-edit">'+
+        '<input class="phys-item-edit-label" value="'+escHtml(it.label)+'" placeholder="Name" '+
+          'onchange="savePhysItemLabel(\''+it.key+'\',\'label\',this.value)">'+
+        '<input class="phys-item-edit-hint" value="'+escHtml(it.hint||'')+'" placeholder="Hint (optional)" '+
+          'onchange="savePhysItemLabel(\''+it.key+'\',\'hint\',this.value)">'+
+        '<button class="btn-icon" style="color:#e53e3e" title="Remove" onclick="deletePhysItem(\''+it.key+'\')">🗑</button>'+
+      '</div>';
+    }).join('') +
+    '<button class="phys-item-add" onclick="addPhysItem()">+ Add item</button>'+
+    '<div class="phys-item-edit-note">Adding an item only counts from today onward, so your streak stays intact.</div>';
+    renderPhysStreakLine();
+    return;
+  }
+
+  el.innerHTML = items.map(function(it){
     var on = !!day[it.key];
     return '<div class="phys-item'+(on?' is-on':'')+'" data-key="'+it.key+'" role="button" tabindex="0">'+
       '<span class="phys-item-check">'+(on?'✓':'')+'</span>'+
@@ -3752,11 +3821,12 @@ function renderPhysDaily() {
 function renderPhysStreakLine() {
   var line = document.getElementById('physStreakLine'); if (!line) return;
   var day = getPhysDay(state.healthDate);
-  var done = PHYS_ITEMS.filter(function(it){return !!day[it.key];}).length;
+  var items = physItemsForDay(state.healthDate);
+  var done = items.filter(function(it){return !!day[it.key];}).length;
   var isToday = state.healthDate === toDateStr(new Date());
   line.innerHTML = '<span class="phys-streak-num">🔥 '+physStreak()+'</span>'+
     '<span class="phys-streak-txt">day streak</span>'+
-    '<span class="phys-streak-today">'+done+'/5 '+(isToday?'today':'this day')+'</span>';
+    '<span class="phys-streak-today">'+done+'/'+items.length+' '+(isToday?'today':'this day')+'</span>';
 }
 
 function renderPhysFun() {
@@ -7532,6 +7602,7 @@ function _doLogin() {
   var _openCatPickerId=null;
   var _editingPersonId=null;
   var _editingNoteKey=null;
+  var _editingCatId=null;
 
   function _getPeopleCats(){ try{ return JSON.parse(localStorage.getItem('esav_person_cats')||'[]'); }catch(e){ return []; } }
   function _savePeopleCats(cats){ localStorage.setItem('esav_person_cats',JSON.stringify(cats)); }
@@ -7544,17 +7615,51 @@ function _doLogin() {
     cats.forEach(function(c){
       var active=c.id===_activePeopleCat;
       var style=active?'background:'+c.color+';border-color:'+c.color+';color:#fff':'border-color:'+c.color+';color:'+c.color;
-      html+='<span class="people-cat-filter-wrap">'+
-        '<button class="people-cat-filter'+(active?' active':'')+'" data-cat="'+c.id+'" onclick="window._setPeopleCatFilter(\''+c.id+'\')" style="'+style+'">'+escHtml(c.name)+'</button>'+
-        '<button class="people-cat-strip-del" onclick="event.stopPropagation();window._deletePeopleCat(\''+c.id+'\')" title="Delete category" style="color:'+c.color+'">×</button>'+
-      '</span>';
+      if(_editingCatId===c.id){
+        html+='<span class="people-cat-filter-wrap">'+
+          '<input class="people-cat-rename" id="peopleCatRename_'+c.id+'" value="'+escHtml(c.name)+'" style="border-color:'+c.color+';color:'+c.color+'" '+
+            'onclick="event.stopPropagation()" '+
+            'onkeydown="if(event.key===\'Enter\')window._savePeopleCatRename(\''+c.id+'\');if(event.key===\'Escape\')window._cancelPeopleCatRename()" '+
+            'onblur="window._savePeopleCatRename(\''+c.id+'\')">'+
+        '</span>';
+      } else {
+        html+='<span class="people-cat-filter-wrap">'+
+          '<button class="people-cat-filter'+(active?' active':'')+'" data-cat="'+c.id+'" onclick="window._setPeopleCatFilter(\''+c.id+'\')" ondblclick="event.stopPropagation();window._renamePeopleCat(\''+c.id+'\')" title="Double-click to rename" style="'+style+'">'+escHtml(c.name)+'</button>'+
+          '<button class="people-cat-strip-edit" onclick="event.stopPropagation();window._renamePeopleCat(\''+c.id+'\')" title="Rename category" style="color:'+c.color+'">✏️</button>'+
+          '<button class="people-cat-strip-del" onclick="event.stopPropagation();window._deletePeopleCat(\''+c.id+'\')" title="Delete category" style="color:'+c.color+'">×</button>'+
+        '</span>';
+      }
     });
     html+='<button class="people-cat-add-btn" id="peopleCatAddBtn" onclick="var f=document.getElementById(\'peopleCatNewForm\');if(f){f.style.display=f.style.display===\'none\'?\'\':\'none\';}">+ Category</button>';
     strip.innerHTML=html;
   }
 
   window._setPeopleCatFilter=function(catId){ _activePeopleCat=catId; _renderCatStrip(); _renderPeople(_peopleCache); };
+  window._renamePeopleCat=function(id){
+    _editingCatId=id; _renderCatStrip();
+    setTimeout(function(){ var i=document.getElementById('peopleCatRename_'+id); if(i){i.focus();i.select();} },30);
+  };
+  window._cancelPeopleCatRename=function(){ _editingCatId=null; _renderCatStrip(); };
+  window._savePeopleCatRename=function(id){
+    if(_editingCatId!==id) return; // blur already handled by Escape
+    var inp=document.getElementById('peopleCatRename_'+id);
+    var name=inp?inp.value.trim():'';
+    _editingCatId=null;
+    if(name){
+      var cats=_getPeopleCats();
+      var c=cats.find(function(x){return x.id===id;});
+      if(c && c.name!==name){ c.name=name; _savePeopleCats(cats); }
+    }
+    _renderCatStrip(); _renderPeople(_peopleCache);
+    if(window._renderAddTagRow) window._renderAddTagRow();
+  };
   window._deletePeopleCat=function(id){
+    var cat=_getPeopleCats().find(function(c){return c.id===id;});
+    var inUse=_peopleCache.filter(function(p){return (p.categories||[]).indexOf(id)>=0;}).length;
+    var msg=inUse
+      ? 'Delete "'+((cat&&cat.name)||'this category')+'"? It will be removed from '+inUse+' contact'+(inUse>1?'s':'')+'.'
+      : 'Delete "'+((cat&&cat.name)||'this category')+'"?';
+    if(!confirm(msg)) return;
     var cats=_getPeopleCats().filter(function(c){return c.id!==id;});
     _savePeopleCats(cats);
     _peopleCache.forEach(function(p){ p.categories=(p.categories||[]).filter(function(cid){return cid!==id;}); });
