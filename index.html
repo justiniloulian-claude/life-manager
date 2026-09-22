@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Life Manager">
   <title>Dashboard v150</title>
-  <link rel="stylesheet" href="style.css?v=292">
+  <link rel="stylesheet" href="style.css?v=293">
 </head>
 <body>
 
@@ -49,6 +49,7 @@
       <button class="header-nav-tab" data-page="goals">Goals</button>
       <button class="header-nav-tab" data-page="people">People</button>
     </nav>
+    <button id="backupBtn" class="btn-nav header-dark-toggle" title="Backup &amp; export your data" onclick="openModal('backupModal')">⬇</button>
     <button id="darkModeToggle" class="btn-nav header-dark-toggle" title="Toggle dark mode">🌙</button>
   </div>
 </header>
@@ -933,6 +934,41 @@
 </div>
 
 <!-- Simple Item Modal (Short Term / Long Term) -->
+<!-- Backup / Export Modal -->
+<div id="backupModal" class="modal">
+  <div class="modal-box" style="max-width:440px">
+    <div class="modal-header">
+      <h2>Backup &amp; Export</h2>
+      <button class="modal-close" id="closeBackupModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="backup-row">
+        <div class="backup-row-body">
+          <div class="backup-row-title">Full backup</div>
+          <div class="backup-row-sub">Everything, as a file you can keep. Use this one for safekeeping.</div>
+        </div>
+        <button class="btn-primary backup-btn" onclick="exportBackupJSON()">Download</button>
+      </div>
+      <div class="backup-row">
+        <div class="backup-row-body">
+          <div class="backup-row-title">Readable copy</div>
+          <div class="backup-row-sub">Your notes, reflections and goals as a page you can open and read.</div>
+        </div>
+        <button class="btn-secondary backup-btn" onclick="exportReadableHTML()">Download</button>
+      </div>
+      <div class="backup-row">
+        <div class="backup-row-body">
+          <div class="backup-row-title">Voice recordings</div>
+          <div class="backup-row-sub" id="backupAudioSub">Downloads each recording as an audio file.</div>
+        </div>
+        <button class="btn-secondary backup-btn" onclick="exportRecordings()">Download</button>
+      </div>
+      <div id="backupStatus" class="backup-status"></div>
+      <div class="modal-note" style="margin-top:14px;margin-bottom:0">Downloads work best on a computer — iPhone handles downloaded files awkwardly.</div>
+    </div>
+  </div>
+</div>
+
 <!-- Goal Modal (Monthly + Yearly) -->
 <div id="goalModal" class="modal">
   <div class="modal-box" style="max-width:440px">
@@ -1635,8 +1671,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<div id="_ver" style="position:fixed;bottom:4px;right:8px;font-size:10px;color:#aaa;z-index:99990;cursor:pointer" onclick="calDiag()" title="Tap for diagnostics">v292</div>
-<script src="app.js?v=292"></script>
+<div id="_ver" style="position:fixed;bottom:4px;right:8px;font-size:10px;color:#aaa;z-index:99990;cursor:pointer" onclick="calDiag()" title="Tap for diagnostics">v293</div>
+<script src="app.js?v=293"></script>
 </body>
 </html>
 

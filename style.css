@@ -4185,3 +4185,20 @@ body.dark-mode .people-cat-rename,
 body.dark-mode .phys-item-edit,
 body.dark-mode .phys-item-edit-label,
 body.dark-mode .phys-item-edit-hint { background:#1c1c1c; border-color:#2e2e2e; color:#e8e8e8; }
+
+/* Backup & export */
+.backup-row {
+  display:flex; align-items:center; gap:12px;
+  padding:13px 0; border-bottom:1px solid #f0f0f0;
+}
+.backup-row:last-of-type { border-bottom:none; }
+.backup-row-body { flex:1; min-width:0; }
+.backup-row-title { font-size:14.5px; font-weight:600; color:#1a1a1a; }
+.backup-row-sub { font-size:12.5px; color:#8c8c8c; line-height:1.45; margin-top:2px; }
+.backup-btn { font-size:13px; padding:7px 15px; flex-shrink:0; }
+.backup-status {
+  margin-top:12px; font-size:13px; color:#7c3aed; font-weight:500; min-height:18px;
+}
+#backupBtn { font-size:15px; }
+body.dark-mode .backup-row { border-bottom-color:#2a2a2a; }
+body.dark-mode .backup-row-title { color:#e8e8e8; }

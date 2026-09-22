@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v292';
+var APP_VERSION = 'v293';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -3088,6 +3088,194 @@ window.confirmTransferMonthly = function() {
   saveYH(data.yearlyHistory);
   closeModal('transferMonthlyModal');
   renderYearlyHist();
+};
+
+// ============================================================
+// BACKUP & EXPORT
+// Everything the user created, pulled from localStorage (which _loadFromFS
+// has already filled from the cloud) plus the raw esav_* People keys, which
+// live only on this device.
+// ============================================================
+// Caches and one-off flags — not user content, skipped from the backup.
+var BACKUP_SKIP = /^(_hebMonthEndsCache2|_peopleSeedCleared_|dm_jewish_hol_|dm_last_opened|dm_dismissed_reminders)/;
+
+function _backupStatus(msg) {
+  var el = document.getElementById('backupStatus');
+  if (el) el.textContent = msg || '';
+}
+function _downloadBlob(blob, filename) {
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+}
+function _stamp() { return toDateStr(new Date()); }
+
+function _collectBackup() {
+  var out = {};
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if (!k || BACKUP_SKIP.test(k)) continue;
+    out[k] = localStorage.getItem(k);
+  }
+  return out;
+}
+
+window.exportBackupJSON = function() {
+  try {
+    var data = _collectBackup();
+    var payload = {
+      _meta: {
+        app: 'Life Manager', version: APP_VERSION,
+        exportedAt: new Date().toISOString(),
+        keyCount: Object.keys(data).length
+      },
+      data: data
+    };
+    var json = JSON.stringify(payload, null, 2);
+    _downloadBlob(new Blob([json], {type:'application/json'}), 'life-manager-backup-'+_stamp()+'.json');
+    _backupStatus('Backup downloaded — '+Object.keys(data).length+' categories, '+Math.round(json.length/1024)+' KB.');
+  } catch(e) {
+    _backupStatus('Backup failed: '+e);
+  }
+};
+
+// ── Readable export ──────────────────────────────────────────────────────────
+function _esc(s){ return escHtml(String(s==null?'':s)); }
+function _nl2br(s){ return _esc(s).replace(/\n/g,'<br>'); }
+function _readableSection(title, bodyHtml) {
+  if (!bodyHtml) return '';
+  return '<section><h2>'+_esc(title)+'</h2>'+bodyHtml+'</section>';
+}
+function _readableList(items, fn) {
+  if (!items || !items.length) return '';
+  return '<ul>'+items.map(fn).join('')+'</ul>';
+}
+
+window.exportReadableHTML = function() {
+  try {
+    var d = getData();
+    var parts = [];
+
+    // Notes
+    var liveNotes = (d.notes||[]).filter(function(n){ return !n.deleted; });
+    parts.push(_readableSection('Notes', _readableList(liveNotes, function(n){
+      var body = n.type==='checklist'
+        ? '<ul>'+(n.items||[]).map(function(i){ return '<li>'+(i.done?'☑':'☐')+' '+_esc(i.text)+'</li>'; }).join('')+'</ul>'
+        : '<div class="body">'+_nl2br(String(n.content||'').replace(/<[^>]*>/g,''))+'</div>';
+      return '<li><div class="t">'+_esc(n.title||'(untitled)')+'</div>'+body+'</li>';
+    })));
+
+    // Goals
+    ['yearly','monthly'].forEach(function(scope){
+      var gs = (d.goals||[]).filter(function(g){ return g.scope===scope; });
+      gs.sort(function(a,b){ return String(a.period).localeCompare(String(b.period)) || (a.order||0)-(b.order||0); });
+      parts.push(_readableSection(scope==='yearly'?'Yearly goals':'Monthly goals', _readableList(gs, function(g){
+        return '<li><div class="t">'+_esc(g.title)+' <span class="tag">'+_esc(g.period)+(g.category?' · '+_esc(g.category):'')+'</span></div>'+
+          (g.goal?'<div class="body"><b>Goal:</b> '+_nl2br(g.goal)+'</div>':'')+
+          (g.practice||g.description?'<div class="body"><b>Practice:</b> '+_nl2br(g.practice||g.description)+'</div>':'')+'</li>';
+      })));
+    });
+
+    // Reflections
+    parts.push(_readableSection('Daily reflections', _readableList(d.reflHistory||[], function(r){
+      return '<li><div class="t">'+_esc(r.date||r.storedAt||'')+'</div><div class="body">'+_nl2br(r.learned||r.text||'')+'</div></li>';
+    })));
+    parts.push(_readableSection('Free reflections', _readableList(d.freeReflHistory||[], function(r){
+      return '<li><div class="t">'+_esc(new Date(r.ts||r.storedAt||Date.now()).toLocaleDateString())+'</div><div class="body">'+_nl2br(r.text||'')+'</div></li>';
+    })));
+
+    // Recording logs (titles/dates — audio itself exports separately)
+    parts.push(_readableSection('Monthly recordings', _readableList(d.monthlyJewishHistory||[], function(e){
+      return '<li><div class="t">'+_esc(e.month)+' <span class="tag">'+_esc(new Date(e.storedAt).toLocaleDateString())+(e.audioKey?' · has audio':'')+'</span></div></li>';
+    })));
+    parts.push(_readableSection('Monthly reflections', _readableList(d.monthlySecularHistory||[], function(e){
+      return '<li><div class="t">'+_esc(e.month)+'</div><div class="body">'+_nl2br(e.text||'')+'</div></li>';
+    })));
+    parts.push(_readableSection('Yearly recordings', _readableList(d.yearlyHistory||[], function(e){
+      return '<li><div class="t">'+_esc(e.year)+' <span class="tag">'+_esc(new Date(e.storedAt).toLocaleDateString())+(e.audioKey?' · has audio':'')+'</span></div></li>';
+    })));
+
+    // Short / long term
+    parts.push(_readableSection('Short term', _readableList(d.shortterm||[], function(i){
+      return '<li><div class="t">'+(i.done?'☑':'☐')+' '+_esc(i.title)+'</div>'+(i.notes?'<div class="body">'+_nl2br(i.notes)+'</div>':'')+'</li>';
+    })));
+    parts.push(_readableSection('Long term', _readableList(d.longterm||[], function(i){
+      return '<li><div class="t">'+(i.done?'☑':'☐')+' '+_esc(i.title)+'</div>'+(i.notes?'<div class="body">'+_nl2br(i.notes)+'</div>':'')+'</li>';
+    })));
+
+    // Weekly fun activity
+    parts.push(_readableSection('Weekly fun activity', _readableList(d.physWeekly||[], function(e){
+      return '<li><div class="t">'+_esc(e.what)+' <span class="tag">'+_esc(e.date)+' · '+e.fun+'/5</span></div></li>';
+    })));
+
+    // People (device-local)
+    var people = [];
+    try { people = JSON.parse(localStorage.getItem('esav_contacts')||'[]'); } catch(e){}
+    parts.push(_readableSection('People', _readableList(people, function(p){
+      var notes = [];
+      try { notes = JSON.parse(localStorage.getItem('pnotes_'+p.id)||'[]'); } catch(e){}
+      var hist = (p.contactHistory||[]).concat(notes);
+      return '<li><div class="t">'+_esc(p.name)+' <span class="tag">every '+(p.frequencyDays||0)+'d</span></div>'+
+        _readableList(hist, function(h){
+          return '<li><div class="body">'+_esc(new Date(h.ts).toLocaleDateString())+' — '+_nl2br(h.note||'')+'</div></li>';
+        })+'</li>';
+    })));
+
+    var html = '<!doctype html><meta charset="utf-8"><title>Life Manager — '+_stamp()+'</title>'+
+      '<style>'+
+      'body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:760px;margin:40px auto;padding:0 20px;color:#1a1a1a;line-height:1.6}'+
+      'h1{font-size:26px;margin-bottom:2px}h2{font-size:18px;margin:34px 0 10px;padding-bottom:6px;border-bottom:2px solid #eee}'+
+      '.sub{color:#888;font-size:13px;margin-bottom:8px}'+
+      'ul{list-style:none;padding:0;margin:0}li{margin:0 0 12px;padding:10px 14px;border:1px solid #eee;border-radius:10px}'+
+      'li li{margin:6px 0 0;border:none;padding:2px 0;border-left:2px solid #eee;padding-left:10px;border-radius:0}'+
+      '.t{font-weight:600}.body{color:#555;font-size:14px;margin-top:4px;white-space:pre-wrap}'+
+      '.tag{font-weight:400;font-size:12px;color:#999}'+
+      '@media print{li{break-inside:avoid}}'+
+      '</style>'+
+      '<h1>Life Manager</h1><div class="sub">Exported '+new Date().toLocaleString()+' · '+APP_VERSION+'</div>'+
+      parts.join('');
+
+    _downloadBlob(new Blob([html], {type:'text/html'}), 'life-manager-readable-'+_stamp()+'.html');
+    _backupStatus('Readable copy downloaded.');
+  } catch(e) {
+    _backupStatus('Readable export failed: '+e);
+  }
+};
+
+// ── Recordings ───────────────────────────────────────────────────────────────
+function _audioEntries() {
+  var d = getData();
+  var out = [];
+  (d.monthlyJewishHistory||[]).forEach(function(e){ if(e.audioKey) out.push({key:e.audioKey, label:'monthly-'+(e.month||'entry')}); });
+  (d.yearlyHistory||[]).forEach(function(e){ if(e.audioKey) out.push({key:e.audioKey, label:'yearly-'+(e.year||'entry')}); });
+  // A recording transferred to Yearly shares its key with the Monthly original
+  var seen = {};
+  return out.filter(function(x){ if(seen[x.key]) return false; seen[x.key]=true; return true; });
+}
+function _safeName(s){ return String(s).replace(/[^a-zA-Z0-9\-_ ]/g,'').trim().replace(/\s+/g,'-').slice(0,60) || 'recording'; }
+
+window.exportRecordings = async function() {
+  var list = _audioEntries();
+  if (!list.length) { _backupStatus('No recordings to download.'); return; }
+  if (!_uid) { _backupStatus('Not signed in — cannot fetch recordings.'); return; }
+  var ok = 0, failed = 0;
+  for (var i = 0; i < list.length; i++) {
+    _backupStatus('Downloading recording '+(i+1)+' of '+list.length+'…');
+    try {
+      var blob = await loadAudioFromFirestore(list[i].key);
+      if (!blob) { failed++; continue; }
+      var ext = (blob.type||'').indexOf('mp4')!==-1 ? 'm4a'
+              : (blob.type||'').indexOf('mpeg')!==-1 ? 'mp3'
+              : (blob.type||'').indexOf('ogg')!==-1 ? 'ogg' : 'webm';
+      _downloadBlob(blob, _safeName(list[i].label)+'.'+ext);
+      ok++;
+      // Browsers throttle rapid successive downloads; give each one room.
+      await new Promise(function(r){ setTimeout(r, 600); });
+    } catch(e) { failed++; }
+  }
+  _backupStatus('Downloaded '+ok+' recording'+(ok===1?'':'s')+(failed?' · '+failed+' failed':'')+'.');
 };
 
 // ============================================================
@@ -6761,6 +6949,9 @@ function initListeners() {
   document.getElementById('healthBackTodayBtn').addEventListener('click', function(){
     state.healthDate=toDateStr(new Date()); renderHealth();
   });
+
+  // Backup modal
+  document.getElementById('closeBackupModal').addEventListener('click', function(){ closeModal('backupModal'); });
 
   // Goal modal
   document.getElementById('closeGoalModal').addEventListener('click', function(){ closeModal('goalModal'); });
