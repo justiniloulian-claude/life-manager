@@ -4273,3 +4273,16 @@ body.dark-mode .gs-chip.active { background:#7c3aed; border-color:#7c3aed; color
   .gs-filters { padding:9px 12px; gap:5px; }
   .gs-chip { font-size:11.5px; padding:4px 9px; }
 }
+
+/* Offline / unsynced indicator */
+.offline-bar {
+  position:fixed; left:0; right:0; bottom:0; z-index:99998;
+  padding:9px 16px; text-align:center;
+  font-size:13px; font-weight:600; color:#fff;
+  box-shadow:0 -2px 12px rgba(0,0,0,0.12);
+}
+.offline-bar.is-off     { background:#4b5563; }
+.offline-bar.is-pending { background:#7c3aed; }
+@media (max-width: 768px) {
+  .offline-bar { bottom:56px; font-size:12.5px; padding:8px 12px; }
+}

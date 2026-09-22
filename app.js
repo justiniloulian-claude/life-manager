@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v297';
+var APP_VERSION = 'v298';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -146,13 +146,61 @@ var _localWriteTs = {};
 // startup/init code (which uses _origSetItem directly). So there's no risk
 // of boot data being double-written to Firestore.
 // Removing _bootMode from this guard is what makes the ↑ badge finally appear.
+// ── Offline write queue ──────────────────────────────────────────────────────
+// A write that fails (no signal, not signed in yet) used to be dropped on the
+// floor, and the next load would overwrite the local copy from the server —
+// silently destroying anything written offline. Keys with unsent changes are
+// recorded here, survive a reload, win over the server copy, and are re-sent
+// once a connection comes back.
+var PENDING_KEY = 'dm_pending_writes';
+function _getPending(){ try{ return JSON.parse(_origGetItem(PENDING_KEY)||'{}'); }catch(e){ return {}; } }
+function _setPending(p){ try{ _origSetItem(PENDING_KEY, JSON.stringify(p)); }catch(e){} }
+function _isPending(key){ return Object.prototype.hasOwnProperty.call(_getPending(), key); }
+function _pendingCount(){ return Object.keys(_getPending()).length; }
+function _markPending(key){ var p=_getPending(); p[key]=Date.now(); _setPending(p); _updateOfflineUI(); }
+function _clearPending(key, ts){
+  var p=_getPending();
+  // Only clear if no newer local edit happened while this write was in flight
+  if(p[key] !== undefined && p[key] <= ts){ delete p[key]; _setPending(p); }
+  _updateOfflineUI();
+}
+function _flushPending(){
+  if(!_uid || !navigator.onLine) return;
+  var p=_getPending(); var keys=Object.keys(p);
+  if(!keys.length) return;
+  keys.forEach(function(k){
+    var val=_origGetItem(k);
+    if(val===null){ var q=_getPending(); delete q[k]; _setPending(q); return; }
+    _fsSaveKey(k, val);
+  });
+}
+function _updateOfflineUI(){
+  var n = _pendingCount();
+  var off = !navigator.onLine;
+  var el = document.getElementById('offlineBar');
+  if(!off && !n){ if(el && el.parentNode) el.parentNode.removeChild(el); return; }
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'offlineBar';
+    if(document.body) document.body.appendChild(el); else return;
+  }
+  el.className = 'offline-bar ' + (off ? 'is-off' : 'is-pending');
+  el.textContent = off
+    ? (n ? 'Offline — ' + n + ' change' + (n>1?'s':'') + ' saved here, will sync when you\'re back'
+         : 'Offline — your changes are saved on this device')
+    : 'Syncing ' + n + ' change' + (n>1?'s':'') + '…';
+}
+window.addEventListener('online',  function(){ _updateOfflineUI(); _flushPending(); });
+window.addEventListener('offline', function(){ _updateOfflineUI(); });
+
 function _syncSave(key, str){
   _origSetItem(key, str);           // 1. always save to localStorage immediately
   _localWriteTs[key] = Date.now(); // 2. stamp this key so polls won't overwrite it
+  _markPending(key);               // 3. unsent until the server confirms it
   if(_uid){
-    _fsSaveKey(key, str);           // 3. push to Firestore → badge shows ↑ then ✓
+    _fsSaveKey(key, str);           // 4. push to Firestore → badge shows ↑ then ✓
   } else {
-    // Not logged in yet — show a hint in the badge so we can diagnose
+    // Not signed in yet — it stays queued and flushes after login
     _syncStatus('err', 'no uid');
   }
 }
@@ -166,6 +214,7 @@ function _fsSaveKey(key, value){
   if(value && value.length > FS_DOC_LIMIT * 0.9){
     var mb = (value.length/1048576).toFixed(2);
     _syncStatus('err', key+' too big: '+mb+'MB');
+    _clearPending(key, Date.now()); // retrying will never help; stop queueing it
     if(!document.getElementById('fsSizeWarn')){
       var w=document.createElement('div');
       w.id='fsSizeWarn';
@@ -183,8 +232,12 @@ function _fsSaveKey(key, value){
   var ref = _db.collection('users').doc(_uid).collection('appdata');
   ref.doc(key.replace(/\//g,'__')).set({key:key, val:value, ts:ts, src:_deviceId})
     .then(function(){ return ref.doc('_syncTS').set({val:String(ts), src:_deviceId}); })
-    .then(function(){ _syncStatus('ok'); })
-    .catch(function(e){ _syncStatus('err', String(e).slice(0,60)); });
+    .then(function(){ _clearPending(key, ts); _syncStatus('ok'); })
+    .catch(function(e){
+      // Stays pending and will be re-sent by _flushPending once back online
+      _syncStatus('err', String(e).slice(0,60));
+      _updateOfflineUI();
+    });
 }
 
 // Called once after login to verify writes reach the server.
@@ -221,6 +274,7 @@ var _FS_TS_MIN = 1704067200000; // 2024-01-01 in ms
 // writes (ts ≈ now) always come through.
 function _applyFSDoc(d){
   if(!d || !d.key || d.val===undefined || _skipFS(d.key)) return false;
+  if(_isPending(d.key)) return false; // unsent local change wins
   if(_origGetItem(d.key) === d.val) return false; // already up to date
   var fsTs = Number(d.ts || '0');
   if(fsTs < _FS_TS_MIN) return false; // stale legacy doc — never overwrite local
@@ -251,6 +305,9 @@ function _loadFromFS(uid, cb){
       snap.forEach(function(doc){
         var d=doc.data();
         if(d && d.key && d.val!==undefined && !_skipFS(d.key)){
+          // A key edited offline has not reached the server yet — the local
+          // copy is the newer one, so the server must not overwrite it.
+          if(_isPending(d.key)) return;
           _origSetItem(d.key, d.val);
         }
       });
@@ -258,6 +315,8 @@ function _loadFromFS(uid, cb){
       try { cb(); } catch(e){ console.error('[sync] init error:', e); }
       _bootMode=false;
       _startRealtimeListener(uid);
+      _flushPending();   // send anything written while offline
+      _updateOfflineUI();
       _syncStatus('ok');
     })
     .catch(function(e){
@@ -267,6 +326,7 @@ function _loadFromFS(uid, cb){
       try { cb(); } catch(er){ console.error('[sync] init error:', er); }
       _bootMode=false;
       _startRealtimeListener(uid);
+      _updateOfflineUI();
     });
 }
 
@@ -3343,7 +3403,7 @@ window.closeGlobalSearch = function() { closeModal('globalSearchModal'); };
 // live only on this device.
 // ============================================================
 // Caches and one-off flags — not user content, skipped from the backup.
-var BACKUP_SKIP = /^(_hebMonthEndsCache2|_peopleSeedCleared_|dm_jewish_hol_|dm_last_opened|dm_dismissed_reminders)/;
+var BACKUP_SKIP = /^(_hebMonthEndsCache2|_peopleSeedCleared_|dm_jewish_hol_|dm_last_opened|dm_dismissed_reminders|dm_pending_writes)/;
 
 function _backupStatus(msg) {
   var el = document.getElementById('backupStatus');
@@ -7853,6 +7913,7 @@ function init() {
   updateHeaderDate();
   loadHeaderHebrewDate();
   _initHebMonthEnds(); // populates the "end of Hebrew month" recurrence dates
+  _updateOfflineUI();
   setInterval(updateHeaderDate,60000);
   initListeners();
   initSwipe();

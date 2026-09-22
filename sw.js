@@ -1,35 +1,62 @@
-// v274: NO caching. Every navigation and every asset always fetched from network.
-// Prior versions used cache-first for go.html which caused stale content to be
-// served indefinitely. This version deletes every cache on activate and never
-// writes to any cache, so there is no stuck-SW cache layer.
+// v298: network-first offline shell.
+//
+// History matters here: an earlier cache-first service worker is what pinned
+// this app on v256 for hours. So the rule is strict — always try the network
+// first and only fall back to the cache when the request actually fails. When
+// you have signal you are, by definition, getting the newest files.
+//
+// Only same-origin GETs are cached. Firestore, gstatic and hebcal always pass
+// straight through, so live data is never served stale from a cache.
 
-self.addEventListener('install', function() {
+var SHELL = 'lm-shell-v298';
+var SHELL_FILES = ['./', './index.html', './app.js', './style.css', './manifest.json'];
+
+self.addEventListener('install', function(e) {
   self.skipWaiting();
-});
-
-self.addEventListener('activate', function(e) {
-  // Delete every cache from every previous SW version without exception.
   e.waitUntil(
-    caches.keys().then(function(keys) {
-      return Promise.all(keys.map(function(k) { return caches.delete(k); }));
-    }).then(function() {
-      return self.clients.claim();
-    }).then(function() {
-      return self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    }).then(function(clients) {
-      return Promise.all(clients.map(function(c) {
-        return c.navigate(c.url).catch(function() {});
-      }));
+    caches.open(SHELL).then(function(cache) {
+      return cache.addAll(SHELL_FILES).catch(function() {
+        // A single missing file must not abort the whole install
+        return Promise.all(SHELL_FILES.map(function(f) {
+          return cache.add(f).catch(function() {});
+        }));
+      });
     })
   );
 });
 
-// Never cache anything. Pass every request straight to the network.
-// cache:'no-store' tells the browser not to store the response in its HTTP cache.
+self.addEventListener('activate', function(e) {
+  e.waitUntil(
+    caches.keys().then(function(keys) {
+      return Promise.all(keys.filter(function(k) { return k !== SHELL; })
+                            .map(function(k) { return caches.delete(k); }));
+    }).then(function() { return self.clients.claim(); })
+  );
+});
+
 self.addEventListener('fetch', function(e) {
+  var req = e.request;
+  if (req.method !== 'GET') return;
+
+  var sameOrigin = req.url.indexOf(self.location.origin) === 0;
+  if (!sameOrigin) return; // Firestore / gstatic / hebcal — never touch these
+
   e.respondWith(
-    fetch(e.request, { cache: 'no-store' }).catch(function() {
-      return fetch(e.request);
+    fetch(req).then(function(resp) {
+      if (resp && resp.status === 200 && resp.type === 'basic') {
+        var copy = resp.clone();
+        caches.open(SHELL).then(function(cache) { cache.put(req, copy); });
+      }
+      return resp;
+    }).catch(function() {
+      // Offline: ignoreSearch so app.js?v=298 still matches a cached app.js?v=297
+      return caches.match(req, { ignoreSearch: true }).then(function(hit) {
+        if (hit) return hit;
+        if (req.mode === 'navigate') {
+          return caches.match('./index.html', { ignoreSearch: true });
+        }
+        return new Response('', { status: 504, statusText: 'Offline' });
+      });
     })
   );
 });
