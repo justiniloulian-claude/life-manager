@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v293';
+var APP_VERSION = 'v294';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -1719,13 +1719,6 @@ function fmtDollar(n) { var x=parseFloat(n)||0; return x%1===0?x.toLocaleString(
 function fmtAmt(lo,hi) { lo=parseFloat(lo)||0; hi=parseFloat(hi)||lo; return lo===hi?'$'+fmtDollar(lo):'$'+fmtDollar(lo)+'–$'+fmtDollar(hi); }
 var TAG_CLS={'Need':'tag-need','Flexible':'tag-flex','Self-invest':'tag-invest','Gift':'tag-gift','Income':'tag-income','Bonus':'tag-bonus'};
 function tagBadge(tag) { var cls=TAG_CLS[tag]||'tag-need'; return '<span class="fin-tag '+cls+'">'+escHtml(tag||'')+'</span>'; }
-function getFinWeeks() {
-  var now=new Date(); var y=now.getFullYear(); var m=now.getMonth();
-  var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return [1,8,15,22].map(function(d,i){ return {label:'Week '+(i+1)+' \xb7 '+MON[m]+' '+d,idx:i}; });
-}
-function getAutoWeekIdx() { var d=new Date().getDate(); if(d<8)return 0; if(d<15)return 1; if(d<22)return 2; return 3; }
-function itemInWeek(item,wi) { if(item.frequency==='weekly')return true; return (item.weeks||[]).indexOf(wi)!==-1; }
 function addFinInc(d)       { var data=getData(); data.finIncome.push(Object.assign({id:uid()},d)); saveFinInc(data.finIncome); }
 function updateFinInc(id,d) { var data=getData(); var i=data.finIncome.findIndex(function(x){return x.id===id;}); if(i>-1)data.finIncome[i]=Object.assign({},data.finIncome[i],d,{id:id}); saveFinInc(data.finIncome); }
 function deleteFinInc(id)   { var data=getData(); saveFinInc(data.finIncome.filter(function(x){return x.id!==id;})); }
@@ -4059,49 +4052,6 @@ function renderPhysFun() {
 // ============================================================
 // RENDER — PEOPLE / RELATIONSHIP CRM
 // ============================================================
-function renderCRM() {
-  var el = document.getElementById('peopleList');
-  if (!el) return;
-  var raw = localStorage.getItem('esav_contacts');
-  var contacts = raw ? JSON.parse(raw) : [];
-
-  if (!contacts.length) {
-    el.innerHTML = '<div class="stl-empty">No contacts yet. Tell Esav: "Add a contact — Bob, every 2 months" and they\'ll appear here.</div>';
-    return;
-  }
-
-  var today = new Date();
-
-  function getStatus(c) {
-    if (!c.lastContactDate) return { cls: 'overdue', label: 'Never logged', days: Infinity };
-    var daysSince = Math.floor((today - new Date(c.lastContactDate)) / 86400000);
-    var freq = c.frequencyDays || 30;
-    if (daysSince > freq)            return { cls: 'overdue',  label: 'Overdue by ' + (daysSince - freq) + ' days', days: daysSince - freq };
-    if (daysSince > freq * 0.8)      return { cls: 'due-soon', label: (freq - daysSince) + ' days left', days: -(freq - daysSince) };
-    return                                  { cls: 'good',     label: 'Last seen ' + daysSince + ' d ago', days: -(freq - daysSince) };
-  }
-
-  contacts.sort(function(a, b) { return getStatus(b).days - getStatus(a).days; });
-
-  el.innerHTML = contacts.map(function(c) {
-    var st = getStatus(c);
-    var initials = c.name.split(' ').map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase();
-    var lastSeen = c.lastContactDate ? 'Last: ' + c.lastContactDate : 'Never logged';
-    return '<div class="crm-card">'+
-      '<div class="crm-avatar crm-avatar-'+st.cls+'">'+escHtml(initials)+'</div>'+
-      '<div class="crm-info">'+
-        '<div class="crm-name">'+escHtml(c.name)+'</div>'+
-        '<div class="crm-freq">'+escHtml(c.frequency || 'every '+(c.frequencyDays||30)+' days')+'</div>'+
-        (c.notes ? '<div class="crm-notes">'+escHtml(c.notes)+'</div>' : '')+
-      '</div>'+
-      '<div class="crm-status">'+
-        '<span class="crm-status-badge crm-'+st.cls+'">'+escHtml(st.label)+'</span>'+
-        '<div class="crm-last">'+escHtml(lastSeen)+'</div>'+
-      '</div>'+
-    '</div>';
-  }).join('');
-}
-window.renderCRM = renderCRM;
 
 // ============================================================
 // RENDER — LEARNING SEDER
@@ -4327,58 +4277,6 @@ function renderFinancial() {
   }
 }
 
-function renderFinWeekly() {
-  var data=getData(); var wi=state.finWeekIdx; var weeks=getFinWeeks();
-  var stEl=document.getElementById('finWeekSubtabs');
-  if(stEl) stEl.innerHTML=weeks.map(function(w){
-    return '<button class="fin-week-tab'+(w.idx===wi?' active':'')+'" onclick="setFinWeek('+w.idx+')">'+escHtml(w.label)+'</button>';
-  }).join('');
-  var incItems=data.finIncome.filter(function(i){return itemInWeek(i,wi);});
-  var expItems=data.finExpenses.filter(function(i){return itemInWeek(i,wi);});
-  var incLo=incItems.reduce(function(s,i){return s+(parseFloat(i.amountLow)||0);},0);
-  var incHi=incItems.reduce(function(s,i){return s+(parseFloat(i.amountHigh)||parseFloat(i.amountLow)||0);},0);
-  var expLo=expItems.reduce(function(s,i){return s+(parseFloat(i.amountLow)||0);},0);
-  var expHi=expItems.reduce(function(s,i){return s+(parseFloat(i.amountHigh)||parseFloat(i.amountLow)||0);},0);
-  var surpLo=incLo-expHi; var surpHi=incHi-expLo;
-  function tblRow(item,type) {
-    var lo=parseFloat(item.amountLow)||0; var hi=parseFloat(item.amountHigh)||lo;
-    var editFn=type==='inc'?'openEditFinInc':'openEditFinExp';
-    var delFn=type==='inc'?'delFinInc':'delFinExp';
-    return '<div class="fin-tbl-row">'+
-      '<span class="fin-tbl-name">'+escHtml(item.name)+(item.notes?'<span class="fin-note-dot" title="'+escHtml(item.notes)+'"> ·</span>':'')+'</span>'+
-      tagBadge(item.tag||(type==='inc'?'Income':'Need'))+
-      '<span class="fin-tbl-freq">'+escHtml(FREQ_LABEL[item.frequency]||'')+'</span>'+
-      '<span class="fin-tbl-amt '+(type==='inc'?'inc':'exp')+'">$'+fmtDollar(lo)+'</span>'+
-      '<span class="fin-tbl-amt '+(type==='inc'?'inc':'exp')+'">$'+fmtDollar(hi)+'</span>'+
-      '<span class="fin-tbl-act">'+
-        '<button class="btn-icon-sm" onclick="'+editFn+'(\''+item.id+'\')">✏️</button>'+
-        '<button class="btn-icon-sm" onclick="'+delFn+'(\''+item.id+'\')">🗑</button>'+
-      '</span></div>';
-  }
-  var incHdr='<div class="fin-tbl-hdr"><span>Item</span><span>Tag</span><span>Freq</span><span>Low</span><span>High</span><span></span></div>';
-  var callout='';
-  if(surpLo<0) callout='<div class="fin-callout fin-callout-alert">⚠️ Possible deficit of $'+Math.abs(Math.round(surpLo))+' at max spend</div>';
-  else if(surpHi<50) callout='<div class="fin-callout fin-callout-warn">Tight week — max surplus under $50</div>';
-  else callout='<div class="fin-callout fin-callout-ok">✓ Surplus range: $'+Math.max(0,Math.round(surpLo))+' – $'+Math.max(0,Math.round(surpHi))+'</div>';
-  var expPct=incHi?Math.min(100,Math.round(expHi/incHi*100)):100;
-  var cEl=document.getElementById('finWeekContent');
-  if(!cEl)return;
-  cEl.innerHTML=
-    '<div class="fin-section">'+
-      '<div class="fin-section-header"><h3>Income</h3><button class="btn-primary" style="font-size:13px;padding:6px 13px" onclick="openAddFinInc()">+ Add</button></div>'+
-      '<div class="fin-tbl-wrap">'+incHdr+(incItems.length?incItems.map(function(i){return tblRow(i,'inc');}).join(''):'<div class="fin-empty">No income this week.</div>')+
-      (incItems.length?'<div class="fin-total-row"><span class="fin-total-lbl">Total Income</span><span></span><span></span><span class="fin-tbl-amt inc">$'+fmtDollar(incLo)+'</span><span class="fin-tbl-amt inc">$'+fmtDollar(incHi)+'</span><span></span></div>':'')+'</div>'+
-    '</div>'+
-    '<div class="fin-section">'+
-      '<div class="fin-section-header"><h3>Expenses</h3><button class="btn-primary" style="font-size:13px;padding:6px 13px" onclick="openAddFinExp()">+ Add</button></div>'+
-      '<div class="fin-tbl-wrap">'+incHdr+(expItems.length?expItems.map(function(i){return tblRow(i,'exp');}).join(''):'<div class="fin-empty">No expenses this week.</div>')+
-      (expItems.length?'<div class="fin-total-row"><span class="fin-total-lbl">Total Expenses</span><span></span><span></span><span class="fin-tbl-amt exp">$'+fmtDollar(expLo)+'</span><span class="fin-tbl-amt exp">$'+fmtDollar(expHi)+'</span><span></span></div>':'')+'</div>'+
-    '</div>'+
-    '<div class="fin-surplus-block">'+
-      '<div class="fin-surplus-bar-outer"><div class="fin-surplus-bar-fill" style="width:'+expPct+'%"></div></div>'+
-      callout+
-    '</div>';
-}
 
 function renderFinMonthly() {
   var data=getData();
@@ -5019,7 +4917,7 @@ window.setCheshTab = function(tab) {
 // DASHBOARD VIEW SWITCHING
 // ============================================================
 function setDashView(viewName) {
-  var viewMap = {single:'singleDayView',seven:'sevenDayView',future:'futureView',cheshbon:'cheshbonView',health:'healthView',people:'peopleView',reminders:'remindersView'};
+  var viewMap = {single:'singleDayView',seven:'sevenDayView',future:'futureView',cheshbon:'cheshbonView',health:'healthView'};
   var pillMap = {single:'pillDay',seven:'pillSeven',future:'pillFuture',cheshbon:'pillCheshbon',health:'pillHealth'};
   // Clear Shabbat timer when leaving 7-day view
   if(viewName!=='seven'&&_shabbatTimer){clearInterval(_shabbatTimer);_shabbatTimer=null;}
@@ -5033,7 +4931,6 @@ function setDashView(viewName) {
   if (viewName==='future')    renderFuture();
   if (viewName==='cheshbon')  { setCheshTab('daily'); }
   if (viewName==='health')    renderHealth();
-  if (viewName==='people')    renderCRM();
 
 }
 
@@ -6066,7 +5963,6 @@ window.openLearningCopy=function(day,id){
 };
 
 // Financial — week selection
-window.setFinWeek = function(idx) { state.finWeekIdx=idx; renderFinWeekly(); };
 
 // Financial — CRUD globals
 window.delFinInc  = function(id){ if(confirm('Delete this income stream?')){ deleteFinInc(id); renderFinancial(); } };
@@ -6722,9 +6618,6 @@ function initListeners() {
   document.getElementById('pillCheshbon').addEventListener('click', function(){ setDashView('cheshbon'); });
   document.getElementById('pillHealth').addEventListener('click',   function(){ setDashView('health'); });
 
-  var pillPeopleEl=document.getElementById('pillPeople');
-  if(pillPeopleEl) pillPeopleEl.addEventListener('click', function(){ setDashView('people'); });
-
   // Priority filter button
   var pfBtn=document.getElementById('priorityFilterBtn');
   if(pfBtn) pfBtn.addEventListener('click', function(){
@@ -6993,7 +6886,6 @@ function initListeners() {
   if(document.getElementById('closeWeightHistoryModal'))
     document.getElementById('closeWeightHistoryModal').addEventListener('click',function(){closeModal('weightHistoryModal');});
 
-  var _addRemBtn=document.getElementById('addReminderBtn'); if(_addRemBtn) _addRemBtn.addEventListener('click', function(){ state.editReminderId=null; document.getElementById('reminderModalTitle').textContent='Add Reminder'; document.getElementById('reminderText').value=''; document.getElementById('reminderCategory').value=''; openModal('reminderModal'); setTimeout(function(){document.getElementById('reminderText').focus();},80); });
   document.getElementById('closeReminderModal').addEventListener('click', function(){ closeModal('reminderModal'); });
   document.getElementById('cancelReminder').addEventListener('click',     function(){ closeModal('reminderModal'); });
   document.getElementById('saveReminder').addEventListener('click', function(){
@@ -7260,7 +7152,6 @@ function initListeners() {
   if(document.getElementById('closeEditCalScopeModal'))
     document.getElementById('closeEditCalScopeModal').addEventListener('click',function(){closeModal('editCalScopeModal');});
   document.getElementById('closeDayDetailModal').addEventListener('click', function(){ closeModal('dayDetailModal'); });
-  document.getElementById('calMonthViewBtn') && document.getElementById('calMonthViewBtn').addEventListener('click', function(){ renderCalendar(); });
 
   // Note view modal (inline editable)
   function closeNoteView() { saveNoteViewModal(); closeModal('noteViewModal'); renderNotes(); }
