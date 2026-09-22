@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v295';
+var APP_VERSION = 'v296';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -7042,8 +7042,16 @@ function initListeners() {
   document.getElementById('closeGlobalSearch').addEventListener('click', closeGlobalSearch);
   document.getElementById('globalSearchInput').addEventListener('input', _renderGlobalSearch);
   document.addEventListener('keydown', function(e){
-    if ((e.metaKey||e.ctrlKey) && (e.key==='k'||e.key==='K')) { e.preventDefault(); openGlobalSearch(); return; }
-    if (e.key==='Escape' && document.getElementById('globalSearchModal').classList.contains('open')) closeGlobalSearch();
+    if (e.key==='Escape' && document.getElementById('globalSearchModal').classList.contains('open')) { closeGlobalSearch(); return; }
+    if (e.key!=='s' && e.key!=='S') return;
+    // Bare letter shortcut: never steal the key while the user is typing,
+    // and never override a real shortcut like Cmd+S.
+    if (e.metaKey||e.ctrlKey||e.altKey) return;
+    var t=e.target;
+    if (t && (t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT'||t.isContentEditable)) return;
+    if (document.getElementById('globalSearchModal').classList.contains('open')) return;
+    e.preventDefault();
+    openGlobalSearch();
   });
 
   // Backup modal
