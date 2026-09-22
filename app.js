@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v296';
+var APP_VERSION = 'v297';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -3089,7 +3089,34 @@ window.confirmTransferMonthly = function() {
 // rather than opening an editor, and completed items are included (but
 // deleted notes are not).
 // ============================================================
-var _gsResults = [];
+var _gsResults = [];   // what is currently shown (after filtering)
+var _gsAll = [];       // every match for the query, used for the chip counts
+var _gsFilters = [];   // active group names; empty means All
+
+// The raw result types are too granular to be useful as chips, so they roll up.
+var GS_GROUPS = [
+  ['Tasks & Events', ['Task','Routine','Event']],
+  ['Notes',          ['Note']],
+  ['Goals',          ['Goal']],
+  ['Lists',          ['Short term','Long term']],
+  ['People',         ['Person']],
+  ['Cheshbon',       ['Reflection','Recording','Monthly reflection','Cheshbon item','Weekly item']],
+  ['Learning',       ['Learning']],
+  ['Financial',      ['Income','Expense','Wishlist','Bonus','Money idea']],
+  ['Physical',       ['Activity']]
+];
+function _gsGroupOf(type){
+  for (var i=0;i<GS_GROUPS.length;i++) if (GS_GROUPS[i][1].indexOf(type)!==-1) return GS_GROUPS[i][0];
+  return 'Other';
+}
+window.toggleGsFilter = function(group){
+  if (group === null) { _gsFilters = []; }
+  else {
+    var i = _gsFilters.indexOf(group);
+    if (i===-1) _gsFilters.push(group); else _gsFilters.splice(i,1);
+  }
+  _renderGlobalSearch();
+};
 
 function _gsFlash(sel) {
   setTimeout(function(){
@@ -3238,16 +3265,44 @@ function _globalSearch(q) {
   return out;
 }
 
+function _renderGsFilters() {
+  var bar = document.getElementById('globalSearchFilters'); if (!bar) return;
+  if (!_gsAll.length) { bar.innerHTML = ''; bar.style.display = 'none'; return; }
+  bar.style.display = '';
+  var counts = {};
+  _gsAll.forEach(function(r){ var g=_gsGroupOf(r.type); counts[g]=(counts[g]||0)+1; });
+  var html = '<button class="gs-chip'+(_gsFilters.length?'':' active')+'" onclick="toggleGsFilter(null)">All <span class="gs-chip-n">'+_gsAll.length+'</span></button>';
+  GS_GROUPS.forEach(function(g){
+    var n = counts[g[0]] || 0;
+    if (!n) return; // only offer filters that would actually return something
+    var on = _gsFilters.indexOf(g[0])!==-1;
+    html += '<button class="gs-chip'+(on?' active':'')+'" onclick="toggleGsFilter(\''+g[0].replace(/'/g,"\\'")+'\')">'+
+      escHtml(g[0])+' <span class="gs-chip-n">'+n+'</span></button>';
+  });
+  bar.innerHTML = html;
+}
+
 function _renderGlobalSearch() {
   var q = document.getElementById('globalSearchInput').value;
   var box = document.getElementById('globalSearchResults');
-  _gsResults = _globalSearch(q);
+  _gsAll = _globalSearch(q);
+  // Drop filters that the new query made meaningless, so nothing silently hides results
+  var live = {}; _gsAll.forEach(function(r){ live[_gsGroupOf(r.type)] = true; });
+  _gsFilters = _gsFilters.filter(function(g){ return live[g]; });
+  _gsResults = _gsFilters.length
+    ? _gsAll.filter(function(r){ return _gsFilters.indexOf(_gsGroupOf(r.type))!==-1; })
+    : _gsAll;
+  _renderGsFilters();
   if (q.trim().length < 2) {
     box.innerHTML = '<div class="gs-empty">Type at least two letters.</div>';
     return;
   }
-  if (!_gsResults.length) {
+  if (!_gsAll.length) {
     box.innerHTML = '<div class="gs-empty">Nothing found for “'+escHtml(q)+'”.</div>';
+    return;
+  }
+  if (!_gsResults.length) {
+    box.innerHTML = '<div class="gs-empty">No matches in that filter — tap All to see everything.</div>';
     return;
   }
   var shown = _gsResults.slice(0, 50);
@@ -3271,6 +3326,9 @@ function _renderGlobalSearch() {
 
 window.openGlobalSearch = function() {
   openModal('globalSearchModal');
+  _gsFilters = []; _gsAll = []; _gsResults = [];
+  var bar = document.getElementById('globalSearchFilters');
+  if (bar) { bar.innerHTML = ''; bar.style.display = 'none'; }
   var inp = document.getElementById('globalSearchInput');
   inp.value = '';
   document.getElementById('globalSearchResults').innerHTML = '<div class="gs-empty">Type at least two letters.</div>';
