@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v294';
+var APP_VERSION = 'v295';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -1126,7 +1126,7 @@ function getTasksForDate(ds) {
   var data=getData();
   var dow=fromDateStr(ds).getDay();
   var completions=(data.tasks[ds]||[]).filter(function(t){return t._rc;});
-  var routineTasks=data.routine.filter(function(r){return r.days.includes(dow);}).map(function(r){
+  var routineTasks=data.routine.filter(function(r){return (r.days||[]).includes(dow);}).map(function(r){
     var c=completions.find(function(c){return c._rc===r.id;});
     var ov=data.routineOverrides[ds+'_'+r.id]||{};
     if(ov.skipped) return null;
@@ -3082,6 +3082,201 @@ window.confirmTransferMonthly = function() {
   closeModal('transferMonthlyModal');
   renderYearlyHist();
 };
+
+// ============================================================
+// GLOBAL SEARCH
+// Searches every area at once. Results navigate to where the item lives
+// rather than opening an editor, and completed items are included (but
+// deleted notes are not).
+// ============================================================
+var _gsResults = [];
+
+function _gsFlash(sel) {
+  setTimeout(function(){
+    var el = document.querySelector(sel);
+    if (!el) return;
+    el.scrollIntoView({behavior:'smooth', block:'center'});
+    el.classList.add('stl-flash');
+    setTimeout(function(){ el.classList.remove('stl-flash'); }, 1600);
+  }, 140);
+}
+function _gsGoDay(ds) {
+  showPage('dashboard');
+  var today = new Date(); today.setHours(0,0,0,0);
+  state.dayOffset = Math.round((fromDateStr(ds) - today) / 86400000);
+  setDashView('single');
+}
+
+function _globalSearch(q) {
+  q = (q||'').trim().toLowerCase();
+  var out = [];
+  if (q.length < 2) return out;
+  var d = getData();
+  function hit(){ for(var i=0;i<arguments.length;i++){ var v=arguments[i]; if(v && String(v).toLowerCase().indexOf(q)!==-1) return true; } return false; }
+  function add(type, title, sub, go){ out.push({type:type, title:title||'(untitled)', sub:sub||'', go:go}); }
+
+  // Tasks (completed included)
+  Object.keys(d.tasks||{}).forEach(function(ds){
+    (d.tasks[ds]||[]).forEach(function(t){
+      if (!t.title) return;
+      if (hit(t.title, t.notes, t.location))
+        add('Task', t.title, (t.done?'✓ ':'')+shortMonthDay(fromDateStr(ds)), function(){ _gsGoDay(ds); });
+    });
+  });
+  // Routine
+  (d.routine||[]).forEach(function(r){
+    if (hit(r.title, r.notes, r.location))
+      add('Routine', r.title, 'Recurring', function(){ showPage('dashboard'); setDashView('single'); renderRoutineList(); openModal('routineModal'); });
+  });
+  // Calendar events
+  (d.calEvents||[]).forEach(function(e){
+    if (e._overrideFor) return;
+    if (hit(e.title, e.notes, e.location))
+      add('Event', e.title, e.date||'', function(){
+        showPage('calendar');
+        if (e.date) { var nd=fromDateStr(e.date); state.calYear=nd.getFullYear(); state.calMonth=nd.getMonth(); }
+        renderCalendar();
+      });
+  });
+  // Notes (skip deleted)
+  (d.notes||[]).forEach(function(n){
+    if (n.deleted) return;
+    var itemText = (n.items||[]).map(function(i){return i.text;}).join(' ');
+    if (hit(n.title, String(n.content||'').replace(/<[^>]*>/g,''), itemText))
+      add('Note', n.title||'(untitled note)', n.type==='checklist'?'Checklist':'Note', function(){
+        showPage('notes'); setNoteFolder('all'); _gsFlash('.note-card[data-note-id="'+n.id+'"]');
+      });
+  });
+  // Goals
+  (d.goals||[]).forEach(function(g){
+    if (hit(g.title, g.goal, g.practice, g.description, g.category))
+      add('Goal', g.title, (g.scope==='yearly'?'Yearly · ':'Monthly · ')+g.period, function(){
+        showPage('goals'); setGoalScope(g.scope);
+        var parts = String(g.period).split('-');
+        setGoalYear(parts[0]); if (parts[1]) setGoalMonth(parts[1]);
+        _gsFlash('.ygoal-card[data-gid="'+g.id+'"]');
+      });
+  });
+  // Short / long term
+  [['shortterm','Short term'],['longterm','Long term']].forEach(function(pair){
+    (d[pair[0]]||[]).forEach(function(i){
+      if (hit(i.title, i.notes))
+        add(pair[1], i.title, i.done?'✓ done':'', function(){
+          showPage('dashboard'); setDashView('future');
+          _gsFlash('.stl-item[data-id="'+i.id+'"]');
+        });
+    });
+  });
+  // Learning
+  Object.keys(d.learning||{}).forEach(function(day){
+    (d.learning[day]||[]).forEach(function(it){
+      if (hit(it.title, it.seder, it.notes))
+        add('Learning', it.title||it.seder, day, function(){ showPage('learning'); });
+    });
+  });
+  // People + their conversation notes
+  var people=[]; try{ people=JSON.parse(localStorage.getItem('esav_contacts')||'[]'); }catch(e){}
+  people.forEach(function(p){
+    var notes=[]; try{ notes=JSON.parse(localStorage.getItem('pnotes_'+p.id)||'[]'); }catch(e){}
+    var allNotes=(p.contactHistory||[]).concat(notes).map(function(h){return h.note;}).join(' ');
+    if (hit(p.name, allNotes))
+      add('Person', p.name, hit(p.name)?'Contact':'Mentioned in a note', function(){ showPage('people'); });
+  });
+  // Reflections
+  (d.reflHistory||[]).forEach(function(r){
+    if (hit(r.learned, r.feeling, r.text))
+      add('Reflection', (r.learned||r.text||'').slice(0,60), r.date||'', function(){
+        showPage('dashboard'); setDashView('cheshbon'); setCheshTab('daily');
+      });
+  });
+  (d.freeReflHistory||[]).forEach(function(r){
+    if (hit(r.text))
+      add('Reflection', String(r.text||'').slice(0,60), 'Free write', function(){
+        showPage('dashboard'); setDashView('cheshbon'); setCheshTab('daily');
+      });
+  });
+  // Recordings + monthly write-ups
+  (d.monthlyJewishHistory||[]).forEach(function(e){
+    if (hit(e.month)) add('Recording', e.month, 'Monthly', function(){
+      showPage('dashboard'); setDashView('cheshbon'); setCheshTab('monthly'); });
+  });
+  (d.yearlyHistory||[]).forEach(function(e){
+    if (hit(e.year)) add('Recording', e.year, 'Yearly', function(){
+      showPage('dashboard'); setDashView('cheshbon'); setCheshTab('yearly'); });
+  });
+  (d.monthlySecularHistory||[]).forEach(function(e){
+    if (hit(e.month, e.text)) add('Monthly reflection', e.month, '', function(){
+      showPage('dashboard'); setDashView('cheshbon'); setCheshTab('monthly'); });
+  });
+  // Financial
+  [['finIncome','Income','income'],['finExpenses','Expense','monthly'],
+   ['finWishlist','Wishlist','wishlist'],['finBonuses','Bonus','income'],
+   ['moneymaking','Money idea','moneymaking']].forEach(function(cfg){
+    (d[cfg[0]]||[]).forEach(function(it){
+      if (hit(it.name, it.notes, it.idea, it.tag))
+        add(cfg[1], it.name||it.idea, it.tag||'', function(){
+          showPage('financial');
+          var btn=document.querySelector('.fin-tab[data-tab="'+cfg[2]+'"]'); if(btn) btn.click();
+        });
+    });
+  });
+  // Cheshbon + weekly items
+  (d.cheshbonItems||[]).forEach(function(i){
+    if (hit(i.title||i.name)) add('Cheshbon item', i.title||i.name, '', function(){
+      showPage('dashboard'); setDashView('cheshbon'); setCheshTab('daily'); });
+  });
+  (d.weeklyItems||[]).forEach(function(i){
+    if (hit(i.title||i.name)) add('Weekly item', i.title||i.name, '', function(){
+      showPage('dashboard'); setDashView('cheshbon'); setCheshTab('weekly'); });
+  });
+  // Weekly fun activity
+  (d.physWeekly||[]).forEach(function(e){
+    if (hit(e.what)) add('Activity', e.what, e.date+' · '+e.fun+'/5', function(){
+      showPage('dashboard'); setDashView('health'); });
+  });
+
+  return out;
+}
+
+function _renderGlobalSearch() {
+  var q = document.getElementById('globalSearchInput').value;
+  var box = document.getElementById('globalSearchResults');
+  _gsResults = _globalSearch(q);
+  if (q.trim().length < 2) {
+    box.innerHTML = '<div class="gs-empty">Type at least two letters.</div>';
+    return;
+  }
+  if (!_gsResults.length) {
+    box.innerHTML = '<div class="gs-empty">Nothing found for “'+escHtml(q)+'”.</div>';
+    return;
+  }
+  var shown = _gsResults.slice(0, 50);
+  box.innerHTML = shown.map(function(r, i){
+    return '<div class="gs-item" data-idx="'+i+'">'+
+      '<span class="gs-type">'+escHtml(r.type)+'</span>'+
+      '<span class="gs-body">'+
+        '<span class="gs-title">'+escHtml(r.title)+'</span>'+
+        (r.sub?'<span class="gs-sub">'+escHtml(r.sub)+'</span>':'')+
+      '</span></div>';
+  }).join('') +
+  (_gsResults.length>shown.length ? '<div class="gs-empty">+ '+(_gsResults.length-shown.length)+' more — keep typing to narrow it down.</div>' : '');
+  box.querySelectorAll('.gs-item').forEach(function(row){
+    row.addEventListener('click', function(){
+      var r = _gsResults[parseInt(row.dataset.idx,10)];
+      closeGlobalSearch();
+      try { r.go(); } catch(e) { console.error('[search nav]', e); }
+    });
+  });
+}
+
+window.openGlobalSearch = function() {
+  openModal('globalSearchModal');
+  var inp = document.getElementById('globalSearchInput');
+  inp.value = '';
+  document.getElementById('globalSearchResults').innerHTML = '<div class="gs-empty">Type at least two letters.</div>';
+  setTimeout(function(){ inp.focus(); }, 60);
+};
+window.closeGlobalSearch = function() { closeModal('globalSearchModal'); };
 
 // ============================================================
 // BACKUP & EXPORT
@@ -6841,6 +7036,14 @@ function initListeners() {
   });
   document.getElementById('healthBackTodayBtn').addEventListener('click', function(){
     state.healthDate=toDateStr(new Date()); renderHealth();
+  });
+
+  // Global search
+  document.getElementById('closeGlobalSearch').addEventListener('click', closeGlobalSearch);
+  document.getElementById('globalSearchInput').addEventListener('input', _renderGlobalSearch);
+  document.addEventListener('keydown', function(e){
+    if ((e.metaKey||e.ctrlKey) && (e.key==='k'||e.key==='K')) { e.preventDefault(); openGlobalSearch(); return; }
+    if (e.key==='Escape' && document.getElementById('globalSearchModal').classList.contains('open')) closeGlobalSearch();
   });
 
   // Backup modal

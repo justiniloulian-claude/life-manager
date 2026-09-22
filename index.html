@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Life Manager">
   <title>Dashboard v150</title>
-  <link rel="stylesheet" href="style.css?v=293">
+  <link rel="stylesheet" href="style.css?v=295">
 </head>
 <body>
 
@@ -49,6 +49,7 @@
       <button class="header-nav-tab" data-page="goals">Goals</button>
       <button class="header-nav-tab" data-page="people">People</button>
     </nav>
+    <button id="globalSearchBtn" class="btn-nav header-dark-toggle" title="Search everything (⌘K)" onclick="openGlobalSearch()">🔍</button>
     <button id="backupBtn" class="btn-nav header-dark-toggle" title="Backup &amp; export your data" onclick="openModal('backupModal')">⬇</button>
     <button id="darkModeToggle" class="btn-nav header-dark-toggle" title="Toggle dark mode">🌙</button>
   </div>
@@ -934,6 +935,18 @@
 </div>
 
 <!-- Simple Item Modal (Short Term / Long Term) -->
+<!-- Global Search Overlay -->
+<div id="globalSearchModal" class="modal gs-modal">
+  <div class="gs-box">
+    <div class="gs-input-row">
+      <span class="gs-icon">🔍</span>
+      <input type="text" id="globalSearchInput" class="gs-input" placeholder="Search tasks, notes, goals, people, everything…" autocomplete="off">
+      <button class="gs-close" id="closeGlobalSearch" title="Close">esc</button>
+    </div>
+    <div id="globalSearchResults" class="gs-results"></div>
+  </div>
+</div>
+
 <!-- Backup / Export Modal -->
 <div id="backupModal" class="modal">
   <div class="modal-box" style="max-width:440px">
@@ -1671,8 +1684,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<div id="_ver" style="position:fixed;bottom:4px;right:8px;font-size:10px;color:#aaa;z-index:99990;cursor:pointer" onclick="calDiag()" title="Tap for diagnostics">v294</div>
-<script src="app.js?v=294"></script>
+<div id="_ver" style="position:fixed;bottom:4px;right:8px;font-size:10px;color:#aaa;z-index:99990;cursor:pointer" onclick="calDiag()" title="Tap for diagnostics">v295</div>
+<script src="app.js?v=295"></script>
 </body>
 </html>
 
