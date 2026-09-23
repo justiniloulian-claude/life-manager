@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v299';
+var APP_VERSION = 'v300';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -67,6 +67,7 @@ var _auth = firebase.auth();
 var _uid  = null;
 var _appInited = false;
 var _fsUnsubscribe = null;
+var _fsLoadDone = false; // true once the cloud copy is in localStorage
 
 // No offline persistence. The IndexedDB queue from earlier broken-WebSocket
 // sessions was blocking all new writes from ever reaching the server.
@@ -312,6 +313,7 @@ function _loadFromFS(uid, cb){
           _origSetItem(d.key, d.val);
         }
       });
+      _fsLoadDone = true;
       _bootMode=true;
       try { cb(); } catch(e){ console.error('[sync] init error:', e); }
       _bootMode=false;
@@ -323,6 +325,7 @@ function _loadFromFS(uid, cb){
     .catch(function(e){
       // Firestore unreachable — fall back to whatever localStorage has cached
       _syncStatus('err', String(e).slice(0,40));
+      _fsLoadDone = true;   // offline: local copy is all there is, safe to merge
       _bootMode=true;
       try { cb(); } catch(er){ console.error('[sync] init error:', er); }
       _bootMode=false;
@@ -3263,7 +3266,7 @@ function _globalSearch(q) {
     });
   });
   // People + their conversation notes
-  var people=[]; try{ people=JSON.parse(localStorage.getItem('esav_contacts')||'[]'); }catch(e){}
+  var people=[]; try{ people=JSON.parse(localStorage.getItem('dm_people')||'[]'); }catch(e){}
   people.forEach(function(p){
     var notes=[]; try{ notes=JSON.parse(localStorage.getItem('pnotes_'+p.id)||'[]'); }catch(e){}
     var allNotes=(p.contactHistory||[]).concat(notes).map(function(h){return h.note;}).join(' ');
@@ -3519,10 +3522,10 @@ window.exportReadableHTML = function() {
 
     // People (device-local)
     var people = [];
-    try { people = JSON.parse(localStorage.getItem('esav_contacts')||'[]'); } catch(e){}
+    try { people = JSON.parse(localStorage.getItem('dm_people')||'[]'); } catch(e){}
     parts.push(_readableSection('People', _readableList(people, function(p){
       var notes = [];
-      try { notes = JSON.parse(localStorage.getItem('pnotes_'+p.id)||'[]'); } catch(e){}
+      try { notes = (JSON.parse(localStorage.getItem('dm_people_notes')||'{}')[p.id])||[]; } catch(e){}
       var hist = (p.contactHistory||[]).concat(notes);
       return '<li><div class="t">'+_esc(p.name)+' <span class="tag">every '+(p.frequencyDays||0)+'d</span></div>'+
         _readableList(hist, function(h){
@@ -8017,9 +8020,60 @@ function _doLogin() {
   var _editingNoteKey=null;
   var _editingCatId=null;
 
-  function _getPeopleCats(){ try{ return JSON.parse(localStorage.getItem('esav_person_cats')||'[]'); }catch(e){ return []; } }
-  function _savePeopleCats(cats){ localStorage.setItem('esav_person_cats',JSON.stringify(cats)); }
-  function _savePeople(people){ localStorage.setItem('esav_contacts',JSON.stringify(people)); }
+  // People used to live in raw localStorage (esav_contacts / esav_person_cats /
+  // pnotes_*), so it never synced and existed on one device only. It now goes
+  // through _syncSave like everything else. The old keys are left in place as a
+  // backup and are never written to again.
+  function _peopleJson(key, dflt){ try{ return JSON.parse(_origGetItem(key) || dflt); }catch(e){ return JSON.parse(dflt); } }
+  function _getPeopleCats(){ return _peopleJson('dm_people_cats','[]'); }
+  function _savePeopleCats(cats){ _syncSave('dm_people_cats', JSON.stringify(cats)); }
+  function _savePeople(people){ _syncSave('dm_people', JSON.stringify(people)); }
+
+  // Runs after _loadFromFS, so the cloud copy is already in localStorage and we
+  // can MERGE into it rather than clobber it — the other device may have
+  // migrated its own contacts first.
+  function _migratePeople(){
+    // Merging before the cloud copy has landed would overwrite the other
+    // device's contacts with only this device's. Wait for the load.
+    if (!_fsLoadDone) return;
+    var legacyPeople = _peopleJson('esav_contacts','[]');
+    var legacyCats   = _peopleJson('esav_person_cats','[]');
+    var legacyNotes  = {};
+    for (var i=0;i<localStorage.length;i++){
+      var k = localStorage.key(i);
+      if (k && k.indexOf('pnotes_')===0) legacyNotes[k.slice(7)] = _peopleJson(k,'[]');
+    }
+    if (!legacyPeople.length && !legacyCats.length && !Object.keys(legacyNotes).length) return;
+
+    function mergeById(cloud, local, pick){
+      var byId = {};
+      cloud.forEach(function(x){ byId[x.id] = x; });
+      local.forEach(function(x){
+        byId[x.id] = byId[x.id] ? pick(byId[x.id], x) : x;
+      });
+      return Object.keys(byId).map(function(k){ return byId[k]; });
+    }
+
+    var people = mergeById(_peopleJson('dm_people','[]'), legacyPeople, function(a,b){
+      // keep whichever has more history, tie-break on most recent contact
+      var ah=(a.contactHistory||[]).length, bh=(b.contactHistory||[]).length;
+      if (ah!==bh) return ah>bh ? a : b;
+      return (a.lastContact||0) >= (b.lastContact||0) ? a : b;
+    });
+    var cats = mergeById(_peopleJson('dm_people_cats','[]'), legacyCats, function(a){ return a; });
+
+    var notes = _peopleJson('dm_people_notes','{}');
+    Object.keys(legacyNotes).forEach(function(pid){
+      var have = notes[pid] || [];
+      var seen = {}; have.forEach(function(n){ seen[n.ts] = true; });
+      notes[pid] = have.concat(legacyNotes[pid].filter(function(n){ return !seen[n.ts]; }))
+                       .sort(function(x,y){ return y.ts - x.ts; }).slice(0,50);
+    });
+
+    if (people.length) _syncSave('dm_people', JSON.stringify(people));
+    if (cats.length)   _syncSave('dm_people_cats', JSON.stringify(cats));
+    if (Object.keys(notes).length) _syncSave('dm_people_notes', JSON.stringify(notes));
+  }
 
   function _renderCatStrip(){
     var strip=document.getElementById('peopleCatStrip'); if(!strip) return;
@@ -8114,8 +8168,16 @@ function _doLogin() {
   function _nextContactDate(lastMs, days){ if(!lastMs||!days) return null; var d=new Date(lastMs+days*86400000); return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
   function _daysAgoStr(ts){ if(!ts) return 'never'; var d=Math.floor((Date.now()-ts)/86400000); return d===0?'today':d===1?'yesterday':d+' days ago'; }
 
-  function _localNotes(pid){ try{ return JSON.parse(localStorage.getItem('pnotes_'+pid)||'[]'); }catch(e){ return []; } }
-  function _saveLocalNote(pid,ts,note){ var arr=_localNotes(pid); arr.unshift({ts:ts,note:note}); try{ localStorage.setItem('pnotes_'+pid,JSON.stringify(arr.slice(0,50))); }catch(e){} }
+  function _allPersonNotes(){ return _peopleJson('dm_people_notes','{}'); }
+  function _localNotes(pid){ return _allPersonNotes()[pid] || []; }
+  function _savePersonNotes(pid, arr){
+    var all=_allPersonNotes(); all[pid]=arr.slice(0,50);
+    _syncSave('dm_people_notes', JSON.stringify(all));
+  }
+  function _saveLocalNote(pid,ts,note){
+    var arr=_localNotes(pid).slice(); arr.unshift({ts:ts,note:note});
+    _savePersonNotes(pid, arr);
+  }
 
   var _expandedHistory = {};
 
@@ -8233,7 +8295,8 @@ function _doLogin() {
   };
 
   window._loadPeople = function(){
-    try { _peopleCache = JSON.parse(localStorage.getItem('esav_contacts')||'[]'); } catch(e) { _peopleCache=[]; }
+    _migratePeople();
+    _peopleCache = _peopleJson('dm_people','[]');
     _peopleCache.forEach(function(p){ if(!p.categories) p.categories=[]; });
     _renderCatStrip(); _renderPeople(_peopleCache);
     if(window._renderAddTagRow) window._renderAddTagRow();
@@ -8280,14 +8343,14 @@ function _doLogin() {
     var h=(p.contactHistory||[]).find(function(x){return x.ts===ts;});
     if(h) h.note=note;
     var local=_localNotes(pid); var lh=local.find(function(x){return x.ts===ts;});
-    if(lh){ lh.note=note; try{localStorage.setItem('pnotes_'+pid,JSON.stringify(local));}catch(e){} }
+    if(lh){ lh.note=note; _savePersonNotes(pid, local); }
     _editingNoteKey=null; _savePeople(_peopleCache); _renderPeople(_peopleCache);
   };
   window._esavDeleteNote=function(pid,ts){
     var p=_peopleCache.find(function(x){return x.id===pid;}); if(!p) return;
     p.contactHistory=(p.contactHistory||[]).filter(function(h){return h.ts!==ts;});
     var local=_localNotes(pid).filter(function(h){return h.ts!==ts;});
-    try{localStorage.setItem('pnotes_'+pid,JSON.stringify(local));}catch(e){}
+    _savePersonNotes(pid, local);
     _savePeople(_peopleCache); _renderPeople(_peopleCache);
   };
 
