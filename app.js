@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v298';
+var APP_VERSION = 'v299';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -117,20 +117,21 @@ function _initSyncBadge(){
   document.body.appendChild(b);
   _syncBadge = b;
 }
+// Successful syncing is not news. The badge stays hidden for ok/send/recv and
+// only appears when something actually went wrong.
 function _syncStatus(st, detail){
   if(!_syncBadge) return;
   clearTimeout(_syncHideTimer);
   var icons = {ok:'✓', send:'↑', recv:'↓', err:'✗'};
   _syncBadge.textContent = APP_VERSION+(icons[st]||st)+(detail?' '+detail:'');
-  _syncBadge.style.opacity = '1';
-  _syncBadge.style.background = st==='err' ?'rgba(180,0,0,0.85)':
-                                 st==='ok'  ?'rgba(0,120,0,0.75)':
-                                 st==='recv'?'rgba(0,80,160,0.75)':
-                                             'rgba(0,0,0,0.75)';
-  // fade out after 2.5s unless it's an error
-  if(st !== 'err'){
-    _syncHideTimer = setTimeout(function(){ if(_syncBadge) _syncBadge.style.opacity='0'; }, 2500);
+  // Being offline is expected, not a failure — the offline bar already says so,
+  // so a red error badge on top of it is just noise.
+  if(st !== 'err' || !navigator.onLine){
+    _syncBadge.style.opacity = '0';
+    return;
   }
+  _syncBadge.style.opacity = '1';
+  _syncBadge.style.background = 'rgba(180,0,0,0.85)';
 }
 document.addEventListener('DOMContentLoaded', _initSyncBadge);
 
@@ -174,21 +175,21 @@ function _flushPending(){
     _fsSaveKey(k, val);
   });
 }
+// Only surfaces the one state worth knowing: you are offline. Syncing that is
+// simply in progress says nothing — it works, and the queue handles failures.
 function _updateOfflineUI(){
-  var n = _pendingCount();
-  var off = !navigator.onLine;
   var el = document.getElementById('offlineBar');
-  if(!off && !n){ if(el && el.parentNode) el.parentNode.removeChild(el); return; }
+  if(navigator.onLine){ if(el && el.parentNode) el.parentNode.removeChild(el); return; }
   if(!el){
     el = document.createElement('div');
     el.id = 'offlineBar';
     if(document.body) document.body.appendChild(el); else return;
   }
-  el.className = 'offline-bar ' + (off ? 'is-off' : 'is-pending');
-  el.textContent = off
-    ? (n ? 'Offline — ' + n + ' change' + (n>1?'s':'') + ' saved here, will sync when you\'re back'
-         : 'Offline — your changes are saved on this device')
-    : 'Syncing ' + n + ' change' + (n>1?'s':'') + '…';
+  var n = _pendingCount();
+  el.className = 'offline-bar is-off';
+  el.textContent = n
+    ? 'Offline — ' + n + ' change' + (n>1?'s':'') + ' saved here, will sync when you\'re back'
+    : 'Offline — your changes are saved on this device';
 }
 window.addEventListener('online',  function(){ _updateOfflineUI(); _flushPending(); });
 window.addEventListener('offline', function(){ _updateOfflineUI(); });

@@ -4282,7 +4282,6 @@ body.dark-mode .gs-chip.active { background:#7c3aed; border-color:#7c3aed; color
   box-shadow:0 -2px 12px rgba(0,0,0,0.12);
 }
 .offline-bar.is-off     { background:#4b5563; }
-.offline-bar.is-pending { background:#7c3aed; }
 @media (max-width: 768px) {
   .offline-bar { bottom:56px; font-size:12.5px; padding:8px 12px; }
 }
