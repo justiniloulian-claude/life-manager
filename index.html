@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Life Manager">
   <title>Dashboard v150</title>
-  <link rel="stylesheet" href="style.css?v=299">
+  <link rel="stylesheet" href="style.css?v=301">
 </head>
 <body>
 
@@ -75,6 +75,7 @@
     </div>
     <div class="dash-subnav-right">
       <button id="priorityFilterBtn" class="priority-filter-btn" title="Show urgent/high priority tasks only">⚡ Priority</button>
+      <button id="routineFilterBtn" class="priority-filter-btn" title="Cycle: all tasks → routine only → one-off only">🔁 All</button>
       <label class="date-jump-label">Jump to:</label>
       <input type="date" id="dateJumpInput" class="date-jump-input" title="Jump to any date">
     </div>
@@ -1685,8 +1686,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<div id="_ver" style="position:fixed;bottom:4px;right:8px;font-size:10px;color:#aaa;z-index:99990;cursor:pointer" onclick="calDiag()" title="Tap for diagnostics">v300</div>
-<script src="app.js?v=300"></script>
+<div id="_ver" style="position:fixed;bottom:4px;right:8px;font-size:10px;color:#aaa;z-index:99990;cursor:pointer" onclick="calDiag()" title="Tap for diagnostics">v301</div>
+<script src="app.js?v=301"></script>
 </body>
 </html>
 

@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v300';
+var APP_VERSION = 'v301';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -617,6 +617,7 @@ const state = {
   notesSearchQuery: '',
   taskModalLinkedNotes: [],
   priorityFilter: false,
+  routineFilter: 'all', // 'all' | 'routine' | 'oneoff'
   zmanimCache: {},
   hebrewCache: {},
   location: null,
@@ -811,8 +812,11 @@ var AUDIO_CHUNK_SIZE = 700000; // ~700KB per chunk, well under Firestore 1MB doc
 // Long recordings upload as several sequential requests; show progress so the
 // save doesn't look frozen. Call with (0,0) to clear.
 function _audioUploadProgress(done, total) {
+  // Uploading is routine — it should happen quietly. Kept as a no-op so the
+  // call sites in the chunked upload stay untouched.
   var el = document.getElementById('audioUploadProgress');
-  if (!total) { if (el) el.remove(); return; }
+  if (el) el.remove();
+  if (true) return;
   if (!el) {
     el = document.createElement('div');
     el.id = 'audioUploadProgress';
@@ -1226,6 +1230,17 @@ function getTasksForDate(ds) {
   }
   var inc=all.filter(function(t){return !t.done;});
   if (state.priorityFilter) inc=inc.filter(function(t){return t.priority==='priority'||t.priority==='mustdo'||t.priority===true;});
+  if (state.routineFilter !== 'all') {
+    // A task is "routine" if it came from the recurring routine (_rc) or from a
+    // recurring calendar event (_calEv / cal-event); everything else is one-off.
+    var wantRoutine = state.routineFilter === 'routine';
+    inc = inc.filter(function(t){
+        // Rendered routine rows carry type:'routine' (the _rc flag only ever
+      // appears on completion markers, never on the row itself).
+      var isRoutine = t.type==='routine' || t.type==='cal-event';
+      return isRoutine === wantRoutine;
+    });
+  }
   var don=all.filter(function(t){return t.done;});
   // Partial sort: timed tasks enforce time order among themselves;
   // untimed tasks stay exactly where drag placed them.
@@ -2047,7 +2062,9 @@ function taskHTML(task, ds, noActions) {
     +' ondrop="taskDrop(event,\''+ds+'\',\''+task.id+'\')"'
     +' ondragend="taskDragEnd(event)"';
   var dragHandle = !noActions
-    ? '<span class="task-drag-handle" onclick="event.stopPropagation()" title="Drag to reorder">⠿</span>'
+    ? '<span class="task-drag-handle" onclick="event.stopPropagation()" '
+      +'onpointerdown="taskPointerDown(event,\''+ds+'\',\''+task.id+'\')" '
+      +'title="Drag to move or reorder">⠿</span>'
     : '';
   var ctxMenu = (!isR && !isCalEv) ? ' oncontextmenu="taskContextMenu(event,\''+ds+'\',\''+task.id+'\')"' : '';
   return '<div class="task-item '+itemCls+(hasBlock?' task-time-block':'')+(task.done?' is-done':'')+(noActions?' task-compact-click':' task-clickable')+'" id="ti-'+task.id+'" data-ds="'+ds+'" data-tid="'+task.id+'" data-isroutine="'+chkArg+'"'+itemClick+dragAttrs+ctxMenu+'>' +
@@ -2090,7 +2107,7 @@ function dayCardHTML(date, compact) {
     '</div></div>';
 
   var crossDayAttrs=compact?' ondragover="dayCardDragOver(event,\''+ds+'\')" ondragleave="dayCardDragLeave(event)" ondrop="dayCardDrop(event,\''+ds+'\')"':'';
-  return '<div class="day-card'+(today?' is-today':'')+(compact?' day-card-compact':'')+'"'+(compact?' onclick="compactCardClick(\''+ds+'\',event)"':'')+crossDayAttrs+'>'+
+  return '<div class="day-card'+(today?' is-today':'')+(compact?' day-card-compact':'')+'" data-daycard="'+ds+'"'+(compact?' onclick="compactCardClick(\''+ds+'\',event)"':'')+crossDayAttrs+'>'+
     headSection + zmanimSection +
     '<div class="task-list">'+tHTML+'</div>' +
     '<button class="add-task-row" onclick="event.stopPropagation();openAddTask(\''+ds+'\')">+ Add task or event</button>' +
@@ -5528,14 +5545,9 @@ window.taskDragOver=function(e){
 window.taskDragLeave=function(e){
   var t=e.currentTarget; if(t){t.classList.remove('task-drag-above','task-drag-below');}
 };
-window.taskDrop=function(e,ds,toId){
-  e.preventDefault(); e.stopPropagation();
-  var target=e.currentTarget;
-  var insertBefore=target&&target.classList.contains('task-drag-above');
-  if(target)target.classList.remove('task-drag-above','task-drag-below');
-  if(!_dragTaskInfo||_dragTaskInfo.id===toId)return;
-  var fromId=_dragTaskInfo.id;
-  var fromDs=_dragTaskInfo.ds;
+// Shared by both the old mouse path and the pointer drag below.
+function _applyTaskDrop(fromDs, fromId, ds, toId, insertBefore){
+  if(!fromId || fromId===toId) return;
 
   if(fromDs===ds){
     // ── Same-day reorder ──
@@ -5578,7 +5590,148 @@ window.taskDrop=function(e,ds,toId){
     saveTOrd(orderData2);
     _dragTaskInfo=null; refresh(); refreshDashDayModal();
   }
+}
+window.taskDrop=function(e,ds,toId){
+  e.preventDefault(); e.stopPropagation();
+  var target=e.currentTarget;
+  var insertBefore=target&&target.classList.contains('task-drag-above');
+  if(target)target.classList.remove('task-drag-above','task-drag-below');
+  if(!_dragTaskInfo) return;
+  _applyTaskDrop(_dragTaskInfo.ds, _dragTaskInfo.id, ds, toId, insertBefore);
 };
+
+// ============================================================
+// POINTER DRAG — works with finger and mouse alike.
+// The browser's native drag-and-drop has no touch support at all, so on a
+// phone these tasks simply could not be moved. This drives the same drop
+// logic from pointer events instead, via the ⠿ grip so it never fights
+// scrolling or a tap on the row.
+// ============================================================
+var _pd = null; // {fromDs, fromId, ghost, lastTarget, insertBefore}
+
+function _pdClear(){
+  document.querySelectorAll('.task-drag-above,.task-drag-below').forEach(function(el){
+    el.classList.remove('task-drag-above','task-drag-below');
+  });
+  document.querySelectorAll('.day-card-drop-target').forEach(function(el){
+    el.classList.remove('day-card-drop-target');
+  });
+}
+function _pdEnd(){
+  if(!_pd) return;
+  if(_pd.ghost && _pd.ghost.parentNode) _pd.ghost.parentNode.removeChild(_pd.ghost);
+  var src=document.getElementById('ti-'+_pd.fromId);
+  if(src) src.classList.remove('task-dragging');
+  _pdClear();
+  _pd=null;
+  document.body.classList.remove('task-dragging-active');
+}
+function _pdAutoScroll(y){
+  var margin=70, speed=14;
+  if(y < margin) window.scrollBy(0, -speed);
+  else if(y > window.innerHeight - margin) window.scrollBy(0, speed);
+  // also scroll a horizontally scrolling 7-day grid container if we are in one
+  var grid=document.querySelector('.seven-grid');
+  if(grid && grid.scrollWidth > grid.clientWidth && _pd){
+    var r=grid.getBoundingClientRect();
+    if(_pd.lastX < r.left+40) grid.scrollLeft -= speed;
+    else if(_pd.lastX > r.right-40) grid.scrollLeft += speed;
+  }
+}
+
+window.taskPointerDown=function(e, ds, id){
+  if(e.button && e.button!==0) return;      // right-click etc.
+  e.preventDefault(); e.stopPropagation();
+  var src=document.getElementById('ti-'+id); if(!src) return;
+
+  _pd={fromDs:ds, fromId:id, lastX:e.clientX, lastY:e.clientY, target:null, insertBefore:false};
+  _dragTaskInfo={ds:ds,id:id};              // keeps the old mouse path consistent
+  src.classList.add('task-dragging');
+  document.body.classList.add('task-dragging-active');
+
+  var rect=src.getBoundingClientRect();
+  var ghost=src.cloneNode(true);
+  ghost.classList.add('task-drag-ghost');
+  ghost.style.width=rect.width+'px';
+  ghost.style.left=rect.left+'px';
+  ghost.style.top=rect.top+'px';
+  _pd.ghost=ghost;
+  _pd.offX=e.clientX-rect.left;
+  _pd.offY=e.clientY-rect.top;
+  document.body.appendChild(ghost);
+
+  try { e.target.setPointerCapture(e.pointerId); } catch(err) {}
+  _pd.pointerId=e.pointerId;
+  _pd.moveHandler=function(ev){ _pdMove(ev); };
+  _pd.upHandler=function(ev){ _pdUp(ev); };
+  document.addEventListener('pointermove', _pd.moveHandler, {passive:false});
+  document.addEventListener('pointerup', _pd.upHandler);
+  document.addEventListener('pointercancel', _pd.upHandler);
+};
+
+function _pdMove(e){
+  if(!_pd) return;
+  e.preventDefault();
+  _pd.lastX=e.clientX; _pd.lastY=e.clientY;
+  _pd.ghost.style.left=(e.clientX-_pd.offX)+'px';
+  _pd.ghost.style.top =(e.clientY-_pd.offY)+'px';
+  _pdAutoScroll(e.clientY);
+
+  _pd.ghost.style.display='none';
+  var under=document.elementFromPoint(e.clientX, e.clientY);
+  _pd.ghost.style.display='';
+  if(!under) return;
+
+  _pdClear();
+  var row=under.closest ? under.closest('.task-item') : null;
+  if(row && row.id!=='ti-'+_pd.fromId && row.dataset.tid){
+    var r=row.getBoundingClientRect();
+    var before=e.clientY < r.top + r.height/2;
+    row.classList.add(before?'task-drag-above':'task-drag-below');
+    _pd.target={ds:row.dataset.ds, id:row.dataset.tid};
+    _pd.insertBefore=before;
+    return;
+  }
+  // Dropping on empty space in a day card still moves the task to that day
+  var card=under.closest ? under.closest('[data-daycard]') : null;
+  if(card){
+    card.classList.add('day-card-drop-target');
+    _pd.target={ds:card.getAttribute('data-daycard'), id:null};
+    _pd.insertBefore=false;
+    return;
+  }
+  _pd.target=null;
+}
+
+function _pdUp(){
+  if(!_pd) return;
+  document.removeEventListener('pointermove', _pd.moveHandler);
+  document.removeEventListener('pointerup', _pd.upHandler);
+  document.removeEventListener('pointercancel', _pd.upHandler);
+  var t=_pd.target, fromDs=_pd.fromDs, fromId=_pd.fromId, before=_pd.insertBefore;
+  _pdEnd();
+  if(!t) return;
+  if(t.id){
+    _applyTaskDrop(fromDs, fromId, t.ds, t.id, before);
+  } else if(t.ds && t.ds!==fromDs){
+    moveTaskToDay(fromDs, fromId, t.ds);
+  }
+}
+
+// Move a task to a day when dropped on empty space in that day's card.
+function moveTaskToDay(fromDs, fromId, toDs){
+  var data=getData();
+  var task=(data.tasks[fromDs]||[]).find(function(t){return t.id===fromId&&!t._rc;});
+  if(!task) return; // routine tasks stay put
+  data.tasks[fromDs]=(data.tasks[fromDs]||[]).filter(function(t){return t.id!==fromId;});
+  if(!data.tasks[toDs]) data.tasks[toDs]=[];
+  data.tasks[toDs].push(Object.assign({},task,{id:uid(),done:false}));
+  saveT(data.tasks);
+  var ord=JSON.parse(localStorage.getItem('dm_task_order')||'{}');
+  ord[fromDs]=(ord[fromDs]||[]).filter(function(oid){return oid!==fromId;});
+  saveTOrd(ord);
+  refresh(); refreshDashDayModal();
+}
 window.taskDragEnd=function(e){
   _dragTaskInfo=null;
   document.querySelectorAll('.task-dragging,.task-drag-above,.task-drag-below').forEach(function(el){el.classList.remove('task-dragging','task-drag-above','task-drag-below');});
@@ -6940,6 +7093,17 @@ function initListeners() {
   if(pfBtn) pfBtn.addEventListener('click', function(){
     state.priorityFilter=!state.priorityFilter;
     pfBtn.classList.toggle('active', state.priorityFilter);
+    if(state.dashView==='single') renderSingle();
+    else if(state.dashView==='seven') renderSeven();
+  });
+
+  var rfBtn=document.getElementById('routineFilterBtn');
+  if(rfBtn) rfBtn.addEventListener('click', function(){
+    var next = {all:'routine', routine:'oneoff', oneoff:'all'};
+    state.routineFilter = next[state.routineFilter] || 'all';
+    var label = {all:'🔁 All', routine:'🔁 Routine', oneoff:'📌 One-off'};
+    rfBtn.textContent = label[state.routineFilter];
+    rfBtn.classList.toggle('active', state.routineFilter !== 'all');
     if(state.dashView==='single') renderSingle();
     else if(state.dashView==='seven') renderSeven();
   });
