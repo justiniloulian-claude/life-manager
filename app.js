@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v301';
+var APP_VERSION = 'v302';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -1663,6 +1663,60 @@ window.dismissSTReminder=function(id){
 };
 
 // ============================================================
+// PEOPLE TAB CHECK-IN BANNER
+// A single aggregate nudge ("go check the People tab"), not a per-contact
+// reminder — those already exist as the overdue/urgent status on each card.
+// Always resurfaces on a Sunday; cadence (every N weeks) is edited from the
+// People tab itself. Stays up across both dashboard views until dismissed.
+// ============================================================
+function peopleRemFreqWeeks(){
+  var n=parseInt(localStorage.getItem('dm_people_rem_freq_weeks'),10);
+  return (n>0) ? n : 1;
+}
+function peopleRemSetFreqWeeks(n){
+  n=parseInt(n,10); if(!(n>0)) n=1;
+  _syncSave('dm_people_rem_freq_weeks', String(n));
+}
+// This cycle's trigger Sunday as a date string, or null if this week isn't
+// one (an every-N-weeks cadence skips the Sundays in between).
+function peopleRemTriggerSunday(){
+  var d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-d.getDay());
+  var epochSunday=new Date(1970,0,4);
+  var weeks=Math.round((d-epochSunday)/(7*86400000));
+  var freq=peopleRemFreqWeeks();
+  if(((weeks%freq)+freq)%freq!==0) return null;
+  return toDateStr(d);
+}
+function renderPeopleCheckBanner(){
+  var sunDs=peopleRemTriggerSunday();
+  if(!sunDs) return '';
+  if(localStorage.getItem('dm_people_rem_dismissed_week')===sunDs) return '';
+  var people=[]; try{ people=JSON.parse(localStorage.getItem('dm_people')||'[]'); }catch(e){}
+  var now=Date.now();
+  var overdueCount=people.filter(function(p){
+    var daysOverdue=p.lastContact?Math.floor((now-p.lastContact)/86400000)-(p.frequencyDays||30):999;
+    return daysOverdue>0;
+  }).length;
+  var sub=overdueCount>0
+    ? (overdueCount+' '+(overdueCount===1?'person':'people')+' overdue')
+    : 'Tap to review your contacts';
+  return '<div class="rem-banner people-check-banner">'+
+    '<div class="rem-banner-item">'+
+      '<div class="rem-banner-item-info" style="cursor:pointer" onclick="goPeopleTab()">'+
+        '<span class="rem-banner-title">🔔 Check your People tab</span>'+
+        '<span class="rem-banner-when">'+escHtml(sub)+'</span>'+
+      '</div>'+
+      '<button class="rem-dismiss-btn" onclick="dismissPeopleCheckBanner(\''+sunDs+'\')">Dismiss</button>'+
+    '</div>'+
+  '</div>';
+}
+window.goPeopleTab=function(){ showPage('people'); };
+window.dismissPeopleCheckBanner=function(sunDs){
+  localStorage.setItem('dm_people_rem_dismissed_week', sunDs);
+  refresh();
+};
+
+// ============================================================
 // NOTES & FOLDERS
 // ============================================================
 function addFolder(name,parentId,color,password){ var data=getData(); data.folders.push({id:uid(),name:name,parentId:parentId||null,color:color||'',password:password||''}); saveF(data.folders); }
@@ -2028,6 +2082,10 @@ function taskHTML(task, ds, noActions) {
   var hasTaskNotes = task.notes && task.notes.trim();
   var linkedCount = (!isR && !isCalEv && task.linkedNoteIds && task.linkedNoteIds.length) ? task.linkedNoteIds.length : 0;
   var notesDot = hasTaskNotes ? '<span class="task-has-notes" title="Has notes"></span>' : '';
+  // In compact (7-day) mode the 📎 link button is hidden with the rest of the
+  // actions row, so show a standalone icon there instead — distinct from the
+  // plain notes dot so "inline notes" and "linked note" read differently.
+  var linkedDot = (noActions && linkedCount) ? '<span class="task-has-link" title="'+linkedCount+' linked note'+(linkedCount>1?'s':'')+'">📎</span>' : '';
   var priorityIcon = isRPriority ? '<span class="routine-priority-icon">⚡</span>' : '';
   var calIcon = isCalEv ? '<span class="cal-event-task-icon" title="Recurring calendar event">📅</span>' : '';
   // Third arg for checkTask/taskClick: true=routine, 'cal'=cal-event, false=one-time
@@ -2055,22 +2113,17 @@ function taskHTML(task, ds, noActions) {
   var itemClick = noActions
     ? ' onclick="openDashDayPopup(\''+ds+'\')"'
     : ' onclick="taskClick(\''+ds+'\',\''+task.id+'\','+chkArg+',event)"';
-  var dragAttrs = ' draggable="true"'
-    +' ondragstart="taskDragStart(event,\''+ds+'\',\''+task.id+'\')"'
-    +' ondragover="taskDragOver(event)"'
-    +' ondragleave="taskDragLeave(event)"'
-    +' ondrop="taskDrop(event,\''+ds+'\',\''+task.id+'\')"'
-    +' ondragend="taskDragEnd(event)"';
-  var dragHandle = !noActions
-    ? '<span class="task-drag-handle" onclick="event.stopPropagation()" '
+  // Dragging goes through the pointer-based system (taskPointerDown below) —
+  // it works with mouse and touch alike and can auto-scroll whatever
+  // container it's in, unlike native HTML5 drag-and-drop.
+  var dragHandle = '<span class="task-drag-handle" onclick="event.stopPropagation()" '
       +'onpointerdown="taskPointerDown(event,\''+ds+'\',\''+task.id+'\')" '
-      +'title="Drag to move or reorder">⠿</span>'
-    : '';
+      +'title="Drag to move or reorder">⠿</span>';
   var ctxMenu = (!isR && !isCalEv) ? ' oncontextmenu="taskContextMenu(event,\''+ds+'\',\''+task.id+'\')"' : '';
-  return '<div class="task-item '+itemCls+(hasBlock?' task-time-block':'')+(task.done?' is-done':'')+(noActions?' task-compact-click':' task-clickable')+'" id="ti-'+task.id+'" data-ds="'+ds+'" data-tid="'+task.id+'" data-isroutine="'+chkArg+'"'+itemClick+dragAttrs+ctxMenu+'>' +
+  return '<div class="task-item '+itemCls+(hasBlock?' task-time-block':'')+(task.done?' is-done':'')+(noActions?' task-compact-click':' task-clickable')+'" id="ti-'+task.id+'" data-ds="'+ds+'" data-tid="'+task.id+'" data-isroutine="'+chkArg+'"'+itemClick+ctxMenu+'>' +
     dragHandle+
     '<input type="checkbox" class="task-check"'+(task.done?' checked':'')+' onclick="event.stopPropagation()" onchange="checkTask(\''+ds+'\',\''+task.id+'\','+chkArg+')">' +
-    '<div class="task-body"><div class="task-title '+priorityCls+'">'+calIcon+priorityIcon+escHtml(task.title)+notesDot+'</div>' +
+    '<div class="task-body"><div class="task-title '+priorityCls+'">'+calIcon+priorityIcon+escHtml(task.title)+notesDot+linkedDot+'</div>' +
     '<div class="task-meta">'+tb+lb+'</div>'+notesPanel+'</div>' +
     actionsHTML+'</div>';
 }
@@ -2106,8 +2159,9 @@ function dayCardHTML(date, compact) {
     '<span class="z-loading">Loading times…</span><span class="z-expand">Tap for all times ›</span>' +
     '</div></div>';
 
-  var crossDayAttrs=compact?' ondragover="dayCardDragOver(event,\''+ds+'\')" ondragleave="dayCardDragLeave(event)" ondrop="dayCardDrop(event,\''+ds+'\')"':'';
-  return '<div class="day-card'+(today?' is-today':'')+(compact?' day-card-compact':'')+'" data-daycard="'+ds+'"'+(compact?' onclick="compactCardClick(\''+ds+'\',event)"':'')+crossDayAttrs+'>'+
+  // Cross-day drops (7-day view) go through the pointer-drag system below —
+  // it detects [data-daycard] under the pointer, so no drop handlers needed here.
+  return '<div class="day-card'+(today?' is-today':'')+(compact?' day-card-compact':'')+'" data-daycard="'+ds+'"'+(compact?' onclick="compactCardClick(\''+ds+'\',event)"':'')+'>'+
     headSection + zmanimSection +
     '<div class="task-list">'+tHTML+'</div>' +
     '<button class="add-task-row" onclick="event.stopPropagation();openAddTask(\''+ds+'\')">+ Add task or event</button>' +
@@ -2172,8 +2226,9 @@ function renderSingle() {
   var ds=toDateStr(date);
   var physBanner=state.dayOffset===0?renderPhysBanner():'';
   var remBanner=state.dayOffset===0?renderReminderBanner():'';
+  var peopleBanner=state.dayOffset===0?renderPeopleCheckBanner():'';
   var banner=state.dayOffset===0?renderCarryOverBanner():'';
-  document.getElementById('singleDayContainer').innerHTML=physBanner+remBanner+banner+dayCardHTML(date,false);
+  document.getElementById('singleDayContainer').innerHTML=physBanner+remBanner+peopleBanner+banner+dayCardHTML(date,false);
   loadZstrip(ds);
   loadHebrewDate(ds);
   document.getElementById('backToTodayBtn').style.display=state.dayOffset===0?'none':'';
@@ -2197,7 +2252,7 @@ function renderSeven() {
       grid.parentElement.insertBefore(remEl,grid);
     }
   }
-  if(remEl) remEl.innerHTML=renderPhysBanner()+renderReminderBanner();
+  if(remEl) remEl.innerHTML=renderPhysBanner()+renderReminderBanner()+renderPeopleCheckBanner();
   dates.forEach(function(d){ loadHebrewDate(toDateStr(d)); });
   // Shabbat countdown: fetch Thu+Fri zmanim then start ticker
   if(_shabbatTimer){clearInterval(_shabbatTimer);_shabbatTimer=null;}
@@ -3424,7 +3479,7 @@ window.closeGlobalSearch = function() { closeModal('globalSearchModal'); };
 // live only on this device.
 // ============================================================
 // Caches and one-off flags — not user content, skipped from the backup.
-var BACKUP_SKIP = /^(_hebMonthEndsCache2|_peopleSeedCleared_|dm_jewish_hol_|dm_last_opened|dm_dismissed_reminders|dm_pending_writes)/;
+var BACKUP_SKIP = /^(_hebMonthEndsCache2|_peopleSeedCleared_|dm_jewish_hol_|dm_last_opened|dm_dismissed_reminders|dm_people_rem_dismissed_week|dm_pending_writes)/;
 
 function _backupStatus(msg) {
   var el = document.getElementById('backupStatus');
@@ -5524,28 +5579,8 @@ function buildNotePickerCategorized(linked, el) {
   el.innerHTML=html;
 }
 // ============================================================
-// DRAG-TO-REORDER TASKS (today view only)
+// DRAG-TO-REORDER TASKS
 // ============================================================
-var _dragTaskInfo=null;
-window.taskDragStart=function(e,ds,id){
-  _dragTaskInfo={ds:ds,id:id};
-  e.dataTransfer.effectAllowed='move';
-  setTimeout(function(){var el=document.getElementById('ti-'+id);if(el)el.classList.add('task-dragging');},0);
-};
-window.taskDragOver=function(e){
-  e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect='move';
-  var target=e.currentTarget;
-  if(!target||(_dragTaskInfo&&target.id==='ti-'+_dragTaskInfo.id))return;
-  document.querySelectorAll('.task-drag-above,.task-drag-below').forEach(function(el){el.classList.remove('task-drag-above','task-drag-below');});
-  // Clear whole-card drop highlight when hovering over a specific task
-  document.querySelectorAll('.day-card-drop-target').forEach(function(el){el.classList.remove('day-card-drop-target');});
-  var rect=target.getBoundingClientRect();
-  target.classList.add(e.clientY<rect.top+rect.height/2?'task-drag-above':'task-drag-below');
-};
-window.taskDragLeave=function(e){
-  var t=e.currentTarget; if(t){t.classList.remove('task-drag-above','task-drag-below');}
-};
-// Shared by both the old mouse path and the pointer drag below.
 function _applyTaskDrop(fromDs, fromId, ds, toId, insertBefore){
   if(!fromId || fromId===toId) return;
 
@@ -5588,17 +5623,9 @@ function _applyTaskDrop(fromDs, fromId, ds, toId, insertBefore){
     orderData2[fromDs]=srcOrder2.filter(function(oid){return oid!==fromId;});
     orderData2[ds]=tIds;
     saveTOrd(orderData2);
-    _dragTaskInfo=null; refresh(); refreshDashDayModal();
+    refresh(); refreshDashDayModal();
   }
 }
-window.taskDrop=function(e,ds,toId){
-  e.preventDefault(); e.stopPropagation();
-  var target=e.currentTarget;
-  var insertBefore=target&&target.classList.contains('task-drag-above');
-  if(target)target.classList.remove('task-drag-above','task-drag-below');
-  if(!_dragTaskInfo) return;
-  _applyTaskDrop(_dragTaskInfo.ds, _dragTaskInfo.id, ds, toId, insertBefore);
-};
 
 // ============================================================
 // POINTER DRAG — works with finger and mouse alike.
@@ -5626,16 +5653,34 @@ function _pdEnd(){
   _pd=null;
   document.body.classList.remove('task-dragging-active');
 }
-function _pdAutoScroll(y){
+// Walks up from `el` to find the nearest ancestor that actually scrolls
+// vertically (e.g. the day-popup modal body), so auto-scroll works inside
+// a scrolled dialog and not just the main window.
+function _scrollableAncestor(el){
+  while(el && el!==document.body && el!==document.documentElement){
+    var cs=getComputedStyle(el);
+    if((cs.overflowY==='auto'||cs.overflowY==='scroll') && el.scrollHeight>el.clientHeight) return el;
+    el=el.parentElement;
+  }
+  return null;
+}
+function _pdAutoScroll(y, under){
   var margin=70, speed=14;
-  if(y < margin) window.scrollBy(0, -speed);
-  else if(y > window.innerHeight - margin) window.scrollBy(0, speed);
+  var box=_scrollableAncestor(under);
+  if(box){
+    var r=box.getBoundingClientRect();
+    if(y < r.top+margin) box.scrollTop -= speed;
+    else if(y > r.bottom-margin) box.scrollTop += speed;
+  } else {
+    if(y < margin) window.scrollBy(0, -speed);
+    else if(y > window.innerHeight - margin) window.scrollBy(0, speed);
+  }
   // also scroll a horizontally scrolling 7-day grid container if we are in one
-  var grid=document.querySelector('.seven-grid');
+  var grid=document.querySelector('.seven-day-grid');
   if(grid && grid.scrollWidth > grid.clientWidth && _pd){
-    var r=grid.getBoundingClientRect();
-    if(_pd.lastX < r.left+40) grid.scrollLeft -= speed;
-    else if(_pd.lastX > r.right-40) grid.scrollLeft += speed;
+    var gr=grid.getBoundingClientRect();
+    if(_pd.lastX < gr.left+40) grid.scrollLeft -= speed;
+    else if(_pd.lastX > gr.right-40) grid.scrollLeft += speed;
   }
 }
 
@@ -5645,7 +5690,6 @@ window.taskPointerDown=function(e, ds, id){
   var src=document.getElementById('ti-'+id); if(!src) return;
 
   _pd={fromDs:ds, fromId:id, lastX:e.clientX, lastY:e.clientY, target:null, insertBefore:false};
-  _dragTaskInfo={ds:ds,id:id};              // keeps the old mouse path consistent
   src.classList.add('task-dragging');
   document.body.classList.add('task-dragging-active');
 
@@ -5675,11 +5719,12 @@ function _pdMove(e){
   _pd.lastX=e.clientX; _pd.lastY=e.clientY;
   _pd.ghost.style.left=(e.clientX-_pd.offX)+'px';
   _pd.ghost.style.top =(e.clientY-_pd.offY)+'px';
-  _pdAutoScroll(e.clientY);
 
   _pd.ghost.style.display='none';
   var under=document.elementFromPoint(e.clientX, e.clientY);
   _pd.ghost.style.display='';
+
+  _pdAutoScroll(e.clientY, under);
   if(!under) return;
 
   _pdClear();
@@ -5732,10 +5777,6 @@ function moveTaskToDay(fromDs, fromId, toDs){
   saveTOrd(ord);
   refresh(); refreshDashDayModal();
 }
-window.taskDragEnd=function(e){
-  _dragTaskInfo=null;
-  document.querySelectorAll('.task-dragging,.task-drag-above,.task-drag-below').forEach(function(el){el.classList.remove('task-dragging','task-drag-above','task-drag-below');});
-};
 
 // ============================================================
 // MISSED TASKS — surface unfinished tasks from skipped days
@@ -6218,44 +6259,6 @@ function renderCalMonthPickerGrid(){
 window.calPickerSelectMonth=function(month){
   state.calYear=_calPickerYear; state.calMonth=month;
   closeCalMonthPicker(); renderCalendar();
-};
-
-// ============================================================
-// CROSS-DAY TASK DRAG (7-day view)
-// ============================================================
-window.dayCardDragOver=function(e,ds){
-  if(!_dragTaskInfo||_dragTaskInfo.ds===ds)return;
-  var data=getData();
-  var isOnetime=(data.tasks[_dragTaskInfo.ds]||[]).some(function(t){return t.id===_dragTaskInfo.id&&!t._rc;});
-  if(!isOnetime)return; // block routine tasks
-  e.preventDefault(); e.stopPropagation();
-  e.dataTransfer.dropEffect='move';
-  document.querySelectorAll('.day-card-drop-target').forEach(function(el){el.classList.remove('day-card-drop-target');});
-  e.currentTarget.classList.add('day-card-drop-target');
-};
-window.dayCardDragLeave=function(e){
-  if(!e.currentTarget.contains(e.relatedTarget))
-    e.currentTarget.classList.remove('day-card-drop-target');
-};
-window.dayCardDrop=function(e,ds){
-  e.preventDefault(); e.stopPropagation();
-  document.querySelectorAll('.day-card-drop-target').forEach(function(el){el.classList.remove('day-card-drop-target');});
-  if(!_dragTaskInfo||_dragTaskInfo.ds===ds)return;
-  var fromDs=_dragTaskInfo.ds; var taskId=_dragTaskInfo.id;
-  var data=getData();
-  var task=(data.tasks[fromDs]||[]).find(function(t){return t.id===taskId&&!t._rc;});
-  if(!task)return; // not found or is routine completion record
-  data.tasks[fromDs]=(data.tasks[fromDs]||[]).filter(function(t){return t.id!==taskId;});
-  if(!data.tasks[ds])data.tasks[ds]=[];
-  data.tasks[ds].push(Object.assign({},task,{id:uid(),done:false}));
-  saveT(data.tasks);
-  var orderData=JSON.parse(localStorage.getItem('dm_task_order')||'{}');
-  // Remove only the moved task from source day's order; clear target day so new task appends cleanly
-  var srcOrder=orderData[fromDs]||[];
-  orderData[fromDs]=srcOrder.filter(function(oid){return oid!==taskId;});
-  delete orderData[ds];
-  saveTOrd(orderData);
-  _dragTaskInfo=null; refresh();
 };
 
 // ============================================================
@@ -8464,6 +8467,14 @@ function _doLogin() {
     _peopleCache.forEach(function(p){ if(!p.categories) p.categories=[]; });
     _renderCatStrip(); _renderPeople(_peopleCache);
     if(window._renderAddTagRow) window._renderAddTagRow();
+    var freqInp=document.getElementById('peopleRemFreqInput');
+    if(freqInp) freqInp.value=peopleRemFreqWeeks();
+  };
+  window._savePeopleRemFreq = function(){
+    var freqInp=document.getElementById('peopleRemFreqInput');
+    peopleRemSetFreqWeeks(freqInp?freqInp.value:1);
+    if(freqInp) freqInp.value=peopleRemFreqWeeks();
+    refresh();
   };
 
   window._esavLogConvo = function(pid){

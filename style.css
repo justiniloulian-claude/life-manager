@@ -340,6 +340,17 @@ body {
   flex-shrink: 0;
 }
 
+/* Linked-note indicator — compact (7-day) view only, where the 📎 action
+   button is hidden; kept visually distinct from the plain notes dot above */
+.task-has-link {
+  display: inline-block;
+  font-size: 10px;
+  margin-left: 6px;
+  vertical-align: middle;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
 /* Link button badge */
 .task-link-btn { position: relative; }
 .task-link-btn.has-links { color: #6c5ce7; }
@@ -2545,6 +2556,17 @@ body.dark-mode .stl-item-rem { color: #a78bfa; }
 .rem-banner-item-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .rem-banner-title { color: #1a1a1a; font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rem-banner-when { color: #b45309; font-size: 12px; }
+
+/* People check-in nudge — same banner shape, violet to match the People tab
+   and to read as distinct from the amber "upcoming reminders" banner above it */
+.people-check-banner { background: #f5f3ff; border-color: #ddd6fe; }
+.people-check-banner .rem-banner-item { border-bottom-color: #ddd6fe; }
+.people-check-banner .rem-banner-when { color: #6d28d9; }
+
+.people-rem-setting {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 13px; color: #6b7280; margin-bottom: 12px;
+}
 .rem-dismiss-btn {
   background: #fef3c7; border: 1.5px solid #fcd34d; cursor: pointer;
   color: #92400e; font-size: 13px; font-weight: 600;

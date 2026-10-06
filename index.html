@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Life Manager">
   <title>Dashboard v150</title>
-  <link rel="stylesheet" href="style.css?v=301">
+  <link rel="stylesheet" href="style.css?v=302">
 </head>
 <body>
 
@@ -468,6 +468,12 @@
       <h2 class="list-page-title">People</h2>
       <p class="list-page-subtitle">Stay in touch — track who you want to connect with and when</p>
     </div>
+  </div>
+  <div class="people-rem-setting">
+    <span>🔔 Remind me to check this tab every</span>
+    <input type="number" min="1" id="peopleRemFreqInput" class="esav-add-input" style="width:52px;text-align:center;flex:none">
+    <span>week(s), on Sundays</span>
+    <button class="esav-add-btn" onclick="window._savePeopleRemFreq()">Save</button>
   </div>
   <div class="esav-add-row">
     <input id="esavPersonName" class="esav-add-input" placeholder="Name" type="text" style="flex:2">
@@ -1687,7 +1693,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <div id="_ver" style="position:fixed;bottom:4px;right:8px;font-size:10px;color:#aaa;z-index:99990;cursor:pointer" onclick="calDiag()" title="Tap for diagnostics">v301</div>
-<script src="app.js?v=301"></script>
+<script src="app.js?v=302"></script>
 </body>
 </html>
 
