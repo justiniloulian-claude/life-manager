@@ -344,11 +344,10 @@ body {
    button is hidden; kept visually distinct from the plain notes dot above */
 .task-has-link {
   display: inline-block;
-  font-size: 10px;
+  font-size: 13px;
   margin-left: 6px;
   vertical-align: middle;
   flex-shrink: 0;
-  opacity: 0.7;
 }
 
 /* Link button badge */
