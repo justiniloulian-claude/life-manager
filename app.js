@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v304';
+var APP_VERSION = 'v305';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -7156,6 +7156,7 @@ function initListeners() {
   document.getElementById('nextWeekBtn').addEventListener('click',        function(){ state.weekStart+=7; renderSeven(); });
   document.getElementById('printDayBtn').addEventListener('click', printDashboardSingle);
   document.getElementById('printWeekBtn').addEventListener('click', printDashboardSeven);
+  document.getElementById('printGoalsBtn').addEventListener('click', printGoals);
 
   // Dash day modal
   document.getElementById('closeDashDayModal').addEventListener('click', function(){ state.dashDayModalDs=null; closeModal('dashDayModal'); });
@@ -8003,6 +8004,34 @@ function printCalendar(mode) {
     html+='</div>';
   }
   var w=window.open('','_blank'); w.document.write(buildPrintHTML('Calendar — '+monthName,html)); w.document.close(); w.print();
+}
+
+// Prints whichever scope/period is currently showing on the Goals tab —
+// the Monthly pill + month picker, or the Yearly pill — so "print my
+// monthly goals" means: pick the month, hit Print.
+function printGoals() {
+  var scope=state.goalScope, period=_activeGoalPeriod();
+  var label=scope==='yearly'?period:(_activeGoalMonth()+' '+_activeGoalYear());
+  var title=(scope==='yearly'?'Yearly Goals — ':'Monthly Goals — ')+label;
+  var goals=_goalsFor(scope,period);
+  // A plain vertical list of goal cards reads better in portrait than the
+  // shared landscape default (built for the calendar grid / 7-day columns).
+  var html='<style>@media print{@page{size:portrait;margin:15mm}}</style>';
+  html+='<h1>'+escHtml(title)+'</h1>';
+  if(!goals.length){
+    html+='<div class="empty">No goals for '+escHtml(label)+'.</div>';
+  } else {
+    html+=goals.map(function(g){
+      var practice=g.practice||g.description||'';
+      var cat=g.category?'<span style="font-size:11px;background:#f0f0f0;border-radius:4px;padding:2px 7px;margin-left:8px;color:#555">'+escHtml(g.category)+'</span>':'';
+      return '<div style="margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #eee;break-inside:avoid">'+
+        '<div style="font-weight:700;font-size:14px;margin-bottom:4px">'+escHtml(g.title||'')+cat+'</div>'+
+        (g.goal?'<div style="font-size:12px;margin-bottom:3px"><strong>Goal:</strong> '+escHtml(g.goal)+'</div>':'')+
+        (practice?'<div style="font-size:12px;color:#555"><strong>Practice:</strong> '+escHtml(practice)+'</div>':'')+
+      '</div>';
+    }).join('');
+  }
+  var w=window.open('','_blank'); w.document.write(buildPrintHTML(title,html)); w.document.close(); w.print();
 }
 
 // ============================================================

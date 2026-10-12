@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Life Manager">
   <title>Dashboard v150</title>
-  <link rel="stylesheet" href="style.css?v=304">
+  <link rel="stylesheet" href="style.css?v=305">
 </head>
 <body>
 
@@ -455,7 +455,8 @@
   </div>
   <div class="goal-period-bar" id="goalYearBar"></div>
   <div class="goal-period-bar" id="goalMonthBar"></div>
-  <div style="text-align:right;margin:10px 0">
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin:10px 0">
+    <button id="printGoalsBtn" class="btn-nav btn-print-dash" title="Print">🖨 Print</button>
     <button class="btn-primary" style="font-size:13px;padding:7px 16px" onclick="openGoalModal()">+ Add Goal</button>
   </div>
   <div id="goalsList" class="esav-goals-list"></div>
@@ -1693,7 +1694,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <div id="_ver" style="position:fixed;bottom:4px;right:8px;font-size:10px;color:#aaa;z-index:99990;cursor:pointer" onclick="calDiag()" title="Tap for diagnostics">v301</div>
-<script src="app.js?v=304"></script>
+<script src="app.js?v=305"></script>
 </body>
 </html>
 
