@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v303';
+var APP_VERSION = 'v304';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -2083,9 +2083,11 @@ function taskHTML(task, ds, noActions) {
   var linkedCount = (!isR && !isCalEv && task.linkedNoteIds && task.linkedNoteIds.length) ? task.linkedNoteIds.length : 0;
   var notesDot = hasTaskNotes ? '<span class="task-has-notes" title="Has notes"></span>' : '';
   // In compact (7-day) mode the 📎 link button is hidden with the rest of the
-  // actions row, so show a standalone icon there instead — distinct from the
-  // plain notes dot so "inline notes" and "linked note" read differently.
-  var linkedDot = (noActions && linkedCount) ? '<span class="task-has-link" title="'+linkedCount+' linked note'+(linkedCount>1?'s':'')+'">📎</span>' : '';
+  // actions row, so show a standalone, clickable icon there instead — distinct
+  // from the plain notes dot so "inline notes" and "linked note" read differently.
+  var linkedDot = (noActions && linkedCount) ? '<span class="task-has-link" '
+    +'onclick="event.stopPropagation();openTaskLinkedNote(\''+ds+'\',\''+task.id+'\')" '
+    +'title="'+(linkedCount===1?'Open linked note':linkedCount+' linked notes')+'">📎</span>' : '';
   var priorityIcon = isRPriority ? '<span class="routine-priority-icon">⚡</span>' : '';
   var calIcon = isCalEv ? '<span class="cal-event-task-icon" title="Recurring calendar event">📅</span>' : '';
   // Third arg for checkTask/taskClick: true=routine, 'cal'=cal-event, false=one-time
@@ -2105,7 +2107,7 @@ function taskHTML(task, ds, noActions) {
         : '<button class="btn-icon" onclick="removeTask(\''+ds+'\',\''+task.id+'\')">🗑</button>';
     var moveBtn = !isCalEv ? '<button class="btn-icon task-move-btn" onclick="openMoveTaskModal(\''+ds+'\',\''+task.id+'\','+isR+')" title="Move to another day">→</button>' : '';
     var nb = hasTaskNotes ? '<button class="btn-icon task-notes-btn" onclick="toggleTaskNotes(this)" title="View notes">📋</button>' : '';
-    var linkBtn = !isR && !isCalEv ? '<button class="btn-icon task-link-btn'+(linkedCount?' has-links':'')+'" onclick="openTaskNotesLink(\''+ds+'\',\''+task.id+'\')" title="'+(linkedCount?linkedCount+' linked note'+(linkedCount>1?'s':''):'Link notes')+'">📎'+(linkedCount?'<span class="link-count">'+linkedCount+'</span>':'')+'</button>' : '';
+    var linkBtn = !isR && !isCalEv ? '<button class="btn-icon task-link-btn'+(linkedCount?' has-links':'')+'" onclick="openTaskLinkedNote(\''+ds+'\',\''+task.id+'\')" title="'+(linkedCount===1?'Open linked note':linkedCount?linkedCount+' linked notes':'Link notes')+'">📎'+(linkedCount?'<span class="link-count">'+linkedCount+'</span>':'')+'</button>' : '';
     actionsHTML = '<div class="task-actions">'+linkBtn+nb+eb+db+moveBtn+'</div>';
   }
   var notesPanel = (!noActions && hasTaskNotes)
@@ -5881,6 +5883,22 @@ window.toggleTaskModalNotePicker=function(){
 window.openLinkedNote=function(id){
   closeModal('taskNotesLinkModal');
   setTimeout(function(){openNoteView(id);},150);
+};
+// Single entry point for the 📎 indicator (both compact and full task views).
+// Most linked tasks point at exactly one note, so that case jumps straight
+// into it — no detour through the manage/pick list. Falls back to that list
+// when there's nothing linked yet (so notes can still be added) or more than
+// one (so it's clear which one you're opening).
+window.openTaskLinkedNote = function(ds, taskId) {
+  var data=getData();
+  var task=(data.tasks[ds]||[]).find(function(t){return t.id===taskId;});
+  var linked=(task&&task.linkedNoteIds)||[];
+  if(linked.length===1){
+    closeModal('dashDayModal');
+    openNoteView(linked[0]);
+    return;
+  }
+  openTaskNotesLink(ds, taskId);
 };
 window.openTaskNotesLink = function(ds, taskId) {
   closeModal('dashDayModal');
