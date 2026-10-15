@@ -1,6 +1,10 @@
 'use strict';
 
-var APP_VERSION = 'v306';
+var APP_VERSION = 'v307';
+// Keep the tab title in sync with APP_VERSION automatically — it used to be a
+// separate hardcoded string in index.html (stuck at "v150") that nobody
+// remembered to bump alongside real releases.
+document.title = 'Dashboard ' + APP_VERSION;
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -3233,7 +3237,8 @@ var _gsFilters = [];   // active group names; empty means All
 
 // The raw result types are too granular to be useful as chips, so they roll up.
 var GS_GROUPS = [
-  ['Tasks & Events', ['Task','Routine','Event']],
+  ['Tasks',          ['Task','Routine']],
+  ['Events',         ['Event']],
   ['Notes',          ['Note']],
   ['Goals',          ['Goal']],
   ['Lists',          ['Short term','Long term']],
