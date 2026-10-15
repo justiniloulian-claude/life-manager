@@ -1,6 +1,6 @@
 'use strict';
 
-var APP_VERSION = 'v305';
+var APP_VERSION = 'v306';
 
 // v274 — register SW immediately (not inside init/login), auto-reload on SW update
 if (navigator.serviceWorker) {
@@ -3272,6 +3272,16 @@ function _gsGoDay(ds) {
   setDashView('single');
 }
 
+// Soonest upcoming first, then already-occurred items most-recent-first —
+// so what's coming up next always leads the list and the past trails at
+// the end instead of being mixed in wherever it happened to sit in storage.
+function _gsSortChrono(matches, todayDs) {
+  var upcoming = matches.filter(function(m){ return m.sortKey >= todayDs; })
+    .sort(function(a,b){ return a.sortKey<b.sortKey?-1:a.sortKey>b.sortKey?1:0; });
+  var past = matches.filter(function(m){ return m.sortKey < todayDs; })
+    .sort(function(a,b){ return a.sortKey<b.sortKey?1:a.sortKey>b.sortKey?-1:0; });
+  return upcoming.concat(past);
+}
 function _globalSearch(q) {
   q = (q||'').trim().toLowerCase();
   var out = [];
@@ -3280,28 +3290,41 @@ function _globalSearch(q) {
   function hit(){ for(var i=0;i<arguments.length;i++){ var v=arguments[i]; if(v && String(v).toLowerCase().indexOf(q)!==-1) return true; } return false; }
   function add(type, title, sub, go){ out.push({type:type, title:title||'(untitled)', sub:sub||'', go:go}); }
 
-  // Tasks (completed included)
+  // Tasks (completed included) — soonest upcoming first, most-recent-past last
+  var todayDs = toDateStr(new Date());
+  var taskMatches = [];
   Object.keys(d.tasks||{}).forEach(function(ds){
     (d.tasks[ds]||[]).forEach(function(t){
       if (!t.title) return;
       if (hit(t.title, t.notes, t.location))
-        add('Task', t.title, (t.done?'✓ ':'')+shortMonthDay(fromDateStr(ds)), function(){ _gsGoDay(ds); });
+        taskMatches.push({sortKey: ds+'T'+(t.time||'00:00'), ds: ds, t: t});
     });
+  });
+  _gsSortChrono(taskMatches, todayDs).forEach(function(m){
+    var ds=m.ds, t=m.t;
+    add('Task', t.title, (t.done?'✓ ':'')+shortMonthDay(fromDateStr(ds)), function(){ _gsGoDay(ds); });
   });
   // Routine
   (d.routine||[]).forEach(function(r){
     if (hit(r.title, r.notes, r.location))
       add('Routine', r.title, 'Recurring', function(){ showPage('dashboard'); setDashView('single'); renderRoutineList(); openModal('routineModal'); });
   });
-  // Calendar events
+  // Calendar events — same chronological order as Tasks above. Includes
+  // single-occurrence overrides (_overrideFor) too — those used to be
+  // skipped entirely, which hid any event created via "edit this occurrence
+  // only" (e.g. renaming one instance) from search.
+  var eventMatches = [];
   (d.calEvents||[]).forEach(function(e){
-    if (e._overrideFor) return;
     if (hit(e.title, e.notes, e.location))
-      add('Event', e.title, e.date||'', function(){
-        showPage('calendar');
-        if (e.date) { var nd=fromDateStr(e.date); state.calYear=nd.getFullYear(); state.calMonth=nd.getMonth(); }
-        renderCalendar();
-      });
+      eventMatches.push({sortKey: (e.date||'9999-99-99')+'T'+(e.time||'00:00'), e: e});
+  });
+  _gsSortChrono(eventMatches, todayDs).forEach(function(m){
+    var e=m.e;
+    add('Event', e.title, e.date||'', function(){
+      showPage('calendar');
+      if (e.date) { var nd=fromDateStr(e.date); state.calYear=nd.getFullYear(); state.calMonth=nd.getMonth(); }
+      renderCalendar();
+    });
   });
   // Notes (skip deleted)
   (d.notes||[]).forEach(function(n){
